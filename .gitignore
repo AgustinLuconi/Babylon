@@ -1,0 +1,18 @@
+# Dependencias y builds
+node_modules/
+dist/
+
+# Secretos locales (cada proyecto tiene su .env.example versionado)
+.env
+.env.*
+!.env.example
+
+# Datos personales reales del ciclo 2025 (alumnos, incluidos menores): quedan
+# en el disco para poder re-ejecutar la importación, pero nunca se versionan.
+server/scripts/importar-ciclo-2025/fuente/
+
+# Ruido de herramientas
+*.log
+.DS_Store
+.vscode/
+.idea/

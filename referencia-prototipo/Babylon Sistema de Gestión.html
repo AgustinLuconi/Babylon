@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Babylon — Sistema de Gestión Académica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="babylon-tokens.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter Tight', 'Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+  <style>
+    body {
+      font-family: 'Inter Tight', system-ui, sans-serif;
+      background: var(--bg-subtle);
+      color: var(--text);
+    }
+    /* Mobile preview frame */
+    .mobile-preview-frame {
+      width: 390px;
+      height: 844px;
+      overflow-y: auto;
+      background: var(--bg);
+      border: 1px solid var(--border-strong);
+      border-radius: 20px;
+      box-shadow: 0 24px 60px rgba(9, 9, 11, 0.10), 0 6px 20px rgba(9, 9, 11, 0.04);
+      flex-shrink: 0;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="babylon-data.jsx"></script>
+  <script type="text/babel" src="babylon-layout.jsx"></script>
+  <script type="text/babel" src="babylon-admin.jsx"></script>
+  <script type="text/babel" src="babylon-teacher.jsx"></script>
+  <script type="text/babel" src="babylon-parent.jsx"></script>
+  <script type="text/babel" src="babylon-chat.jsx"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "role": "parent",
+      "screen": "dashboard",
+      "mobilePreview": false
+    }/*EDITMODE-END*/;
+
+    const DEFAULT_SCREENS = {
+      admin: 'dashboard', secretary: 'dashboard', teacher: 'attendance', parent: 'parent-home',
+    };
+
+    // Screens each role is allowed to open (anything else → access denied)
+    const ALLOWED_SCREENS = {
+      admin:     ['dashboard','students','professors','courses','payments','reports','users','settings','chat'],
+      secretary: ['dashboard','students','payments','chat'],
+      teacher:   ['teacher-home','attendance','grades','observations'],
+      parent:    ['parent-home','parent-grades','parent-attendance','parent-fees','parent-docs','parent-chat'],
+    };
+
+    function App() {
+      const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+      const role = t.role;
+      const mobilePreview = t.mobilePreview;
+
+      const [screen, setScreen] = useState(DEFAULT_SCREENS[role]);
+      const [searchQuery, setSearchQuery] = useState('');
+
+      const [viewportMobile, setViewportMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+      useEffect(() => {
+        const fn = () => setViewportMobile(window.innerWidth < 768);
+        window.addEventListener('resize', fn);
+        return () => window.removeEventListener('resize', fn);
+      }, []);
+      const isMobile = mobilePreview || viewportMobile;
+
+      useEffect(() => { setScreen(DEFAULT_SCREENS[role]); setSearchQuery(''); }, [role]);
+      useEffect(() => { setSearchQuery(''); }, [screen]);
+
+      const handleNavigate = (id) => { setScreen(id); setSearchQuery(''); };
+      const handleRoleChange = (r) => { setTweak('role', r); setScreen(DEFAULT_SCREENS[r]); setSearchQuery(''); };
+
+      const renderScreen = () => {
+        // Permission guard — a role hitting a screen outside its set is denied
+        const allowed = ALLOWED_SCREENS[role] || [];
+        if (!allowed.includes(screen)) {
+          return <AccessDenied onHome={() => setScreen(DEFAULT_SCREENS[role])} />;
+        }
+        if (role === 'admin') {
+          if (screen === 'dashboard')  return <AdminDashboard onNavigate={handleNavigate} />;
+          if (screen === 'students')   return <AdminStudents searchQuery={searchQuery} role="admin" />;
+          if (screen === 'professors') return <AdminProfessors />;
+          if (screen === 'courses')    return <AdminCourses />;
+          if (screen === 'payments')   return <AdminPayments searchQuery={searchQuery} />;
+          if (screen === 'reports')    return <AdminReports />;
+          if (screen === 'users')      return <AdminUsers />;
+          if (screen === 'settings')   return <AdminSettings />;
+          if (screen === 'chat')       return <StaffChat role="admin" />;
+        }
+        if (role === 'secretary') {
+          if (screen === 'dashboard') return <SecretaryDashboard onNavigate={handleNavigate} />;
+          if (screen === 'students')  return <AdminStudents searchQuery={searchQuery} role="secretary" />;
+          if (screen === 'payments')  return <AdminPayments searchQuery={searchQuery} />;
+          if (screen === 'chat')      return <StaffChat role="secretary" />;
+        }
+        if (role === 'teacher') {
+          if (screen === 'teacher-home') return <TeacherHome onNavigate={handleNavigate} />;
+          if (screen === 'attendance')   return <TeacherAttendance searchQuery={searchQuery} />;
+          if (screen === 'grades')       return <TeacherGrades />;
+          if (screen === 'observations') return <TeacherObservations />;
+        }
+        if (role === 'parent') {
+          const tabMap = { 'parent-home': 'home', 'parent-grades': 'grades', 'parent-attendance': 'attendance', 'parent-fees': 'fees', 'parent-docs': 'docs', 'parent-chat': 'chat' };
+          return <ParentHome initialTab={tabMap[screen] || 'home'} />;
+        }
+        return null;
+      };
+
+      const appContent = (
+        <AppLayout role={role} screen={screen} onNavigate={handleNavigate}
+          onRoleChange={handleRoleChange} searchQuery={searchQuery} onSearch={setSearchQuery}
+          isMobile={isMobile}>
+          {renderScreen()}
+        </AppLayout>
+      );
+
+      return (
+        <div className={mobilePreview ? 'min-h-screen flex items-start justify-center p-6 pt-10' : 'min-h-screen'}
+          style={mobilePreview ? { background: 'var(--bg-muted)' } : {}}>
+          {mobilePreview ? (
+            <div className="mobile-preview-frame">
+              {appContent}
+            </div>
+          ) : appContent}
+
+          <TweaksPanel>
+            <TweakSection title="Rol de usuario">
+              <TweakRadio
+                id="role"
+                options={['admin', 'secretary', 'teacher', 'parent']}
+                labels={['Administrador', 'Secretario', 'Profesor', 'Padre/Tutor']}
+                value={role}
+                onChange={v => { setTweak('role', v); setScreen(DEFAULT_SCREENS[v]); }}
+              />
+            </TweakSection>
+
+            <TweakSection title="Pantalla activa">
+              {role === 'admin' && (
+                <TweakSelect
+                  id="screen"
+                  options={['dashboard','students','professors','courses','payments','reports','users','settings','chat']}
+                  labels={['Resumen','Alumnos','Profesores','Cursos','Cuotas','Reportes','Usuarios','Configuración','Chats']}
+                  value={screen}
+                  onChange={v => setScreen(v)}
+                />
+              )}
+              {role === 'secretary' && (
+                <TweakSelect
+                  id="screen"
+                  options={['dashboard','students','payments','chat']}
+                  labels={['Resumen','Alumnos','Cuotas','Chats']}
+                  value={screen}
+                  onChange={v => setScreen(v)}
+                />
+              )}
+              {role === 'teacher' && (
+                <TweakSelect
+                  id="screen"
+                  options={['teacher-home','attendance','grades','observations']}
+                  labels={['Mis Cursos','Asistencia','Calificaciones','Observaciones']}
+                  value={screen}
+                  onChange={v => setScreen(v)}
+                />
+              )}
+              {role === 'parent' && (
+                <TweakSelect
+                  id="screen"
+                  options={['parent-home','parent-grades','parent-attendance','parent-fees','parent-docs','parent-chat']}
+                  labels={['Inicio','Calificaciones','Asistencia','Cuotas','Documentación','Mensajes']}
+                  value={screen}
+                  onChange={v => setScreen(v)}
+                />
+              )}
+            </TweakSection>
+
+            <TweakSection title="Vista">
+              <TweakToggle
+                id="mobilePreview"
+                label="Simular pantalla móvil (390px)"
+                value={mobilePreview}
+                onChange={v => setTweak('mobilePreview', v)}
+              />
+            </TweakSection>
+          </TweaksPanel>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+      <rect width="200" height="140" fill="#FAFAFA"/>
+      <rect x="0" y="0" width="64" height="140" fill="#FFFFFF" stroke="#E4E4E7" stroke-width="1"/>
+      <rect x="14" y="20" width="20" height="20" fill="none" stroke="#0F3D2E" stroke-width="1.2" rx="1"/>
+      <text x="24" y="34" text-anchor="middle" fill="#0F3D2E" font-family="Inter Tight, sans-serif" font-size="11" font-weight="600">B</text>
+      <text x="38" y="28" fill="#09090B" font-family="Inter Tight, sans-serif" font-size="8" font-weight="600">Babylon</text>
+      <text x="38" y="36" fill="#A1A1AA" font-family="Inter Tight, sans-serif" font-size="3.6" font-weight="500" letter-spacing="0.4">ENGLISH INSTITUTE</text>
+      <rect x="10" y="56" width="44" height="3" fill="#F0F4F2"/>
+      <rect x="10" y="64" width="44" height="3" fill="#F4F4F5"/>
+      <rect x="10" y="72" width="44" height="3" fill="#F4F4F5"/>
+      <rect x="10" y="80" width="44" height="3" fill="#F4F4F5"/>
+      <rect x="76" y="12" width="112" height="20" fill="#FFFFFF" stroke="#E4E4E7" stroke-width="0.8" rx="1.5"/>
+      <rect x="76" y="40" width="36" height="32" fill="#FFFFFF" stroke="#E4E4E7" stroke-width="0.8" rx="1.5"/>
+      <rect x="114" y="40" width="36" height="32" fill="#FFFFFF" stroke="#E4E4E7" stroke-width="0.8" rx="1.5"/>
+      <rect x="152" y="40" width="36" height="32" fill="#FFFFFF" stroke="#E4E4E7" stroke-width="0.8" rx="1.5"/>
+      <rect x="76" y="80" width="112" height="50" fill="#FFFFFF" stroke="#E4E4E7" stroke-width="0.8" rx="1.5"/>
+      <text x="80" y="55" fill="#A1A1AA" font-family="Inter Tight, sans-serif" font-size="3.2" font-weight="600">ALUMNOS</text>
+      <text x="80" y="68" fill="#09090B" font-family="Inter Tight, sans-serif" font-size="10" font-weight="500">130</text>
+      <text x="118" y="55" fill="#A1A1AA" font-family="Inter Tight, sans-serif" font-size="3.2" font-weight="600">CUOTAS</text>
+      <text x="118" y="68" fill="#09090B" font-family="Inter Tight, sans-serif" font-size="10" font-weight="500">78%</text>
+      <text x="156" y="55" fill="#A1A1AA" font-family="Inter Tight, sans-serif" font-size="3.2" font-weight="600">ASIST.</text>
+      <text x="156" y="68" fill="#09090B" font-family="Inter Tight, sans-serif" font-size="10" font-weight="500">92%</text>
+    </svg>
+  </template>
+</body>
+</html>

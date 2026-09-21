@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: babylon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: babylon
+      POSTGRES_PASSWORD: babylon
+      POSTGRES_DB: babylon
+    ports:
+      - "5433:5432"
+    volumes:
+      - babylon_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U babylon -d babylon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  babylon_postgres_data:

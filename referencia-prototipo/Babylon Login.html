@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Babylon — Iniciar sesión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="babylon-tokens.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <style>
+    body { font-family: 'Inter Tight', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+
+    /* Brand panel — solid deep green, NO gradient */
+    .brand-panel {
+      background: #0F3D2E;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Crisp subtle line work — engraved/blueprint feel */
+    .brand-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+    /* Hairline divider between panels */
+    .panel-divider {
+      width: 1px;
+      background: var(--border);
+      align-self: stretch;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    /* ── Icon helper ── */
+    const Icon = ({ name, size = 16, className = '', strokeWidth = 1.6, style = {} }) => {
+      const lucide = window.lucide || {};
+      const iconData = lucide[name];
+      if (!iconData) return <span style={{ display:'inline-block', width:size, height:size }} />;
+      const [, , children] = iconData;
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+          className={className} style={style}>
+          {(children || []).map(([tag, attrs], i) => React.createElement(tag, { key: i, ...attrs }))}
+        </svg>
+      );
+    };
+
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "estado": "normal",
+      "emailPrecargado": true
+    }/*EDITMODE-END*/;
+
+    /* ── Brand Panel (desktop) ── */
+    const BrandPanel = () => (
+      <div className="brand-panel hidden lg:flex lg:w-[44%] xl:w-[46%] flex-col">
+
+        {/* Top: monogram + wordmark */}
+        <div className="relative px-14 xl:px-20 pt-12">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center text-white font-semibold"
+              style={{ width: 38, height: 38, border: '1.5px solid rgba(255,255,255,0.85)', borderRadius: 2, fontSize: 17, letterSpacing: '-0.04em' }}>
+              B
+            </div>
+            <div className="leading-none">
+              <div className="text-white" style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.015em' }}>Babylon</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: 500, letterSpacing: '0.18em', textTransform: 'uppercase', marginTop: 5 }}>
+                English Institute
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Center: lockup */}
+        <div className="relative flex-1 flex flex-col justify-center px-14 xl:px-20">
+
+          {/* Large monogram — institutional crest */}
+          <div className="flex items-center justify-center mb-12"
+            style={{
+              width: 96, height: 96,
+              border: '1px solid rgba(255,255,255,0.45)',
+              borderRadius: 3,
+              color: '#FFFFFF',
+              fontSize: 56,
+              fontWeight: 500,
+              letterSpacing: '-0.05em',
+              lineHeight: 1,
+              position: 'relative',
+            }}>
+            B
+            <span style={{ position: 'absolute', top: -1, left: -1, width: 10, height: 10, borderTop: '1px solid #FFFFFF', borderLeft: '1px solid #FFFFFF' }} />
+            <span style={{ position: 'absolute', top: -1, right: -1, width: 10, height: 10, borderTop: '1px solid #FFFFFF', borderRight: '1px solid #FFFFFF' }} />
+            <span style={{ position: 'absolute', bottom: -1, left: -1, width: 10, height: 10, borderBottom: '1px solid #FFFFFF', borderLeft: '1px solid #FFFFFF' }} />
+            <span style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderBottom: '1px solid #FFFFFF', borderRight: '1px solid #FFFFFF' }} />
+          </div>
+
+          {/* Wordmark + sub */}
+          <p className="text-white" style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.22em', textTransform: 'uppercase', opacity: 0.55, marginBottom: 14 }}>
+            Sistema de gestión académica
+          </p>
+          <h1 className="text-white leading-none" style={{ fontSize: 48, fontWeight: 600, letterSpacing: '-0.025em' }}>
+            Babylon
+          </h1>
+          <p className="mt-3" style={{ fontSize: 16, fontWeight: 400, color: 'rgba(255,255,255,0.7)', letterSpacing: '-0.005em' }}>
+            English Institute · San Luis
+          </p>
+
+          {/* Hairline */}
+          <div className="mt-12 mb-8" style={{ width: 36, height: 1, background: 'rgba(255,255,255,0.35)' }} />
+
+          {/* Tagline */}
+          <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.82)', maxWidth: 360, lineHeight: 1.65, letterSpacing: '-0.005em' }}>
+            Una plataforma única para administrativos, profesores y familias.
+            Asistencia, calificaciones y cuotas en un solo lugar.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="relative flex items-center justify-between px-14 xl:px-20 pb-10">
+          <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>EST. 2014 · SAN LUIS, AR</span>
+          <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.4)' }}>v 2.0</span>
+        </div>
+      </div>
+    );
+
+    /* ── Login Form ── */
+    function LoginPage() {
+      const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+      const { estado, emailPrecargado } = t;
+
+      const [email, setEmail] = useState(emailPrecargado ? 'silvana@babylon.edu' : '');
+      const [password, setPassword] = useState('');
+      const [showPass, setShowPass] = useState(false);
+      const [keepSession, setKeepSession] = useState(true);
+
+      useEffect(() => { setEmail(emailPrecargado ? 'silvana@babylon.edu' : ''); }, [emailPrecargado]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (estado === 'normal') {
+          setTweak('estado', 'loading');
+          setTimeout(() => setTweak('estado', 'error'), 1400);
+        }
+      };
+
+      const isLoading = estado === 'loading';
+      const isError   = estado === 'error';
+
+      return (
+        <div className="min-h-screen flex flex-col lg:flex-row">
+          <BrandPanel />
+
+          {/* Form panel */}
+          <div className="flex-1 flex flex-col bg-white min-h-screen lg:min-h-0">
+            {/* Mobile brand strip */}
+            <div className="lg:hidden brand-panel px-6 py-6">
+              <div className="flex items-center gap-3 relative">
+                <div className="flex items-center justify-center text-white font-semibold"
+                  style={{ width: 34, height: 34, border: '1.5px solid rgba(255,255,255,0.85)', borderRadius: 2, fontSize: 15 }}>
+                  B
+                </div>
+                <div className="leading-none">
+                  <div className="text-white" style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.015em' }}>Babylon</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.55)', fontWeight: 500, letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 4 }}>
+                    English Institute
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center px-6 py-12">
+              <div className="w-full max-w-[380px]">
+
+                {/* Eyebrow */}
+                <p className="eyebrow mb-3">Acceso al sistema</p>
+
+                {/* Heading */}
+                <h2 style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1.15, color: 'var(--text)' }}>
+                  Iniciar sesión
+                </h2>
+                <p className="text-[13.5px] mt-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Ingresá con tu cuenta institucional para continuar.
+                </p>
+
+                <form onSubmit={handleSubmit} className="mt-8 space-y-4" noValidate>
+                  {/* Email */}
+                  <div>
+                    <label className="label">Correo institucional</label>
+                    <div className="relative">
+                      <Icon name="Mail" size={14} className="absolute left-3 top-1/2 -translate-y-1/2"
+                        style={{ color: 'var(--text-faint)' }} />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={e => { setEmail(e.target.value); if (isError) setTweak('estado','normal'); }}
+                        placeholder="usuario@babylon.edu"
+                        autoComplete="email"
+                        className="input"
+                        style={{
+                          paddingLeft: 34,
+                          paddingTop: 10, paddingBottom: 10,
+                          borderColor: isError ? 'var(--danger)' : 'var(--border)',
+                          background: isError ? 'var(--danger-soft)' : 'var(--bg)',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="label" style={{ marginBottom: 0 }}>Contraseña</span>
+                      <a href="#" className="text-[11.5px] font-medium hover:underline" style={{ color: 'var(--brand)' }}>
+                        ¿Olvidaste tu contraseña?
+                      </a>
+                    </div>
+                    <div className="relative">
+                      <Icon name="Lock" size={14} className="absolute left-3 top-1/2 -translate-y-1/2"
+                        style={{ color: 'var(--text-faint)' }} />
+                      <input
+                        type={showPass ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); if (isError) setTweak('estado','normal'); }}
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        className="input"
+                        style={{
+                          paddingLeft: 34, paddingRight: 36,
+                          paddingTop: 10, paddingBottom: 10,
+                          borderColor: isError ? 'var(--danger)' : 'var(--border)',
+                          background: isError ? 'var(--danger-soft)' : 'var(--bg)',
+                        }}
+                      />
+                      <button type="button" onClick={() => setShowPass(v => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-zinc-100"
+                        style={{ color: 'var(--text-muted)' }}>
+                        <Icon name={showPass ? 'EyeOff' : 'Eye'} size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Keep session */}
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+                    <button type="button" onClick={() => setKeepSession(v => !v)}
+                      className="flex items-center justify-center flex-shrink-0"
+                      style={{
+                        width: 16, height: 16,
+                        background: keepSession ? 'var(--brand)' : 'var(--bg)',
+                        border: `1px solid ${keepSession ? 'var(--brand)' : 'var(--border-strong)'}`,
+                        borderRadius: 2,
+                      }}>
+                      {keepSession && <Icon name="Check" size={11} strokeWidth={2.5} style={{ color: '#fff' }} />}
+                    </button>
+                    <span className="text-[12.5px]" style={{ color: 'var(--text-muted)' }}
+                      onClick={() => setKeepSession(v => !v)}>
+                      Mantener sesión iniciada
+                    </span>
+                  </label>
+
+                  {/* Error message */}
+                  {isError && (
+                    <div className="flex items-start gap-2 px-3.5 py-3"
+                      style={{ background: 'var(--danger-soft)', border: '1px solid var(--danger)', borderRadius: 4 }}>
+                      <Icon name="AlertCircle" size={14} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 1 }} />
+                      <span className="text-[12.5px]" style={{ color: 'var(--danger)' }}>
+                        Email o contraseña incorrectos. Revisá tus datos e intentá de nuevo.
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Submit */}
+                  <button type="submit" disabled={isLoading}
+                    className="btn btn-primary w-full justify-center mt-2"
+                    style={{ padding: '12px 16px', fontSize: 14, opacity: isLoading ? 0.85 : 1 }}>
+                    {isLoading ? (
+                      <>
+                        <Icon name="Loader2" size={15} strokeWidth={2} className="animate-spin" />
+                        Verificando…
+                      </>
+                    ) : (
+                      <>Ingresar al sistema <Icon name="ArrowRight" size={14} /></>
+                    )}
+                  </button>
+                </form>
+
+                {/* Hairline divider */}
+                <div className="my-8" style={{ height: 1, background: 'var(--border)' }} />
+
+                {/* Footer note */}
+                <p className="text-center text-[12px] leading-relaxed" style={{ color: 'var(--text-faint)' }}>
+                  Si no tenés cuenta, comunicate con la administración del instituto.
+                </p>
+
+                <div className="text-center mt-6">
+                  <a href="Babylon Sistema de Gestión.html"
+                    className="inline-flex items-center gap-1.5 text-[11.5px] font-medium hover:underline"
+                    style={{ color: 'var(--text-faint)' }}>
+                    <Icon name="ArrowLeft" size={11} />
+                    Volver al prototipo principal
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer of form panel */}
+            <div className="hidden lg:flex items-center justify-between px-12 pb-8"
+              style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+              <span>© 2026 Babylon English Institute</span>
+              <div className="flex items-center gap-4">
+                <a href="#" className="hover:text-zinc-700">Soporte</a>
+                <a href="#" className="hover:text-zinc-700">Privacidad</a>
+                <a href="#" className="hover:text-zinc-700">Términos</a>
+              </div>
+            </div>
+          </div>
+
+          <TweaksPanel>
+            <TweakSection title="Estado del formulario">
+              <TweakRadio
+                id="estado"
+                options={['normal', 'error', 'loading']}
+                labels={['Normal', 'Error', 'Cargando']}
+                value={estado}
+                onChange={v => setTweak('estado', v)}
+              />
+            </TweakSection>
+            <TweakSection title="Contenido">
+              <TweakToggle
+                id="emailPrecargado"
+                label="Email pre-cargado"
+                value={emailPrecargado}
+                onChange={v => setTweak('emailPrecargado', v)}
+              />
+            </TweakSection>
+          </TweaksPanel>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<LoginPage />);
+  </script>
+
+  <template id="__bundler_thumbnail">
+    <svg viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+      <rect width="88" height="140" fill="#0F3D2E"/>
+      <rect x="88" y="0" width="112" height="140" fill="#FFFFFF"/>
+      <rect x="30" y="46" width="28" height="28" fill="none" stroke="#FFFFFF" stroke-width="1.4" rx="1.5"/>
+      <text x="44" y="68" text-anchor="middle" fill="#FFFFFF" font-family="Inter Tight, sans-serif" font-size="18" font-weight="500">B</text>
+      <text x="44" y="92" text-anchor="middle" fill="#FFFFFF" font-family="Inter Tight, sans-serif" font-size="10" font-weight="600">Babylon</text>
+      <text x="44" y="102" text-anchor="middle" fill="rgba(255,255,255,0.55)" font-family="Inter Tight, sans-serif" font-size="3.5" letter-spacing="0.4">ENGLISH INSTITUTE</text>
+      <text x="100" y="48" fill="#A1A1AA" font-family="Inter Tight, sans-serif" font-size="3.2" font-weight="600">ACCESO</text>
+      <text x="100" y="60" fill="#09090B" font-family="Inter Tight, sans-serif" font-size="9" font-weight="600">Iniciar sesión</text>
+      <rect x="100" y="72" width="80" height="9" fill="#FAFAFA" stroke="#E4E4E7" stroke-width="0.6" rx="1"/>
+      <rect x="100" y="86" width="80" height="9" fill="#FAFAFA" stroke="#E4E4E7" stroke-width="0.6" rx="1"/>
+      <rect x="100" y="102" width="80" height="11" fill="#0F3D2E" rx="1"/>
+      <text x="140" y="110" text-anchor="middle" fill="#FFFFFF" font-family="Inter Tight, sans-serif" font-size="5" font-weight="600">Ingresar</text>
+    </svg>
+  </template>
+</body>
+</html>

@@ -1,0 +1,384 @@
+// Schema de Prisma — un modelo por entidad de server/src/modules/**/*.entity.ts.
+// Los IDs los genera la app (randomUUID() en el service) antes de llamar a
+// create(), por eso ningún modelo usa @default(uuid()) en `id`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  admin
+  secretario
+  profesor
+  padre
+}
+
+enum EstadoUsuario {
+  activo
+  inactivo
+}
+
+enum VinculoPadre {
+  padre
+  madre
+  tutor
+}
+
+enum EstadoAlumno {
+  activo
+  inactivo
+  egresado
+}
+
+enum NivelCurso {
+  kids
+  teens_a1
+  teens_a2
+  adults_b1
+  adults_b2
+  cambridge_prep
+}
+
+enum EstadoCurso {
+  activo
+  inactivo
+}
+
+enum DiaSemana {
+  lunes
+  martes
+  miercoles
+  jueves
+  viernes
+  sabado
+}
+
+enum EstadoAsistencia {
+  presente
+  tarde
+  ausente
+}
+
+enum EstadoCuota {
+  pagada
+  vencida
+}
+
+enum MetodoPago {
+  efectivo
+  transferencia
+  tarjeta
+}
+
+enum TipoDocumento {
+  formulario_inscripcion
+  copia_dni
+  autorizacion_imagen
+}
+
+enum EstadoDocumento {
+  pendiente
+  cargado
+  autorizado
+  revocado
+}
+
+enum TipoAutorizacion {
+  digital
+  manual
+}
+
+enum TipoEvaluacion {
+  examen
+  trabajo_practico
+  oral
+  proyecto
+}
+
+enum PeriodoAcademico {
+  julio
+  noviembre
+}
+
+enum EscalaEvaluacion {
+  numerica
+  conceptual
+}
+
+enum EstadoEvaluacion {
+  borrador
+  publicada
+}
+
+model Ciclo {
+  id     String  @id
+  anio   Int     @unique
+  activo Boolean
+
+  cursos        Curso[]
+  inscripciones Inscripcion[]
+}
+
+model Usuario {
+  id            String        @id
+  nombre        String
+  email         String        @unique
+  passwordHash  String
+  roles         Rol[]
+  estado        EstadoUsuario
+  fechaCreacion DateTime
+
+  padre    Padre?
+  profesor Profesor?
+}
+
+model Padre {
+  id        String       @id
+  nombre    String
+  apellido  String
+  dni       String       @unique
+  direccion String?
+  telefono  String?
+  email     String?
+  vinculo   VinculoPadre
+  usuarioId String?      @unique
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+  alumnos Alumno[]
+  chat    Chat?
+}
+
+model Profesor {
+  id        String        @id
+  nombre    String
+  apellido  String?
+  dni       String?       @unique
+  telefono  String?
+  email     String?
+  estado    EstadoUsuario @default(activo)
+  usuarioId String?       @unique
+
+  usuario                  Usuario?                 @relation(fields: [usuarioId], references: [id])
+  cursos                   Curso[]
+  categoriasPersonalizadas CategoriaPersonalizada[]
+}
+
+model Alumno {
+  id                      String       @id
+  nombre                  String
+  apellido                String
+  dni                     String       @unique
+  fechaNacimiento         DateTime
+  direccion               String?
+  telefono                String?
+  email                   String?
+  foto                    String?
+  observacionesMedicas    String?
+  fechaInscripcion        DateTime
+  estado                  EstadoAlumno
+  padreId                 String?
+  cursoId                 String?
+  aplicaDescuentoHermanos Boolean
+
+  padre          Padre?         @relation(fields: [padreId], references: [id])
+  curso          Curso?         @relation(fields: [cursoId], references: [id])
+  asistencias    Asistencia[]
+  cuotas         Cuota[]
+  documentos     Documento[]
+  calificaciones Calificacion[]
+  notasCierre    NotaCierre[]
+  observaciones  Observacion[]
+  inscripciones  Inscripcion[]
+}
+
+model Curso {
+  id         String      @id
+  nombre     String
+  nivel      NivelCurso
+  profesorId String
+  cicloId    String
+  aula       String?
+  cupo       Int
+  estado     EstadoCurso
+
+  profesor                 Profesor                 @relation(fields: [profesorId], references: [id])
+  ciclo                    Ciclo                    @relation(fields: [cicloId], references: [id])
+  alumnos                  Alumno[]
+  horarios                 Horario[]
+  asistencias              Asistencia[]
+  evaluaciones             Evaluacion[]
+  notasCierre              NotaCierre[]
+  categoriasPersonalizadas CategoriaPersonalizada[]
+  inscripciones            Inscripcion[]
+}
+
+model Horario {
+  id         String    @id
+  cursoId    String
+  diaSemana  DiaSemana
+  horaInicio String
+  horaFin    String
+
+  curso Curso @relation(fields: [cursoId], references: [id])
+}
+
+model Asistencia {
+  id             String           @id
+  alumnoId       String
+  cursoId        String
+  fecha          DateTime
+  estado         EstadoAsistencia
+  minutosRetraso Int?
+  motivo         String?
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  curso  Curso  @relation(fields: [cursoId], references: [id])
+
+  @@unique([alumnoId, cursoId, fecha])
+}
+
+model Cuota {
+  id          String      @id
+  alumnoId    String
+  mes         Int
+  anio        Int
+  montoBase   Float
+  descuento   Float
+  montoFinal  Float
+  vencimiento DateTime
+  estado      EstadoCuota
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  pago   Pago?
+}
+
+model Pago {
+  id            String     @id
+  cuotaId       String     @unique
+  fechaPago     DateTime
+  metodo        MetodoPago
+  monto         Float
+  registradoPor String
+
+  cuota Cuota @relation(fields: [cuotaId], references: [id])
+}
+
+model Documento {
+  id                String            @id
+  alumnoId          String
+  tipo              TipoDocumento
+  estado            EstadoDocumento
+  urlArchivo        String?
+  fechaCarga        DateTime?
+  autorizadoPor     String?
+  fechaAutorizacion DateTime?
+  tipoAutorizacion  TipoAutorizacion?
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+
+  @@unique([alumnoId, tipo])
+}
+
+model Evaluacion {
+  id      String           @id
+  cursoId String
+  nombre  String
+  tipo    TipoEvaluacion
+  fecha   DateTime
+  periodo PeriodoAcademico
+  escala  EscalaEvaluacion
+  estado  EstadoEvaluacion
+
+  curso          Curso          @relation(fields: [cursoId], references: [id])
+  calificaciones Calificacion[]
+}
+
+model Calificacion {
+  id           String  @id
+  evaluacionId String
+  alumnoId     String
+  nota         String
+  observacion  String?
+
+  evaluacion Evaluacion @relation(fields: [evaluacionId], references: [id])
+  alumno     Alumno     @relation(fields: [alumnoId], references: [id])
+
+  @@unique([evaluacionId, alumnoId])
+}
+
+model NotaCierre {
+  id          String           @id
+  alumnoId    String
+  cursoId     String
+  periodo     PeriodoAcademico
+  nota        String
+  observacion String?
+  estado      EstadoEvaluacion
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  curso  Curso  @relation(fields: [cursoId], references: [id])
+
+  @@unique([alumnoId, cursoId, periodo])
+}
+
+model Observacion {
+  id        String   @id
+  alumnoId  String
+  emisorId  String
+  emisorRol Rol
+  fecha     DateTime
+  texto     String
+  categoria String
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+}
+
+model CategoriaPersonalizada {
+  id         String @id
+  cursoId    String
+  profesorId String
+  nombre     String
+
+  curso    Curso    @relation(fields: [cursoId], references: [id])
+  profesor Profesor @relation(fields: [profesorId], references: [id])
+}
+
+model Inscripcion {
+  id                      String   @id
+  alumnoId                String
+  cursoId                 String
+  cicloId                 String
+  fecha                   DateTime
+  aplicaDescuentoHermanos Boolean
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  curso  Curso  @relation(fields: [cursoId], references: [id])
+  ciclo  Ciclo  @relation(fields: [cicloId], references: [id])
+
+  @@unique([alumnoId, cicloId])
+}
+
+model Chat {
+  id       String   @id
+  padreId  String   @unique
+  creadoEn DateTime
+
+  padre    Padre     @relation(fields: [padreId], references: [id])
+  mensajes Mensaje[]
+}
+
+model Mensaje {
+  id        String   @id
+  chatId    String
+  emisorId  String
+  rolEmisor Rol
+  texto     String
+  fecha     DateTime
+
+  chat Chat @relation(fields: [chatId], references: [id])
+}
