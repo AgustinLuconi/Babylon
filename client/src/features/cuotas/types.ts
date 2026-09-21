@@ -17,6 +17,8 @@ export interface Cuota {
   montoFinal: number;
   vencimiento: string;
   estado: EstadoCuota;
+  // Fecha en que se registró el pago, si la cuota está pagada.
+  fechaPago?: string;
 }
 
 export interface Pago {

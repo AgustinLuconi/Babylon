@@ -25,7 +25,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="card-hl mx-auto flex max-w-3xl flex-col overflow-hidden" style={{ height: "calc(100vh - 300px)", minHeight: 420 }}>
+    <div className="card-hl flex max-w-3xl flex-col overflow-hidden" style={{ height: "calc(100vh - 300px)", minHeight: 420 }}>
       <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--border-hex)" }}>
         <p className="eyebrow mb-1">Mensajes</p>
         <h3 className="text-[14px] font-semibold tracking-tight">Conversación con Administración</h3>
@@ -52,6 +52,7 @@ export default function ChatPage() {
                 {!mine && (
                   <p className="mb-1 text-[10.5px] font-semibold text-muted-foreground">
                     {m.rolEmisor === "admin" ? "Dirección" : "Secretaría"}
+                    {m.emisorNombre ? ` — ${m.emisorNombre}` : ""}
                   </p>
                 )}
                 <p className="text-[13px] leading-relaxed">{m.texto}</p>

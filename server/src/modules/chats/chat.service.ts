@@ -2,10 +2,18 @@ import { randomUUID } from "node:crypto";
 import { AuthorizationError, EntityNotFoundError } from "../../core/errors";
 import type { ChatRepository } from "./chat.repository";
 import type { Chat } from "./chat.entity";
+import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { Mensaje, RolEmisorMensaje } from "./mensaje.entity";
 
+export interface MensajeConEmisor extends Mensaje {
+  emisorNombre: string;
+}
+
 export class ChatService {
-  constructor(private readonly chatRepo: ChatRepository) {}
+  constructor(
+    private readonly chatRepo: ChatRepository,
+    private readonly usuarioRepo: UsuarioRepository,
+  ) {}
 
   async listarChats(): Promise<Chat[]> {
     return this.chatRepo.findAll();
@@ -19,9 +27,21 @@ export class ChatService {
     return this.chatRepo.create({ id: randomUUID(), padreId, creadoEn: new Date() });
   }
 
-  async listarMensajes(chatId: string, padreIdSolicitante?: string): Promise<Mensaje[]> {
+  // Devuelve cada mensaje con el nombre de quien lo escribió (no solo su rol),
+  // para mostrarle al padre "Secretaría — Lucía Peralta" en vez de un rol pelado.
+  async listarMensajes(chatId: string, padreIdSolicitante?: string): Promise<MensajeConEmisor[]> {
     const chat = await this.verificarAccesoAlChat(chatId, padreIdSolicitante);
-    return this.chatRepo.findMensajesByChatId(chat.id);
+    const mensajes = await this.chatRepo.findMensajesByChatId(chat.id);
+    const nombresPorEmisor = new Map<string, string>();
+    const enriquecidos: MensajeConEmisor[] = [];
+    for (const m of mensajes) {
+      if (!nombresPorEmisor.has(m.emisorId)) {
+        const emisor = await this.usuarioRepo.findById(m.emisorId);
+        nombresPorEmisor.set(m.emisorId, emisor?.nombre ?? "Instituto");
+      }
+      enriquecidos.push({ ...m, emisorNombre: nombresPorEmisor.get(m.emisorId)! });
+    }
+    return enriquecidos;
   }
 
   async enviarMensaje(

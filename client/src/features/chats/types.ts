@@ -13,6 +13,8 @@ export interface Mensaje {
   rolEmisor: Rol;
   texto: string;
   fecha: string;
+  // Solo viene al listar los mensajes de una conversación.
+  emisorNombre?: string;
 }
 
 export interface EnviarMensajeInput {

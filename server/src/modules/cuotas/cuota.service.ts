@@ -12,6 +12,10 @@ export interface Solicitante {
   padreId?: string;
 }
 
+export interface CuotaConFechaPago extends Cuota {
+  fechaPago?: Date;
+}
+
 export class CuotaService {
   constructor(
     private readonly cuotaRepo: CuotaRepository,
@@ -19,14 +23,19 @@ export class CuotaService {
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async listarPorAlumno(alumnoId: string, solicitante: Solicitante): Promise<Cuota[]> {
+  // Cada cuota pagada incluye la fecha en que se registró el pago ("Pagada el ..."
+  // en la pantalla del padre), que vive en Pago y no en Cuota.
+  async listarPorAlumno(alumnoId: string, solicitante: Solicitante): Promise<CuotaConFechaPago[]> {
     if (solicitante.rol === "padre") {
       const alumno = await this.alumnoRepo.findById(alumnoId);
       if (!alumno || alumno.padreId !== solicitante.padreId) {
         throw new AuthorizationError("Un padre solo puede ver los datos de sus propios hijos");
       }
     }
-    return this.cuotaRepo.findByAlumnoId(alumnoId);
+    const cuotas = await this.cuotaRepo.findByAlumnoId(alumnoId);
+    const pagos = cuotas.length > 0 ? await this.cuotaRepo.findPagosByCuotaIds(cuotas.map((c) => c.id)) : [];
+    const fechaPagoPorCuota = new Map(pagos.map((p) => [p.cuotaId, p.fechaPago]));
+    return cuotas.map((c) => ({ ...c, fechaPago: fechaPagoPorCuota.get(c.id) }));
   }
 
   async listarTodas(): Promise<Cuota[]> {

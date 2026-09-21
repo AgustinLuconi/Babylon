@@ -38,6 +38,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { tema, alternarTema } = useThemeStore();
   if (!usuario) return null;
   const grupos = navPorRol(usuario.rol);
+  const todosLosItems = grupos.flatMap((g) => g.items);
 
   return (
     <div className="flex h-full w-full flex-col" style={{ background: "var(--sidebar-bg)" }}>
@@ -61,6 +62,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <NavLink
                 key={item.to}
                 to={item.to}
+                // Un ítem que es prefijo de otro (ej. /mis-hijos y /mis-hijos/cuotas)
+                // solo se marca activo en su ruta exacta; el resto sigue activo en
+                // sus subpáginas (ej. /alumnos y el legajo /alumnos/:id).
+                end={todosLosItems.some((otro) => otro.to.startsWith(`${item.to}/`))}
                 onClick={onNavigate}
                 className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
               >

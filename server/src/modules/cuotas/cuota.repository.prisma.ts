@@ -50,4 +50,8 @@ export class PrismaCuotaRepository implements CuotaRepository {
   async findAllPagos(tx?: unknown): Promise<Pago[]> {
     return this.client(tx).pago.findMany();
   }
+
+  async findPagosByCuotaIds(cuotaIds: string[], tx?: unknown): Promise<Pago[]> {
+    return this.client(tx).pago.findMany({ where: { cuotaId: { in: cuotaIds } } });
+  }
 }

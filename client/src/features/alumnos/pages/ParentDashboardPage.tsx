@@ -533,10 +533,11 @@ export default function ParentDashboardPage() {
             <div key={c.id} className="card-hl p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[13.5px] font-medium">
+                  <p className="text-[13.5px] font-medium capitalize">
                     {MESES[c.mes - 1]} {c.anio}
                   </p>
                   <p className="mt-0.5 text-[11.5px] text-muted-foreground">Vence: {formatFecha(c.vencimiento)}</p>
+                  {c.fechaPago && <p className="mt-0.5 text-[11.5px]">Pagada el {formatFecha(c.fechaPago)}</p>}
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <p className="tnum text-[14px] font-medium">{formatMonto(c.montoFinal)}</p>

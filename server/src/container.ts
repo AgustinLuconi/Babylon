@@ -85,7 +85,7 @@ const calificacionService = new CalificacionService(
   unitOfWork,
 );
 const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository);
-const chatService = new ChatService(chatRepository);
+const chatService = new ChatService(chatRepository, usuarioRepository);
 const reporteService = new ReporteService(prisma);
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
