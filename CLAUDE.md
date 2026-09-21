@@ -34,6 +34,8 @@ npm run build       # typecheck + build de producción
 ```bash
 docker compose up -d   # levanta únicamente PostgreSQL (server y client corren con npm run dev, no en Docker)
 ```
+**PostgreSQL 18 (desde 2026-09-21; antes 16)**: la imagen es `postgres:18-alpine`. En la 18 los datos viven en `/var/lib/postgresql/18/docker`, así que el volumen se monta en `/var/lib/postgresql` (no en `.../data` como en la 16) y se usa un volumen nuevo, `babylon_postgres18_data`. Un cambio de versión **mayor** no puede reutilizar el volumen anterior: se hace con `pg_dump -Fc` + `pg_restore --no-owner` (así se migró). El volumen viejo de la 16 (`babylon_postgres_data`) se dejó sin tocar como marcha atrás: para volver, restaurar `image`/volumen en `docker-compose.yml` y `docker compose up -d`. Los respaldos con datos reales viven **fuera del repo** (`~/respaldos-babylon/`).
+
 Cada proyecto tiene su `.env.example` — copiarlo a `.env` antes de correr `npm run dev`. **El contenedor mapea el puerto 5433 del host (no el 5432 estándar)** porque la máquina de desarrollo original tenía una instalación nativa de PostgreSQL ocupando el 5432 — `DATABASE_URL` en `.env`/`.env.example` ya apunta a 5433. Si tu máquina no tiene ese conflicto, podés cambiar ambos a 5432 sin problema, pero mantené `docker-compose.yml` y `DATABASE_URL` coordinados entre sí.
 
 ## Arquitectura — regla central: 100% feature-first
