@@ -136,7 +136,8 @@ Cada carpeta dentro de `modules/` (server) o `features/` (client) es autoconteni
 ## ⚙️ Instalación y ejecución local
 
 ### Requisitos previos
-- Node.js 20+
+- Node.js 24 LTS (versión fijada en `.nvmrc`: `nvm use`)
+- pnpm 11 (`corepack enable` o `npm i -g pnpm`)
 - Docker y Docker Compose
 
 ### 1. Clonar el repositorio
@@ -153,19 +154,19 @@ docker compose up -d
 ### 3. Backend
 ```bash
 cd server
-npm install
+pnpm install
 cp .env.example .env
-npx prisma migrate dev
-npx prisma db seed
-npm run dev
+pnpm exec prisma migrate dev
+pnpm exec prisma db seed
+pnpm dev
 ```
 
 ### 4. Frontend
 ```bash
 cd client
-npm install
+pnpm install
 cp .env.example .env
-npm run dev
+pnpm dev
 ```
 
 ---

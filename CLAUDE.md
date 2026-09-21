@@ -10,33 +10,35 @@ Es un monorepo con `server/` (API) y `client/` (SPA) totalmente independientes �
 
 ## Comandos
 
+**Toolchain (desde 2026-09-21):** Node **24 LTS** (`.nvmrc` en la raíz → `nvm use`; los `package.json` declaran `engines`) y **pnpm 11** (`packageManager` en cada `package.json`), con un `pnpm-lock.yaml` por proyecto (`client/` y `server/` siguen siendo independientes, no hay workspace). pnpm bloquea por seguridad los scripts de instalación de las dependencias: los permitidos están en `client/pnpm-workspace.yaml` (`esbuild`) y `server/pnpm-workspace.yaml` (`@prisma/client`, `@prisma/engines`, `bcrypt`, `esbuild`, `prisma`). Si al agregar una dependencia nativa `pnpm install` falla con `ERR_PNPM_IGNORED_BUILDS`, agregarla ahí con `true`. El campo `pnpm` de `package.json` ya no se lee en pnpm 11.
+
 ### server/ (API)
 ```bash
-npm run dev              # levanta la API con recarga en caliente (tsx watch)
-npm run typecheck        # tsc --noEmit
-npm run build            # compila a dist/
-npm run prisma:generate  # regenerar el cliente de Prisma tras tocar schema.prisma
-npm run prisma:migrate   # crear/aplicar una migración
-npm run prisma:studio    # explorador visual de la base de datos
-npm run prisma:seed      # datos de desarrollo (admin/secretario/profesor/padre + curso/alumno/cuota de ejemplo)
+pnpm dev              # levanta la API con recarga en caliente (tsx watch)
+pnpm typecheck        # tsc --noEmit
+pnpm build            # compila a dist/
+pnpm prisma:generate  # regenerar el cliente de Prisma tras tocar schema.prisma
+pnpm prisma:migrate   # crear/aplicar una migración
+pnpm prisma:studio    # explorador visual de la base de datos
+pnpm prisma:seed      # datos de desarrollo (admin/secretario/profesor/padre + curso/alumno/cuota de ejemplo)
 ```
 No hay test runner configurado todavía (ni Jest ni Vitest) — si se agrega, actualizar esta sección.
 
 ### client/ (SPA)
 ```bash
-npm run dev         # servidor de desarrollo de Vite (puerto 5173)
-npm run typecheck   # tsc -b --noEmit
-npm run lint        # ESLint (flat config en eslint.config.js)
-npm run build       # typecheck + build de producción
+pnpm dev         # servidor de desarrollo de Vite (puerto 5173)
+pnpm typecheck   # tsc -b --noEmit
+pnpm lint        # ESLint (flat config en eslint.config.js)
+pnpm build       # typecheck + build de producción
 ```
 
 ### Infraestructura
 ```bash
-docker compose up -d   # levanta únicamente PostgreSQL (server y client corren con npm run dev, no en Docker)
+docker compose up -d   # levanta únicamente PostgreSQL (server y client corren con pnpm dev, no en Docker)
 ```
 **PostgreSQL 18 (desde 2026-09-21; antes 16)**: la imagen es `postgres:18-alpine`. En la 18 los datos viven en `/var/lib/postgresql/18/docker`, así que el volumen se monta en `/var/lib/postgresql` (no en `.../data` como en la 16) y se usa un volumen nuevo, `babylon_postgres18_data`. Un cambio de versión **mayor** no puede reutilizar el volumen anterior: se hace con `pg_dump -Fc` + `pg_restore --no-owner` (así se migró). El volumen viejo de la 16 (`babylon_postgres_data`) se dejó sin tocar como marcha atrás: para volver, restaurar `image`/volumen en `docker-compose.yml` y `docker compose up -d`. Los respaldos con datos reales viven **fuera del repo** (`~/respaldos-babylon/`).
 
-Cada proyecto tiene su `.env.example` — copiarlo a `.env` antes de correr `npm run dev`. **El contenedor mapea el puerto 5433 del host (no el 5432 estándar)** porque la máquina de desarrollo original tenía una instalación nativa de PostgreSQL ocupando el 5432 — `DATABASE_URL` en `.env`/`.env.example` ya apunta a 5433. Si tu máquina no tiene ese conflicto, podés cambiar ambos a 5432 sin problema, pero mantené `docker-compose.yml` y `DATABASE_URL` coordinados entre sí.
+Cada proyecto tiene su `.env.example` — copiarlo a `.env` antes de correr `pnpm dev`. **El contenedor mapea el puerto 5433 del host (no el 5432 estándar)** porque la máquina de desarrollo original tenía una instalación nativa de PostgreSQL ocupando el 5432 — `DATABASE_URL` en `.env`/`.env.example` ya apunta a 5433. Si tu máquina no tiene ese conflicto, podés cambiar ambos a 5432 sin problema, pero mantené `docker-compose.yml` y `DATABASE_URL` coordinados entre sí.
 
 ## Arquitectura — regla central: 100% feature-first
 
@@ -192,7 +194,7 @@ El rol se valida con `requireRole` a nivel de ruta; la propiedad sobre el recurs
 
 ## Client — piezas base (FASE 4)
 
-- **UI**: los componentes de `core/components/ui/` (`button`, `input`, `label`, `card`, `table`, `badge`, `select`, `avatar`) están escritos a mano siguiendo el patrón estándar de shadcn/ui (CVA + `cn()`), **no generados por el CLI** — el CLI (`npx shadcn@latest`) se cuelga en este entorno de desarrollo (sin acceso de red confiable para su registro). Si en el futuro el CLI funciona, se puede usar para agregar componentes nuevos; los ya escritos a mano son compatibles con su formato.
+- **UI**: los componentes de `core/components/ui/` (`button`, `input`, `label`, `card`, `table`, `badge`, `select`, `avatar`) están escritos a mano siguiendo el patrón estándar de shadcn/ui (CVA + `cn()`), **no generados por el CLI** — el CLI (`pnpm dlx shadcn@latest`) se cuelga en este entorno de desarrollo (sin acceso de red confiable para su registro). Si en el futuro el CLI funciona, se puede usar para agregar componentes nuevos; los ya escritos a mano son compatibles con su formato.
 - **Sesión**: `core/store/sessionStore.ts` (Zustand + `persist` en localStorage, key `babylon-session`) guarda `{ token, usuario }`. `core/lib/apiClient.ts` es un wrapper de `fetch` (`get`/`post`/`patch`) que agrega el header `Authorization` automáticamente desde el store y traduce respuestas de error del backend a `ApiError`.
 - **Rutas**: `core/routes/AppRoutes.tsx` + `ProtectedRoute.tsx` (redirige a `/login` si no hay sesión, o a `/dashboard` si el rol no está en `rolesPermitidos`). `core/components/layout/AppLayout.tsx` es el shell autenticado (sidebar + header, ver "Sistema de diseño" más abajo) que envuelve las rutas protegidas.
 - **`Rol`/`Usuario` están duplicados entre server y client** (`server/src/core/ports.ts` vs `client/src/features/auth/types.ts`) — es intencional: server y client no comparten código (ver arriba), así que cualquier cambio a la forma de estos tipos hay que replicarlo a mano en los dos lados.
@@ -224,7 +226,7 @@ El cliente pasó de un tema shadcn genérico (azul) a la identidad visual real d
 - **`Badge` (`core/components/ui/badge.tsx`)** ahora acepta, además de las variantes shadcn de siempre (`default`/`secondary`/`destructive`/`outline`, para tags simples tipo categoría de observación), 4 variantes nuevas que renderizan con la clase `.status` (punto + fondo suave + texto de color, en vez de relleno sólido): `success`/`warning`/`danger`/`neutral`. Se usan donde el badge representa un **estado real**, no una etiqueta: `AlumnosListPage` (activo/inactivo/egresado), `CuotasPage` (pagada/pendiente/vencida), `EvaluacionesPage` (publicada/borrador).
 - **`Table` (`core/components/ui/table.tsx`)** se hizo más espaciada y con encabezados en mayúscula/tenues (`text-[10.5px] uppercase text-muted-foreground bg-muted/40`) para igualar la densidad del prototipo — cambio en un solo archivo, se propaga a todas las tablas del client.
 - **`LoginPage.tsx`** rediseñado con el layout de dos paneles de `referencia-prototipo/Babylon Login.html`: panel izquierdo sólido verde institucional (`#0F3D2E`) con grilla sutil de fondo + isotipo + tagline, panel derecho blanco con el formulario (inputs con iconos `lucide-react`, toggle mostrar/ocultar contraseña). **No se copiaron** el checkbox "mantener sesión" ni el link "¿olvidaste tu contraseña?" del prototipo porque no existe ningún flujo real detrás (ninguna opción de sesión persistente configurable, ningún reset de contraseña) — mismo criterio que con el header: no UI decorativa sin función real.
-- **Verificación**: como el prototipo no renderiza en este sandbox, la fidelidad se verificó comparando manualmente el código fuente del prototipo contra capturas Playwright reales del client — sin regresiones funcionales, `npm run build` limpio.
+- **Verificación**: como el prototipo no renderiza en este sandbox, la fidelidad se verificó comparando manualmente el código fuente del prototipo contra capturas Playwright reales del client — sin regresiones funcionales, `pnpm build` limpio.
 
 ## Pasada de fidelidad completa con el prototipo (2026-08-01)
 
