@@ -243,7 +243,7 @@ export default function ProfesoresAdminPage() {
                     <button
                       title="Editar"
                       onClick={() => abrirEditar(profesor)}
-                      className="rounded p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"
+                      className="rounded p-1.5 text-(--text-muted) hover:bg-(--bg-muted)"
                     >
                       <Pencil size={14} />
                     </button>
@@ -251,7 +251,7 @@ export default function ProfesoresAdminPage() {
                       title={profesor.estado === "activo" ? "Desactivar" : "Activar"}
                       onClick={() => alternarEstado(profesor)}
                       disabled={actualizarProfesor.isPending}
-                      className="rounded p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"
+                      className="rounded p-1.5 text-(--text-muted) hover:bg-(--bg-muted)"
                     >
                       {profesor.estado === "activo" ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                     </button>
@@ -283,7 +283,7 @@ export default function ProfesoresAdminPage() {
               </div>
               <button
                 onClick={() => abrirEditar(profesor)}
-                className="rounded p-2 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"
+                className="rounded p-2 text-(--text-muted) hover:bg-(--bg-muted)"
               >
                 <Pencil size={15} />
               </button>
@@ -393,7 +393,7 @@ export default function ProfesoresAdminPage() {
           className="fixed bottom-6 left-1/2 z-50 flex max-w-[320px] -translate-x-1/2 items-center gap-2 rounded px-4 py-2.5 text-center text-[12.5px] font-medium"
           style={{ background: "var(--text)", color: "var(--bg)" }}
         >
-          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: "var(--brand-dot)" }} />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--brand-dot)" }} />
           {toast}
         </div>
       )}

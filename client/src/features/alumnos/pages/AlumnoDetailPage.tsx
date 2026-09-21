@@ -68,7 +68,7 @@ type TabId = (typeof TABS)[number]["id"];
 function Campo({ label, value, mono }: { label: string; value?: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b py-2 last:border-b-0" style={{ borderColor: "var(--border-hex)" }}>
-      <span className="flex-shrink-0 text-[12px]" style={{ color: "var(--text-faint)" }}>
+      <span className="shrink-0 text-[12px]" style={{ color: "var(--text-faint)" }}>
         {label}
       </span>
       <span className={`text-right text-[13px] ${mono ? "mono tnum" : ""}`}>
@@ -356,7 +356,7 @@ export default function AlumnoDetailPage() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`whitespace-nowrap rounded px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-              tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+              tab === t.id ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
             }`}
           >
             {t.label}
@@ -427,7 +427,7 @@ export default function AlumnoDetailPage() {
                     className="flex flex-wrap items-center gap-3 px-5 py-3"
                     style={{ borderBottom: i < ORDEN_DOCUMENTOS.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                   >
-                    {esAutorizacion ? <FileSignature size={15} className="flex-shrink-0 text-muted-foreground" /> : <FileText size={15} className="flex-shrink-0 text-muted-foreground" />}
+                    {esAutorizacion ? <FileSignature size={15} className="shrink-0 text-muted-foreground" /> : <FileText size={15} className="shrink-0 text-muted-foreground" />}
                     <div className="min-w-[160px] flex-1">
                       <p className="text-[13px] font-medium">{TIPO_DOCUMENTO_LABELS[tipo]}</p>
                       {esAutorizacion && doc?.estado === "autorizado" ? (
@@ -507,7 +507,7 @@ export default function AlumnoDetailPage() {
                 key={id}
                 onClick={() => setPeriodo(id)}
                 className={`whitespace-nowrap rounded px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-                  periodo === id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                  periodo === id ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"
                 }`}
               >
                 {id === "julio" ? "1° Cierre · Julio" : "2° Cierre · Noviembre"}
@@ -542,7 +542,7 @@ export default function AlumnoDetailPage() {
                       className="flex items-start gap-3 px-5 py-3.5"
                       style={{ borderBottom: i < evalsDelPeriodo.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                     >
-                      <div className="tnum flex h-10 w-10 flex-shrink-0 items-center justify-center rounded font-semibold" style={{ background: "var(--bg-muted)", color: tone, fontSize: 15 }}>
+                      <div className="tnum flex h-10 w-10 shrink-0 items-center justify-center rounded font-semibold" style={{ background: "var(--bg-muted)", color: tone, fontSize: 15 }}>
                         {c.nota}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -567,7 +567,7 @@ export default function AlumnoDetailPage() {
                   const notaNum = Number(notaCierrePeriodo.nota);
                   const tone = Number.isNaN(notaNum) ? "var(--text)" : notaNum >= 7 ? "var(--brand)" : notaNum >= 5 ? "var(--warning)" : "var(--danger)";
                   return (
-                    <div className="tnum flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded border font-semibold" style={{ background: "var(--bg)", color: tone, fontSize: 20, borderColor: "var(--border-hex)" }}>
+                    <div className="tnum flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded border font-semibold" style={{ background: "var(--bg)", color: tone, fontSize: 20, borderColor: "var(--border-hex)" }}>
                       {notaCierrePeriodo.nota}
                     </div>
                   );

@@ -216,7 +216,7 @@ export default function MisCursosPage() {
             className="flex items-center gap-4 px-5 py-3"
             style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}
           >
-            <div className="flex-shrink-0 text-center" style={{ width: 56 }}>
+            <div className="shrink-0 text-center" style={{ width: 56 }}>
               <p className="tnum text-[13px] font-semibold leading-none">{cl.horaInicio}</p>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
                 {diaAbreviadoDe(cl.fecha)} {String(cl.fecha.getDate()).padStart(2, "0")}/{String(cl.fecha.getMonth() + 1).padStart(2, "0")}
@@ -229,7 +229,7 @@ export default function MisCursosPage() {
                 <span className="tnum">{cl.count}</span> alumnos
               </p>
             </div>
-            <Button variant="outline" size="sm" className="flex-shrink-0" onClick={() => navigate("/asistencia")}>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => navigate("/asistencia")}>
               Tomar asistencia
             </Button>
           </div>

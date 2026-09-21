@@ -85,7 +85,7 @@ function EtiquetaRol({ rol, compacta = false }: { rol: Rol; compacta?: boolean }
   const estilo = ESTILO_ROL[rol];
   return (
     <span
-      className={`inline-flex flex-shrink-0 items-center font-medium ${
+      className={`inline-flex shrink-0 items-center font-medium ${
         compacta ? "gap-1 px-2 py-0.5 text-[11px]" : "gap-1.5 px-2 py-0.5 text-[11.5px]"
       }`}
       style={{ background: estilo.bg, color: estilo.color, borderRadius: 2 }}
@@ -307,7 +307,7 @@ export default function UsuariosPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
                 {cuenta.roles.map((r) => (
                   <EtiquetaRol key={r} rol={r} compacta />
                 ))}
@@ -357,7 +357,7 @@ export default function UsuariosPage() {
                     >
                       <div className="flex items-center gap-2.5">
                         <span
-                          className="flex flex-shrink-0 items-center justify-center"
+                          className="flex shrink-0 items-center justify-center"
                           style={{
                             width: 14,
                             height: 14,
@@ -396,7 +396,7 @@ export default function UsuariosPage() {
                 className="flex items-start gap-2 px-3.5 py-3"
                 style={{ background: "var(--danger-soft)", border: "1px solid var(--danger)", borderRadius: 4 }}
               >
-                <AlertTriangle size={14} className="mt-px flex-shrink-0" style={{ color: "var(--danger)" }} />
+                <AlertTriangle size={14} className="mt-px shrink-0" style={{ color: "var(--danger)" }} />
                 <p className="text-[12px]" style={{ color: "var(--danger)" }}>
                   Acceso total al sistema. Asignar únicamente a personal de máxima confianza.
                 </p>
@@ -461,7 +461,7 @@ export default function UsuariosPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="flex-shrink-0"
+                    className="shrink-0"
                     onClick={() => setValue("password", generarPassword(), { shouldValidate: true })}
                   >
                     Generar
@@ -490,7 +490,7 @@ export default function UsuariosPage() {
           className="fixed bottom-6 left-1/2 z-50 flex max-w-[320px] -translate-x-1/2 items-center gap-2 rounded px-4 py-2.5 text-center text-[12.5px] font-medium"
           style={{ background: "var(--text)", color: "var(--bg)" }}
         >
-          <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: "var(--brand-dot)" }} />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--brand-dot)" }} />
           {toast}
         </div>
       )}

@@ -267,7 +267,7 @@ export default function InscribirAlumnoPage() {
                 id="observacionesMedicas"
                 rows={3}
                 placeholder="Ej: alergia a la penicilina, asma, diabetes…"
-                className="flex w-full resize-none rounded-md border border-input bg-background p-2.5 text-[13.5px] leading-[1.55] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-full resize-none rounded-md border border-input bg-background p-2.5 text-[13.5px] leading-[1.55] placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 {...alumnoForm.register("observacionesMedicas")}
               />
             </div>
@@ -350,7 +350,7 @@ export default function InscribirAlumnoPage() {
                             {hijos} hijo{hijos !== 1 ? "s" : ""} inscripto{hijos !== 1 ? "s" : ""} · DNI {formatDni(padre.dni)}
                           </p>
                         </div>
-                        {seleccionado && <Check size={13} className="flex-shrink-0" style={{ color: "var(--brand)" }} />}
+                        {seleccionado && <Check size={13} className="shrink-0" style={{ color: "var(--brand)" }} />}
                       </button>
                     );
                   })}

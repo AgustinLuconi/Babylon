@@ -228,7 +228,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={login.isPending}
-                  className="btn btn-primary mt-2 w-full justify-center"
+                  className="btn btn-primary w-full justify-center"
                   style={{ padding: "12px 16px", fontSize: 14 }}
                 >
                   {login.isPending ? (

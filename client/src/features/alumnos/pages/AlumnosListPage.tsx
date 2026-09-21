@@ -243,14 +243,14 @@ export default function AlumnosListPage() {
                     <Link
                       to={`/alumnos/${alumno.id}`}
                       title="Ver legajo"
-                      className="rounded p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"
+                      className="rounded p-1.5 text-(--text-muted) hover:bg-(--bg-muted)"
                     >
                       <Eye size={14} />
                     </Link>
                     <Link
                       to={`/alumnos/${alumno.id}`}
                       title="Editar"
-                      className="rounded p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-muted)]"
+                      className="rounded p-1.5 text-(--text-muted) hover:bg-(--bg-muted)"
                     >
                       <Pencil size={14} />
                     </Link>

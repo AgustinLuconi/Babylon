@@ -89,7 +89,7 @@ export default function ConfiguracionPage() {
 
           <div className="flex items-end gap-2 border-t pt-4" style={{ borderColor: "var(--border-hex)" }}>
             <div className="flex-1 space-y-1.5">
-              <label className="label !mb-0">Nuevo ciclo (año)</label>
+              <label className="label">Nuevo ciclo (año)</label>
               <Input
                 type="number"
                 value={nuevoAnio}

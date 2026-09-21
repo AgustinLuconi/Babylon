@@ -326,12 +326,12 @@ export default function CursosAdminPage() {
           <form className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-3.5">
               <div className="col-span-2 space-y-1.5">
-                <label className="label !mb-0">Nombre del curso</label>
+                <label className="label">Nombre del curso</label>
                 <Input {...register("nombre")} placeholder="Ej: Teens A2 - Turno Tarde" />
                 {errors.nombre && <p className="text-sm text-destructive">{errors.nombre.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="label !mb-0">Nivel</label>
+                <label className="label">Nivel</label>
                 <Select {...register("nivel")} defaultValue="">
                   <option value="" disabled>
                     Elegir…
@@ -345,11 +345,11 @@ export default function CursosAdminPage() {
                 {errors.nivel && <p className="text-sm text-destructive">{errors.nivel.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="label !mb-0">Aula</label>
+                <label className="label">Aula</label>
                 <Input {...register("aula")} placeholder="Aula 1" />
               </div>
               <div className="space-y-1.5">
-                <label className="label !mb-0">Profesor asignado</label>
+                <label className="label">Profesor asignado</label>
                 <Select {...register("profesorId")} defaultValue="">
                   <option value="" disabled>
                     Elegir…
@@ -363,7 +363,7 @@ export default function CursosAdminPage() {
                 {errors.profesorId && <p className="text-sm text-destructive">{errors.profesorId.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="label !mb-0">Cupo máximo</label>
+                <label className="label">Cupo máximo</label>
                 <Input type="number" min={1} max={60} {...register("cupo")} />
                 {errors.cupo && <p className="text-sm text-destructive">{errors.cupo.message}</p>}
               </div>
@@ -371,7 +371,7 @@ export default function CursosAdminPage() {
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className="label !mb-0">Horarios de clase</label>
+                <label className="label">Horarios de clase</label>
                 <Button
                   type="button"
                   variant="outline"
@@ -384,7 +384,7 @@ export default function CursosAdminPage() {
               <div className="space-y-2">
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-center gap-2">
-                    <Select {...register(`horarios.${index}.diaSemana`)} defaultValue={field.diaSemana} className="flex-[2]">
+                    <Select {...register(`horarios.${index}.diaSemana`)} defaultValue={field.diaSemana} className="flex-2">
                       {(Object.entries(DIA_SEMANA_LABELS) as [DiaSemana, string][]).map(([valor, etiqueta]) => (
                         <option key={valor} value={valor}>
                           {etiqueta}
@@ -395,7 +395,7 @@ export default function CursosAdminPage() {
                     <span className="text-muted-foreground">–</span>
                     <Input type="time" {...register(`horarios.${index}.horaFin`)} defaultValue={field.horaFin} className="flex-1" />
                     {fields.length > 1 && (
-                      <button type="button" onClick={() => remove(index)} className="flex-shrink-0 rounded p-1.5 text-destructive hover:bg-accent">
+                      <button type="button" onClick={() => remove(index)} className="shrink-0 rounded p-1.5 text-destructive hover:bg-accent">
                         <Trash2 size={13} />
                       </button>
                     )}

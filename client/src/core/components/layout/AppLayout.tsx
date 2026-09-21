@@ -18,7 +18,7 @@ function BabylonLogo({ dark = false }: { dark?: boolean }) {
       <img
         src={dark ? logoTintaBlanca : logoTintaVerde}
         alt="Babylon English Institute"
-        className="h-8 w-8 flex-shrink-0 object-contain"
+        className="h-8 w-8 shrink-0 object-contain"
       />
       <div className="flex flex-col leading-none">
         <div className="wordmark text-[15px]">Babylon</div>
@@ -79,7 +79,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="px-3 py-3" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
         <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <Avatar name={usuario.nombre} tone="brand" className="!bg-white/10 !text-white !border-white/20" />
+          <Avatar name={usuario.nombre} tone="brand" className="bg-white/10! text-white! border-white/20!" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-[12.5px] font-medium text-white">{usuario.nombre}</div>
             <div className="truncate text-[11px]" style={{ color: "var(--sidebar-text-muted)" }}>
@@ -117,7 +117,7 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg-subtle)" }}>
-      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[244px] flex-shrink-0 md:flex">
+      <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[244px] shrink-0 md:flex">
         <SidebarContent />
       </aside>
 
@@ -145,7 +145,7 @@ export function AppLayout() {
         >
           <button
             onClick={() => setDrawerOpen(true)}
-            className="-ml-1.5 flex-shrink-0 rounded p-1.5 text-muted-foreground md:hidden"
+            className="-ml-1.5 shrink-0 rounded p-1.5 text-muted-foreground md:hidden"
           >
             <Menu size={20} />
           </button>
@@ -154,7 +154,7 @@ export function AppLayout() {
           </Link>
 
           {encabezado && (
-            <div className="hidden flex-shrink-0 flex-col md:flex">
+            <div className="hidden shrink-0 flex-col md:flex">
               <h1 className="text-[15.5px] font-semibold leading-none tracking-tight">{encabezado.titulo}</h1>
               {encabezado.subtitulo && (
                 <p className="mt-1.5 text-[11.5px] text-muted-foreground">{encabezado.subtitulo}</p>
@@ -164,7 +164,7 @@ export function AppLayout() {
 
           {puedeBuscar && <GlobalSearch />}
 
-          <div className="ml-auto flex flex-shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <NotificationBell />
             {usuario && (
               <Avatar name={usuario.nombre} tone="brand" />

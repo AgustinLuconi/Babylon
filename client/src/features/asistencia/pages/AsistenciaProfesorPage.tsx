@@ -205,7 +205,7 @@ export default function AsistenciaProfesorPage() {
               })()}
             </p>
           </div>
-          <div className="flex-shrink-0 text-right">
+          <div className="shrink-0 text-right">
             <p className="num-display" style={{ fontSize: 22 }}>
               <span className="tnum">{marcados}</span>
               <span className="text-[14px] text-muted-foreground">/{total}</span>
@@ -239,7 +239,7 @@ export default function AsistenciaProfesorPage() {
               <button
                 key={i}
                 onClick={() => setFecha(iso)}
-                className="flex flex-shrink-0 flex-col items-center gap-1.5 rounded px-3 py-2 transition-all"
+                className="flex shrink-0 flex-col items-center gap-1.5 rounded px-3 py-2 transition-all"
                 style={{
                   minWidth: 58,
                   border: `1px solid ${active ? "var(--brand)" : "var(--border-hex)"}`,
@@ -250,7 +250,7 @@ export default function AsistenciaProfesorPage() {
                   {hoy ? "Hoy" : fmtSesionCorta(d)}
                 </span>
                 <span
-                  className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: hoy ? "var(--text-faint)" : completa ? "var(--brand-dot)" : "var(--warning-dot)" }}
                 />
               </button>
@@ -318,7 +318,7 @@ export default function AsistenciaProfesorPage() {
 
                 {estado === "tarde" && (
                   <div className="mt-3 flex items-center gap-2">
-                    <label className="flex-shrink-0 text-[12px] text-muted-foreground">Min. de retraso</label>
+                    <label className="shrink-0 text-[12px] text-muted-foreground">Min. de retraso</label>
                     <Input
                       type="number"
                       min={1}

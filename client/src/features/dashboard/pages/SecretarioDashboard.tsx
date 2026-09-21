@@ -50,7 +50,7 @@ export default function SecretarioDashboard() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <button
               onClick={() => navigate("/cuotas")}
-              className="card-hl text-left transition-colors hover:border-[var(--border-strong)]"
+              className="card-hl text-left transition-colors hover:border-(--border-strong)"
               style={{ padding: "18px 18px 16px" }}
             >
               <div className="flex items-center gap-2">
@@ -82,7 +82,7 @@ export default function SecretarioDashboard() {
 
             <button
               onClick={() => navigate("/alumnos")}
-              className="card-hl text-left transition-colors hover:border-[var(--border-strong)]"
+              className="card-hl text-left transition-colors hover:border-(--border-strong)"
               style={{ padding: "18px 18px 16px" }}
             >
               <div className="flex items-center gap-2">
@@ -177,7 +177,7 @@ export default function SecretarioDashboard() {
                           {f.cursoNombre} · {f.mes}/{f.anio}
                         </p>
                       </div>
-                      <div className="flex-shrink-0 text-right">
+                      <div className="shrink-0 text-right">
                         <p className="tnum text-[13px] font-medium">{formatMonto(f.monto)}</p>
                         <Button size="sm" className="mt-1" onClick={() => navigate("/cuotas")}>
                           Cobrar

@@ -229,7 +229,7 @@ export default function AdminDashboard() {
                       className="flex items-start gap-4 px-5 py-3"
                       style={{ borderBottom: i < resumen.proximasEvaluaciones.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                     >
-                      <div className="flex-shrink-0 text-center" style={{ width: 38 }}>
+                      <div className="shrink-0 text-center" style={{ width: 38 }}>
                         <p className="text-[13px] font-semibold leading-none tnum">{Number(diaNum)}</p>
                         <p className="mt-1.5 text-[10px] uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>
                           {MES_ABREVIADO[Number(mesNum) - 1]}
@@ -290,7 +290,7 @@ export default function AdminDashboard() {
                       style={{ borderBottom: i < resumen.actividadReciente.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                     >
                       <div
-                        className="flex flex-shrink-0 items-center justify-center"
+                        className="flex shrink-0 items-center justify-center"
                         style={{ width: 26, height: 26, borderRadius: 3, background: "var(--bg-muted)", color: "var(--text-muted)" }}
                       >
                         <Icono size={13} />
@@ -299,7 +299,7 @@ export default function AdminDashboard() {
                         <span className="font-medium">{a.actor}</span> <span className="text-muted-foreground">{a.verbo}</span>{" "}
                         <span className="font-medium">{a.objetivo}</span>
                       </div>
-                      <span className="flex-shrink-0 whitespace-nowrap text-[11px]" style={{ color: "var(--text-faint)" }}>
+                      <span className="shrink-0 whitespace-nowrap text-[11px]" style={{ color: "var(--text-faint)" }}>
                         {tiempoRelativo(a.fecha)}
                       </span>
                     </div>

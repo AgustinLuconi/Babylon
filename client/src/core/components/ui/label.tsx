@@ -7,7 +7,7 @@ const Label = React.forwardRef<HTMLLabelElement, LabelProps>(({ className, ...pr
   <label
     ref={ref}
     className={cn(
-      "label !mb-0 peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+      "label peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
       className,
     )}
     {...props}

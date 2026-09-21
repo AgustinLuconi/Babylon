@@ -51,7 +51,7 @@ export function GlobalSearch() {
         onFocus={() => setAbierto(true)}
         onBlur={() => setTimeout(() => setAbierto(false), 150)}
         placeholder="Buscar alumnos por nombre o DNI…"
-        className="w-full rounded border bg-[var(--bg-subtle)] py-1.5 pl-8 pr-8 text-[13px] outline-none"
+        className="w-full rounded border bg-(--bg-subtle) py-1.5 pl-8 pr-8 text-[13px] outline-hidden"
         style={{ borderColor: "var(--border-hex)" }}
       />
       {query ? (

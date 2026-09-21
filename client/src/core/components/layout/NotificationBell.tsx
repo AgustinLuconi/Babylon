@@ -107,7 +107,7 @@ export function NotificationBell() {
                 className="flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left last:border-b-0 hover:bg-accent"
                 style={{ borderColor: "var(--border-hex)" }}
               >
-                <item.icono size={14} className="mt-0.5 flex-shrink-0" style={{ color: colorTono[item.tono] }} />
+                <item.icono size={14} className="mt-0.5 shrink-0" style={{ color: colorTono[item.tono] }} />
                 <span className="text-[12.5px] leading-relaxed">{item.texto}</span>
               </button>
             ))}

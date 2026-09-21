@@ -38,7 +38,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
     <th
       ref={ref}
       className={cn(
-        "h-auto whitespace-nowrap bg-muted/40 px-4 py-2.5 text-left align-middle text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground [&:has([role=checkbox])]:pr-0",
+        "h-auto whitespace-nowrap bg-muted/40 px-4 py-2.5 text-left align-middle text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground has-[[role=checkbox]]:pr-0",
         className,
       )}
       {...props}
@@ -51,7 +51,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
   ({ className, ...props }, ref) => (
     <td
       ref={ref}
-      className={cn("px-4 py-3 align-middle text-[13px] [&:has([role=checkbox])]:pr-0", className)}
+      className={cn("px-4 py-3 align-middle text-[13px] has-[[role=checkbox]]:pr-0", className)}
       {...props}
     />
   ),

@@ -84,7 +84,7 @@ export default function ChatsAdminPage() {
   return (
     <div className="card-hl flex overflow-hidden" style={{ height: "calc(100vh - 168px)", minHeight: 460 }}>
       <div
-        className={`${vistaMobil === "chat" ? "hidden md:flex" : "flex"} w-full flex-shrink-0 flex-col md:w-[290px]`}
+        className={`${vistaMobil === "chat" ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col md:w-[290px]`}
         style={{ borderRight: "1px solid var(--border-hex)" }}
       >
         <div className="px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-hex)" }}>
@@ -110,7 +110,7 @@ export default function ChatsAdminPage() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-[12.5px] font-medium">{t.nombrePadre}</p>
                   {t.ultimaFecha && (
-                    <span className="flex-shrink-0 text-[10px] text-muted-foreground">
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
                       {new Date(t.ultimaFecha).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}
                     </span>
                   )}

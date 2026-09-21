@@ -295,7 +295,7 @@ export default function CuotasPage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex-shrink-0 text-right">
+                <div className="shrink-0 text-right">
                   <p className="tnum text-[14px] font-medium">{formatMonto(c.montoFinal)}</p>
                   <Badge variant={ESTADO_VARIANT[c.estado]}>{ESTADO_LABELS[c.estado]}</Badge>
                 </div>
@@ -419,7 +419,7 @@ export default function CuotasPage() {
                         }}
                       >
                         <div
-                          className="flex flex-shrink-0 items-center justify-center rounded-sm"
+                          className="flex shrink-0 items-center justify-center rounded-sm"
                           style={{
                             width: 16,
                             height: 16,

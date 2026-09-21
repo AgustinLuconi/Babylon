@@ -258,7 +258,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                       {alumno.nombre} {alumno.apellido}
                     </p>
                     {evalObj.escala === "numerica" ? (
-                      <div className="flex flex-shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <Input
                           type="number"
                           min={0}
@@ -346,7 +346,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
           }
         >
           <div className="space-y-1.5">
-            <label className="label !mb-0">Nombre</label>
+            <label className="label">Nombre</label>
             <Input
               value={newForm.nombre}
               onChange={(e) => setNewForm((f) => ({ ...f, nombre: e.target.value }))}
@@ -354,7 +354,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="label !mb-0">Tipo</label>
+            <label className="label">Tipo</label>
             <Select value={newForm.tipo} onChange={(e) => setNewForm((f) => ({ ...f, tipo: e.target.value as TipoEvaluacion }))}>
               {(Object.entries(TIPO_EVALUACION_LABELS) as [TipoEvaluacion, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -364,7 +364,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="label !mb-0">Período</label>
+            <label className="label">Período</label>
             <Select value={newForm.periodo} onChange={(e) => setNewForm((f) => ({ ...f, periodo: e.target.value as PeriodoAcademico }))}>
               {(Object.entries(PERIODO_LABELS) as [PeriodoAcademico, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -374,7 +374,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="label !mb-0">Escala de calificación</label>
+            <label className="label">Escala de calificación</label>
             <Select value={newForm.escala} onChange={(e) => setNewForm((f) => ({ ...f, escala: e.target.value as EscalaEvaluacion }))}>
               {(Object.entries(ESCALA_LABELS) as [EscalaEvaluacion, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -384,7 +384,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="label !mb-0">Fecha</label>
+            <label className="label">Fecha</label>
             <Input type="date" value={newForm.fecha} onChange={(e) => setNewForm((f) => ({ ...f, fecha: e.target.value }))} />
           </div>
         </Modal>
@@ -475,7 +475,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
                     {alumno.nombre} {alumno.apellido}
                   </p>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <span className="eyebrow">Cierre</span>
                   <Input
                     type="number"

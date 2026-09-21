@@ -94,7 +94,7 @@ export default function ObservacionesProfesorPage() {
         <Panel title="Nueva observación">
           <div className="space-y-4 p-5">
             <div className="space-y-1.5">
-              <label className="label !mb-0">Alumno</label>
+              <label className="label">Alumno</label>
               <Select value={alumnoId ?? ""} onChange={(e) => setAlumnoId(e.target.value)}>
                 {alumnos?.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -104,7 +104,7 @@ export default function ObservacionesProfesorPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="label !mb-0">Categoría</label>
+              <label className="label">Categoría</label>
               <div className="flex flex-wrap gap-2">
                 {(Object.entries(CATEGORIA_LABELS) as [CategoriaObservacionPredefinida, string][]).map(([id, label]) => (
                   <button
@@ -147,7 +147,7 @@ export default function ObservacionesProfesorPage() {
             {categoria === NUEVA_CATEGORIA && (
               <div className="flex items-end gap-2 rounded border p-3" style={{ borderColor: "var(--border-hex)" }}>
                 <div className="flex-1 space-y-1.5">
-                  <label className="label !mb-0">Nombre de la nueva categoría</label>
+                  <label className="label">Nombre de la nueva categoría</label>
                   <Input
                     value={nuevaCategoriaNombre}
                     onChange={(e) => setNuevaCategoriaNombre(e.target.value)}
@@ -167,7 +167,7 @@ export default function ObservacionesProfesorPage() {
             )}
 
             <div className="space-y-1.5">
-              <label className="label !mb-0">Observación</label>
+              <label className="label">Observación</label>
               <textarea
                 value={texto}
                 onChange={(e) => setTexto(e.target.value.slice(0, 500))}
@@ -237,7 +237,7 @@ export default function ObservacionesProfesorPage() {
                         >
                           {cat?.label ?? o.categoria}
                         </span>
-                        <span className="tnum flex-shrink-0 text-[11.5px] text-muted-foreground">{formatFecha(o.fecha)}</span>
+                        <span className="tnum shrink-0 text-[11.5px] text-muted-foreground">{formatFecha(o.fecha)}</span>
                       </div>
                       <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{o.texto}</p>
                     </div>

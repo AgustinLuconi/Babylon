@@ -293,7 +293,7 @@ export default function ParentDashboardPage() {
               className="flex items-center gap-3 rounded px-4 py-3"
               style={{ borderColor: "var(--warning-dot)", background: "var(--warning-soft)", border: "1px solid var(--warning-dot)" }}
             >
-              <AlertCircle size={15} className="flex-shrink-0" style={{ color: "var(--warning)" }} />
+              <AlertCircle size={15} className="shrink-0" style={{ color: "var(--warning)" }} />
               <p className="flex-1 text-[12.5px]" style={{ color: "var(--warning)" }}>
                 Tenés documentación pendiente de <strong>{kid.nombre}</strong>.
               </p>
@@ -345,7 +345,7 @@ export default function ParentDashboardPage() {
                     style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                   >
                     <div
-                      className="flex flex-shrink-0 items-center justify-center rounded font-semibold tnum"
+                      className="flex shrink-0 items-center justify-center rounded font-semibold tnum"
                       style={{ width: 36, height: 36, background: "var(--bg-muted)", color: tone, fontSize: 14 }}
                     >
                       {c.nota}
@@ -384,7 +384,7 @@ export default function ParentDashboardPage() {
                 <div key={c.id} className="px-5 py-4" style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
                   <div className="flex items-start gap-3">
                     <div
-                      className="flex flex-shrink-0 items-center justify-center rounded font-semibold tnum"
+                      className="flex shrink-0 items-center justify-center rounded font-semibold tnum"
                       style={{ width: 44, height: 44, background: "var(--bg-muted)", color: tone, fontSize: 17 }}
                     >
                       {c.nota}
@@ -407,7 +407,7 @@ export default function ParentDashboardPage() {
             <div className="card-hl p-5" style={{ borderColor: "var(--border-hex)", background: "var(--brand-soft)" }}>
               <div className="flex items-center gap-4">
                 <div
-                  className="flex flex-shrink-0 items-center justify-center rounded font-semibold tnum"
+                  className="flex shrink-0 items-center justify-center rounded font-semibold tnum"
                   style={{ width: 52, height: 52, background: "var(--bg)", color: "var(--brand)", fontSize: 20, border: "1px solid var(--border-hex)" }}
                 >
                   {cierreVisible.nota}
@@ -539,7 +539,7 @@ export default function ParentDashboardPage() {
                   <p className="mt-0.5 text-[11.5px] text-muted-foreground">Vence: {formatFecha(c.vencimiento)}</p>
                   {c.fechaPago && <p className="mt-0.5 text-[11.5px]">Pagada el {formatFecha(c.fechaPago)}</p>}
                 </div>
-                <div className="flex-shrink-0 text-right">
+                <div className="shrink-0 text-right">
                   <p className="tnum text-[14px] font-medium">{formatMonto(c.montoFinal)}</p>
                   <div className="mt-1">
                     <Badge variant={CUOTA_VARIANT[c.estado]}>{CUOTA_LABELS[c.estado]}</Badge>
@@ -577,7 +577,7 @@ export default function ParentDashboardPage() {
                 <div key={tipo} className="card-hl p-4">
                   <div className="flex items-center gap-3">
                     <div
-                      className="flex flex-shrink-0 items-center justify-center rounded"
+                      className="flex shrink-0 items-center justify-center rounded"
                       style={{
                         width: 34,
                         height: 34,
@@ -602,7 +602,7 @@ export default function ParentDashboardPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       {esAutorizacion ? (
                         doc?.estado === "autorizado" ? (
                           <Badge variant="success">Autorizada</Badge>
@@ -655,7 +655,7 @@ export default function ParentDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setAceptaTerminos((v) => !v)}
-                  className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded"
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded"
                   style={{
                     background: aceptaTerminos ? "var(--brand)" : "var(--bg)",
                     border: `1px solid ${aceptaTerminos ? "var(--brand)" : "var(--border-strong)"}`,

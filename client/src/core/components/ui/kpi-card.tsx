@@ -22,7 +22,7 @@ export function KpiCard({ label, value, sub, delta, deltaTone = "positive", onCl
   return (
     <Tag
       onClick={onClick}
-      className={`card-hl flex w-full flex-col items-stretch justify-start text-left transition-colors ${onClick ? "cursor-pointer hover:border-[var(--border-strong)]" : ""}`}
+      className={`card-hl flex w-full flex-col items-stretch justify-start text-left transition-colors ${onClick ? "cursor-pointer hover:border-(--border-strong)" : ""}`}
       style={{ padding: "18px 18px 16px" }}
     >
       <div className="eyebrow">{label}</div>
