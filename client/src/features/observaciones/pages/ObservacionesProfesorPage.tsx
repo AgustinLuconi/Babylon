@@ -6,7 +6,7 @@ import { Input } from "@/core/components/ui/input";
 import { Panel } from "@/core/components/ui/panel";
 import { Select } from "@/core/components/ui/select";
 import { ApiError } from "@/core/lib/apiClient";
-import { useCursos } from "@/features/cursos/hooks/useCursos";
+import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useCategoriasPersonalizadas } from "../hooks/useCategoriasPersonalizadas";
 import { useCrearCategoriaPersonalizada } from "../hooks/useCrearCategoriaPersonalizada";
@@ -24,7 +24,7 @@ const CATEGORIA_COLOR: Record<string, string> = {
 };
 
 export default function ObservacionesProfesorPage() {
-  const { data: cursos } = useCursos();
+  const { data: cursos } = useCursosDelCicloActivo();
   const [cursoId, setCursoId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export default function ObservacionesProfesorPage() {
         <Panel title="Nueva observación">
           <div className="space-y-4 p-5">
             <div className="space-y-1.5">
-              <label className="text-[12.5px] font-medium">Alumno</label>
+              <label className="label !mb-0">Alumno</label>
               <Select value={alumnoId ?? ""} onChange={(e) => setAlumnoId(e.target.value)}>
                 {alumnos?.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -104,7 +104,7 @@ export default function ObservacionesProfesorPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[12.5px] font-medium">Categoría</label>
+              <label className="label !mb-0">Categoría</label>
               <div className="flex flex-wrap gap-2">
                 {(Object.entries(CATEGORIA_LABELS) as [CategoriaObservacionPredefinida, string][]).map(([id, label]) => (
                   <button
@@ -147,7 +147,7 @@ export default function ObservacionesProfesorPage() {
             {categoria === NUEVA_CATEGORIA && (
               <div className="flex items-end gap-2 rounded border p-3" style={{ borderColor: "var(--border-hex)" }}>
                 <div className="flex-1 space-y-1.5">
-                  <label className="text-[12px] font-medium">Nombre de la nueva categoría</label>
+                  <label className="label !mb-0">Nombre de la nueva categoría</label>
                   <Input
                     value={nuevaCategoriaNombre}
                     onChange={(e) => setNuevaCategoriaNombre(e.target.value)}
@@ -167,7 +167,7 @@ export default function ObservacionesProfesorPage() {
             )}
 
             <div className="space-y-1.5">
-              <label className="text-[12.5px] font-medium">Observación</label>
+              <label className="label !mb-0">Observación</label>
               <textarea
                 value={texto}
                 onChange={(e) => setTexto(e.target.value.slice(0, 500))}

@@ -15,6 +15,19 @@ export const PERIODO_LABELS: Record<PeriodoAcademico, string> = {
   noviembre: "Noviembre",
 };
 
+// Rótulos de cierre del prototipo: "1° Cierre (Julio)" para botones y "1° Cierre" en líneas de detalle.
+export const PERIODO_CIERRE_LABELS: Record<PeriodoAcademico, string> = {
+  julio: "1° Cierre (Julio)",
+  noviembre: "2° Cierre (Noviembre)",
+};
+export const PERIODO_CIERRE_CORTO: Record<PeriodoAcademico, string> = {
+  julio: "1° Cierre",
+  noviembre: "2° Cierre",
+};
+
+// Largo máximo de la observación al padre que acompaña a una nota.
+export const MAX_OBSERVACION_NOTA = 200;
+
 export const ESCALA_LABELS: Record<EscalaEvaluacion, string> = {
   numerica: "Numérica",
   conceptual: "Conceptual",

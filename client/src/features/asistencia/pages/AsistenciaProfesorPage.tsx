@@ -7,7 +7,7 @@ import { Input } from "@/core/components/ui/input";
 import { Select } from "@/core/components/ui/select";
 import { ApiError } from "@/core/lib/apiClient";
 import { fechaLocalISO, hoyLocalISO } from "@/core/lib/utils";
-import { useCursos } from "@/features/cursos/hooks/useCursos";
+import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import type { DiaSemana, Horario } from "@/features/cursos/types";
@@ -34,7 +34,8 @@ function sesionesPasadas(horarios: Horario[], cantidad: number): Date[] {
 }
 
 function fmtSesionCorta(fecha: Date): string {
-  return `${fecha.getDate()}/${fecha.getMonth() + 1}`;
+  const dia = new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(fecha).replace(".", "");
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${fecha.getDate()}`;
 }
 
 const ESTADOS: { id: EstadoAsistencia; label: string }[] = [
@@ -56,7 +57,7 @@ const ESTADO_BG: Record<EstadoAsistencia, string> = {
 
 export default function AsistenciaProfesorPage() {
   const queryClient = useQueryClient();
-  const { data: cursos } = useCursos();
+  const { data: cursos } = useCursosDelCicloActivo();
   const { data: horarios } = useHorarios();
   const [cursoId, setCursoId] = useState<string | undefined>(undefined);
   const [fecha, setFecha] = useState(hoyLocalISO());
@@ -191,9 +192,17 @@ export default function AsistenciaProfesorPage() {
               ))}
             </Select>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              {new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long" }).format(
-                new Date(`${fecha}T00:00:00`),
-              )}
+              {(() => {
+                const largo = new Intl.DateTimeFormat("es-AR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })
+                  .format(new Date(`${fecha}T00:00:00`))
+                  .replace(",", "");
+                return largo.charAt(0).toUpperCase() + largo.slice(1);
+              })()}
             </p>
           </div>
           <div className="flex-shrink-0 text-right">

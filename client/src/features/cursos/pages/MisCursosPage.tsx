@@ -7,13 +7,32 @@ import { KpiCard } from "@/core/components/ui/kpi-card";
 import { Panel } from "@/core/components/ui/panel";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { cursoService } from "../cursoService";
-import { useCursos } from "../hooks/useCursos";
+import { useCursosDelCicloActivo } from "../hooks/useCursosDelCicloActivo";
 import { formatFechaLarga } from "@/core/lib/utils";
 import { useHorarios } from "../hooks/useHorarios";
-import { DIA_SEMANA_LABELS, NIVEL_GRUPO, NIVEL_LABELS, type DiaSemana, type Horario } from "../types";
+import { NIVEL_GRUPO, NIVEL_LABELS, type DiaSemana, type Horario } from "../types";
 
 const DIAS_ORDEN: DiaSemana[] = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
-const MES_ABREVIADO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const DIA_ABREVIADO: Record<DiaSemana, string> = {
+  lunes: "Lun",
+  martes: "Mar",
+  miercoles: "Mié",
+  jueves: "Jue",
+  viernes: "Vie",
+  sabado: "Sáb",
+};
+
+// "Lun/Mié 18:00" cuando todos los días comparten hora; si no, día por día.
+function resumirHorarios(horarios: Horario[]): string {
+  if (horarios.length === 0) return "Sin horarios cargados";
+  const ordenados = [...horarios].sort((a, b) => DIAS_ORDEN.indexOf(a.diaSemana) - DIAS_ORDEN.indexOf(b.diaSemana));
+  const mismaHora = ordenados.every((h) => h.horaInicio === ordenados[0].horaInicio);
+  if (mismaHora) return `${ordenados.map((h) => DIA_ABREVIADO[h.diaSemana]).join("/")} ${ordenados[0].horaInicio}`;
+  return ordenados.map((h) => `${DIA_ABREVIADO[h.diaSemana]} ${h.horaInicio}`).join(" · ");
+}
+
+const diaAbreviadoDe = (fecha: Date) => DIA_ABREVIADO[DIAS_ORDEN[(fecha.getDay() + 6) % 7]] ?? "Dom";
+const esHoy = (fecha: Date) => fecha.toDateString() === new Date().toDateString();
 
 function proximaOcurrencia(horario: Horario): Date {
   const hoy = new Date();
@@ -34,7 +53,7 @@ function proximaOcurrencia(horario: Horario): Date {
 export default function MisCursosPage() {
   const { usuario } = useAuth();
   const navigate = useNavigate();
-  const { data: cursos, isLoading, isError } = useCursos();
+  const { data: cursos, isLoading, isError } = useCursosDelCicloActivo();
   const { data: horarios } = useHorarios();
 
   const horariosPorCurso = useMemo(() => {
@@ -78,6 +97,24 @@ export default function MisCursosPage() {
     return clases.sort((a, b) => a.fecha.getTime() - b.fecha.getTime() || a.horaInicio.localeCompare(b.horaInicio)).slice(0, 5);
   }, [cursos, horariosPorCurso, alumnosQueries]);
 
+  // Clases que quedan desde hoy hasta el domingo de esta semana.
+  const semana = useMemo(() => {
+    const fin = new Date();
+    fin.setDate(fin.getDate() + ((7 - fin.getDay()) % 7));
+    fin.setHours(23, 59, 59, 999);
+    let clases = 0;
+    const comisiones = new Set<string>();
+    for (const curso of cursos ?? []) {
+      for (const h of horariosPorCurso.get(curso.id) ?? []) {
+        if (proximaOcurrencia(h) <= fin) {
+          clases++;
+          comisiones.add(curso.id);
+        }
+      }
+    }
+    return { clases, comisiones: comisiones.size };
+  }, [cursos, horariosPorCurso]);
+
   return (
     <div className="space-y-7">
       <div>
@@ -87,8 +124,18 @@ export default function MisCursosPage() {
         </h2>
         {cursos && (
           <p className="mt-1.5 text-[13.5px] text-muted-foreground">
-            Tenés <span className="font-medium text-foreground">{cursos.length}</span> comisión{cursos.length !== 1 ? "es" : ""} a
-            cargo — {totalAlumnos} alumno{totalAlumnos !== 1 ? "s" : ""} en total.
+            {semana.clases > 0 ? (
+              <>
+                Tenés <span className="font-medium text-foreground">{semana.clases}</span> clase{semana.clases !== 1 ? "s" : ""}{" "}
+                esta semana entre {semana.comisiones} comisión{semana.comisiones !== 1 ? "es" : ""}
+              </>
+            ) : (
+              <>
+                Tenés <span className="font-medium text-foreground">{cursos.length}</span> comisión
+                {cursos.length !== 1 ? "es" : ""} a cargo
+              </>
+            )}{" "}
+            — {totalAlumnos} alumno{totalAlumnos !== 1 ? "s" : ""} en total.
           </p>
         )}
       </div>
@@ -100,13 +147,29 @@ export default function MisCursosPage() {
           <KpiCard
             label="Comisiones a cargo"
             value={String(cursos.length)}
-            sub={cursos.map((c) => c.nombre).join(" · ") || undefined}
+            sub={
+              cursos.length > 3
+                ? `${cursos.slice(0, 2).map((c) => c.nombre).join(" · ")} · +${cursos.length - 2} más`
+                : cursos.map((c) => c.nombre).join(" · ") || undefined
+            }
           />
           <KpiCard label="Alumnos totales" value={String(totalAlumnos)} sub="entre tus cursos" />
           <KpiCard
             label="Próxima clase"
-            value={proximasClases[0] ? `${proximasClases[0].fecha.getDate()}/${proximasClases[0].fecha.getMonth() + 1}` : "—"}
-            sub={proximasClases[0] ? `${proximasClases[0].horaInicio} · ${proximasClases[0].cursoNombre}` : "sin horarios cargados"}
+            value={proximasClases[0] ? (esHoy(proximasClases[0].fecha) ? "Hoy" : diaAbreviadoDe(proximasClases[0].fecha)) : "—"}
+            sub={
+              proximasClases[0] ? (
+                <>
+                  <span className="font-medium" style={{ color: "var(--text)" }}>
+                    {proximasClases[0].cursoNombre}
+                  </span>{" "}
+                  {proximasClases[0].horaInicio}
+                  {proximasClases[0].aula ? ` · Aula ${proximasClases[0].aula}` : ""}
+                </>
+              ) : (
+                "sin horarios cargados"
+              )
+            }
           />
         </div>
       )}
@@ -126,7 +189,7 @@ export default function MisCursosPage() {
                 </div>
                 <h4 className="text-[15px] font-semibold tracking-tight">{curso.nombre}</h4>
                 <p className="mt-1 text-[12px] text-muted-foreground">
-                  {hs.map((h) => `${DIA_SEMANA_LABELS[h.diaSemana]} ${h.horaInicio}`).join(" · ") || "Sin horarios cargados"} ·{" "}
+                  {resumirHorarios(hs)} ·{" "}
                   <span className="tnum">{alumnosQueries[i]?.data?.length ?? 0}</span> alumnos
                 </p>
                 <div className="mt-4 flex gap-2 border-t pt-4" style={{ borderColor: "var(--border-hex)" }}>
@@ -156,7 +219,7 @@ export default function MisCursosPage() {
             <div className="flex-shrink-0 text-center" style={{ width: 56 }}>
               <p className="tnum text-[13px] font-semibold leading-none">{cl.horaInicio}</p>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                {cl.fecha.getDate()} {MES_ABREVIADO[cl.fecha.getMonth()]}
+                {diaAbreviadoDe(cl.fecha)} {String(cl.fecha.getDate()).padStart(2, "0")}/{String(cl.fecha.getMonth() + 1).padStart(2, "0")}
               </p>
             </div>
             <div className="min-w-0 flex-1 border-l pl-4" style={{ borderColor: "var(--border-hex)" }}>

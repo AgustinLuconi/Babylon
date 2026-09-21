@@ -17,7 +17,7 @@ export const cargarCalificacionesSchema = z.object({
       z.object({
         alumnoId: z.string().min(1),
         nota: z.string().min(1),
-        observacion: z.string().optional(),
+        observacion: z.string().max(200, "La observación admite hasta 200 caracteres").optional(),
       }),
     )
     .min(1, "Debe cargar al menos una nota"),
@@ -30,7 +30,7 @@ export const cargarNotaCierreSchema = z.object({
   cursoId: z.string().min(1),
   periodo: z.enum(["julio", "noviembre"]),
   nota: z.string().min(1),
-  observacion: z.string().optional(),
+  observacion: z.string().max(200, "La observación admite hasta 200 caracteres").optional(),
 });
 
 export type CargarNotaCierreInput = z.infer<typeof cargarNotaCierreSchema>;

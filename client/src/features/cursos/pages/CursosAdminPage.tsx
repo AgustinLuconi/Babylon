@@ -326,12 +326,12 @@ export default function CursosAdminPage() {
           <form className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-3.5">
               <div className="col-span-2 space-y-1.5">
-                <label className="text-[12.5px] font-medium">Nombre del curso</label>
+                <label className="label !mb-0">Nombre del curso</label>
                 <Input {...register("nombre")} placeholder="Ej: Teens A2 - Turno Tarde" />
                 {errors.nombre && <p className="text-sm text-destructive">{errors.nombre.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="text-[12.5px] font-medium">Nivel</label>
+                <label className="label !mb-0">Nivel</label>
                 <Select {...register("nivel")} defaultValue="">
                   <option value="" disabled>
                     Elegir…
@@ -345,11 +345,11 @@ export default function CursosAdminPage() {
                 {errors.nivel && <p className="text-sm text-destructive">{errors.nivel.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="text-[12.5px] font-medium">Aula</label>
+                <label className="label !mb-0">Aula</label>
                 <Input {...register("aula")} placeholder="Aula 1" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[12.5px] font-medium">Profesor asignado</label>
+                <label className="label !mb-0">Profesor asignado</label>
                 <Select {...register("profesorId")} defaultValue="">
                   <option value="" disabled>
                     Elegir…
@@ -363,7 +363,7 @@ export default function CursosAdminPage() {
                 {errors.profesorId && <p className="text-sm text-destructive">{errors.profesorId.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="text-[12.5px] font-medium">Cupo máximo</label>
+                <label className="label !mb-0">Cupo máximo</label>
                 <Input type="number" min={1} max={60} {...register("cupo")} />
                 {errors.cupo && <p className="text-sm text-destructive">{errors.cupo.message}</p>}
               </div>
@@ -371,7 +371,7 @@ export default function CursosAdminPage() {
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className="text-[12.5px] font-medium">Horarios de clase</label>
+                <label className="label !mb-0">Horarios de clase</label>
                 <Button
                   type="button"
                   variant="outline"

@@ -9,7 +9,7 @@ import { Panel } from "@/core/components/ui/panel";
 import { Select } from "@/core/components/ui/select";
 import { ApiError } from "@/core/lib/apiClient";
 import { formatFecha, hoyLocalISO } from "@/core/lib/utils";
-import { useCursos } from "@/features/cursos/hooks/useCursos";
+import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useCalificacionesDeEvaluacion } from "../hooks/useCalificacionesDeEvaluacion";
 import { useCargarCalificaciones } from "../hooks/useCargarCalificaciones";
@@ -21,7 +21,7 @@ import { usePublicarEvaluacion } from "../hooks/usePublicarEvaluacion";
 import { usePublicarNotasCierre } from "../hooks/usePublicarNotasCierre";
 import {
   ESCALA_LABELS,
-  PERIODO_LABELS,
+  MAX_OBSERVACION_NOTA, PERIODO_CIERRE_CORTO, PERIODO_CIERRE_LABELS, PERIODO_LABELS,
   TIPO_EVALUACION_LABELS,
   type EscalaEvaluacion,
   type PeriodoAcademico,
@@ -35,7 +35,7 @@ function colorNota(nota: number): string {
 }
 
 export default function CalificacionesProfesorPage() {
-  const { data: cursos } = useCursos();
+  const { data: cursos } = useCursosDelCicloActivo();
   const [cursoId, setCursoId] = useState<string | undefined>(undefined);
   const [view, setView] = useState<"evals" | "cierre">("evals");
 
@@ -166,7 +166,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                 border: `1px solid ${periodFilter === id ? "var(--brand)" : "var(--border-hex)"}`,
               }}
             >
-              {id === "all" ? "Todos" : PERIODO_LABELS[id]}
+              {id === "all" ? "Todos" : PERIODO_CIERRE_LABELS[id]}
             </button>
           ))}
         </div>
@@ -214,7 +214,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                 <h3 className="text-[15.5px] font-semibold tracking-tight">{evalObj.nombre}</h3>
                 <p className="mt-1 text-[12px] text-muted-foreground">
                   {TIPO_EVALUACION_LABELS[evalObj.tipo]} · <span className="tnum">{formatFecha(evalObj.fecha)}</span> ·{" "}
-                  <span style={{ color: "var(--brand)" }}>{PERIODO_LABELS[evalObj.periodo]}</span> · {ESCALA_LABELS[evalObj.escala]}
+                  <span style={{ color: "var(--brand)" }}>{PERIODO_CIERRE_CORTO[evalObj.periodo]}</span> · {ESCALA_LABELS[evalObj.escala]}
                 </p>
               </div>
               {evalObj.estado === "borrador" && <Badge variant="warning">Borrador</Badge>}
@@ -290,8 +290,9 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                     <Input
                       value={observaciones[alumno.id] ?? ""}
                       onChange={(e) => setObservaciones((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
-                      placeholder="Observación al padre (opcional)"
-                      className="h-8 text-[12px] text-muted-foreground"
+                      placeholder={`Observación al padre (opcional, máx ${MAX_OBSERVACION_NOTA} car.)`}
+                      maxLength={MAX_OBSERVACION_NOTA}
+                      className="text-[12px] text-muted-foreground"
                     />
                   </div>
                 </div>
@@ -345,7 +346,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
           }
         >
           <div className="space-y-1.5">
-            <label className="text-[12.5px] font-medium">Nombre</label>
+            <label className="label !mb-0">Nombre</label>
             <Input
               value={newForm.nombre}
               onChange={(e) => setNewForm((f) => ({ ...f, nombre: e.target.value }))}
@@ -353,7 +354,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[12.5px] font-medium">Tipo</label>
+            <label className="label !mb-0">Tipo</label>
             <Select value={newForm.tipo} onChange={(e) => setNewForm((f) => ({ ...f, tipo: e.target.value as TipoEvaluacion }))}>
               {(Object.entries(TIPO_EVALUACION_LABELS) as [TipoEvaluacion, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -363,7 +364,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[12.5px] font-medium">Período</label>
+            <label className="label !mb-0">Período</label>
             <Select value={newForm.periodo} onChange={(e) => setNewForm((f) => ({ ...f, periodo: e.target.value as PeriodoAcademico }))}>
               {(Object.entries(PERIODO_LABELS) as [PeriodoAcademico, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -373,7 +374,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[12.5px] font-medium">Escala de calificación</label>
+            <label className="label !mb-0">Escala de calificación</label>
             <Select value={newForm.escala} onChange={(e) => setNewForm((f) => ({ ...f, escala: e.target.value as EscalaEvaluacion }))}>
               {(Object.entries(ESCALA_LABELS) as [EscalaEvaluacion, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -383,7 +384,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[12.5px] font-medium">Fecha</label>
+            <label className="label !mb-0">Fecha</label>
             <Input type="date" value={newForm.fecha} onChange={(e) => setNewForm((f) => ({ ...f, fecha: e.target.value }))} />
           </div>
         </Modal>
