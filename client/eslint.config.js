@@ -1,5 +1,9 @@
 import js from "@eslint/js";
 import globals from "globals";
+// Fijado en 5.x a propósito (no @latest): eslint-plugin-react-hooks 6/7
+// incorpora las reglas de "React Compiler" (ej. react-hooks/set-state-in-effect)
+// al set recommended, mucho más estrictas — no son parte de esta actualización
+// de ESLint, adoptarlas es una decisión aparte.
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
