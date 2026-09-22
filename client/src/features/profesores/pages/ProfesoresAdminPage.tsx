@@ -27,7 +27,7 @@ const profesorSchema = z.object({
   apellido: z.string().min(1, "El apellido es requerido"),
   dni: z.string().min(1, "El DNI es requerido"),
   telefono: z.string().optional(),
-  email: z.string().email("Email inválido"),
+  email: z.email("Email inválido"),
   password: z.string().optional(),
 });
 type ProfesorForm = z.infer<typeof profesorSchema>;

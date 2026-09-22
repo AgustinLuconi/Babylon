@@ -38,7 +38,7 @@ const alumnoSchema = z.object({
   calleNumero: z.string().optional(),
   ciudad: z.string().optional(),
   telefono: z.string().optional(),
-  email: z.union([z.string().email("Email inválido"), z.literal("")]).optional(),
+  email: z.union([z.email("Email inválido"), z.literal("")]).optional(),
   observacionesMedicas: z.string().optional(),
 });
 
@@ -49,7 +49,7 @@ const nuevoPadreSchema = z.object({
   apellido: z.string().min(1, "El apellido es requerido"),
   dni: z.string().min(1, "El DNI es requerido").refine(dniValido, "DNI inválido (7-8 dígitos)"),
   telefono: z.string().optional(),
-  email: z.string().email("Email inválido"),
+  email: z.email("Email inválido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
   vinculo: z.enum(["padre", "madre", "tutor"]),
 });

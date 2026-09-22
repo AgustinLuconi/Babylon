@@ -9,7 +9,7 @@ import { useLogin } from "../hooks/useAuth";
 import { ROL_LABELS, type Rol } from "../types";
 
 const loginSchema = z.object({
-  email: z.string().email("Ingresá un email válido"),
+  email: z.email("Ingresá un email válido"),
   password: z.string().min(1, "La contraseña es requerida"),
 });
 

@@ -49,8 +49,12 @@ const cuentaSchema = z
     apellido: z.string().optional(),
     dni: z.string().optional(),
     telefono: z.string().optional(),
-    vinculo: z.enum(["padre", "madre", "tutor"]).optional(),
-    email: z.string().email("Email inválido"),
+    // Unión con "" (no solo optional): el <select> sin elegir vale "", no
+    // undefined — sin esto, un envío con el campo en blanco mostraba el
+    // mensaje técnico de zod para el enum en vez del "El vínculo es
+    // requerido" del superRefine de abajo.
+    vinculo: z.union([z.enum(["padre", "madre", "tutor"]), z.literal("")]).optional(),
+    email: z.email("Email inválido"),
     password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
   })
   .superRefine((datos, ctx) => {

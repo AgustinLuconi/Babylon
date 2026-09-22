@@ -49,7 +49,12 @@ const cursoSchema = z.object({
   ),
 });
 
-type CursoForm = z.infer<typeof cursoSchema>;
+// En zod 4, z.coerce.number() tiene tipo de entrada `unknown` (lo que tipea
+// el input) y tipo de salida `number` (lo que llega a onSubmit ya coercido)
+// — dos tipos distintos donde antes (zod 3) eran el mismo. El formulario usa
+// el de entrada; handleSubmit entrega el de salida (tercer genérico de RHF).
+type CursoFormInput = z.input<typeof cursoSchema>;
+type CursoForm = z.output<typeof cursoSchema>;
 
 const CUOTA_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
   pagada: "success",
@@ -87,7 +92,7 @@ export default function CursosAdminPage() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<CursoForm>({ resolver: zodResolver(cursoSchema), defaultValues: { horarios: [] } });
+  } = useForm<CursoFormInput, unknown, CursoForm>({ resolver: zodResolver(cursoSchema), defaultValues: { horarios: [] } });
 
   const { fields, append, remove } = useFieldArray({ control, name: "horarios" });
 
