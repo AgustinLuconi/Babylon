@@ -1,4 +1,8 @@
-import "express-async-errors";
+// Express 5 reenvía nativamente a next(err) cuando un handler async rechaza
+// una promesa (antes hacía falta "express-async-errors" para esto en
+// Express 4; el paquete además dejó de funcionar en Express 5, porque
+// parcheaba un archivo interno — express/lib/router/layer — que cambió de
+// lugar en la v5).
 import express from "express";
 import cors from "cors";
 import { config } from "./core/config";

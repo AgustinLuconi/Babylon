@@ -33,7 +33,7 @@ export class ObservacionController {
 
   listarPorAlumno = async (req: Request, res: Response) => {
     const solicitante = await this.resolverSolicitante(req);
-    const observaciones = await this.observacionService.listarPorAlumno(req.params.alumnoId, solicitante);
+    const observaciones = await this.observacionService.listarPorAlumno(String(req.params.alumnoId), solicitante);
     res.status(200).json(observaciones);
   };
 
@@ -46,7 +46,7 @@ export class ObservacionController {
 
   listarCategoriasPersonalizadas = async (req: Request, res: Response) => {
     const profesorId = await this.resolverProfesorIdSiCorresponde(req);
-    const categorias = await this.observacionService.listarCategoriasPersonalizadas(req.params.cursoId, profesorId);
+    const categorias = await this.observacionService.listarCategoriasPersonalizadas(String(req.params.cursoId), profesorId);
     res.status(200).json(categorias);
   };
 }

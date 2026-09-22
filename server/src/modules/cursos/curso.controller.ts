@@ -37,7 +37,7 @@ export class CursoController {
 
   actualizar = async (req: Request, res: Response) => {
     const datos = actualizarCursoSchema.parse(req.body);
-    const curso = await this.cursoService.actualizarCurso(req.params.id, datos);
+    const curso = await this.cursoService.actualizarCurso(String(req.params.id), datos);
     res.status(200).json(curso);
   };
 
@@ -53,7 +53,7 @@ export class CursoController {
       profesorId = profesor.id;
     }
 
-    const alumnos = await this.alumnoService.listarPorCurso(req.params.id, profesorId);
+    const alumnos = await this.alumnoService.listarPorCurso(String(req.params.id), profesorId);
     res.status(200).json(alumnos);
   };
 }

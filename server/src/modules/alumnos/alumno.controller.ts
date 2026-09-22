@@ -33,7 +33,7 @@ export class AlumnoController {
 
   actualizar = async (req: Request, res: Response) => {
     const datos = actualizarAlumnoSchema.parse(req.body);
-    const alumno = await this.alumnoService.actualizarAlumno(req.params.id, datos);
+    const alumno = await this.alumnoService.actualizarAlumno(String(req.params.id), datos);
     res.status(200).json(alumno);
   };
 }

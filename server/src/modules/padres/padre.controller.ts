@@ -18,7 +18,7 @@ export class PadreController {
 
   actualizar = async (req: Request, res: Response) => {
     const datos = actualizarPadreSchema.parse(req.body);
-    const padre = await this.padreService.actualizarPadre(req.params.id, datos);
+    const padre = await this.padreService.actualizarPadre(String(req.params.id), datos);
     res.status(200).json(padre);
   };
 }

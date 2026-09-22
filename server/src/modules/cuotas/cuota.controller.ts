@@ -17,7 +17,7 @@ export class CuotaController {
     } else {
       solicitante = { rol: req.auth!.rol };
     }
-    const cuotas = await this.cuotaService.listarPorAlumno(req.params.alumnoId, solicitante);
+    const cuotas = await this.cuotaService.listarPorAlumno(String(req.params.alumnoId), solicitante);
     res.status(200).json(cuotas);
   };
 

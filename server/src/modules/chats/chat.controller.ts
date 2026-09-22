@@ -31,7 +31,7 @@ export class ChatController {
 
   listarMensajes = async (req: Request, res: Response) => {
     const padreId = await this.resolverPadreIdSiCorresponde(req);
-    const mensajes = await this.chatService.listarMensajes(req.params.id, padreId);
+    const mensajes = await this.chatService.listarMensajes(String(req.params.id), padreId);
     res.status(200).json(mensajes);
   };
 
@@ -42,7 +42,7 @@ export class ChatController {
     // el rol autenticado es uno de estos tres (profesor no llega hasta acá).
     const rolEmisor = req.auth!.rol as RolEmisorMensaje;
 
-    const mensaje = await this.chatService.enviarMensaje(req.params.id, datos.texto, req.auth!.sub, rolEmisor, padreId);
+    const mensaje = await this.chatService.enviarMensaje(String(req.params.id), datos.texto, req.auth!.sub, rolEmisor, padreId);
     res.status(201).json(mensaje);
   };
 }

@@ -26,7 +26,7 @@ export class AsistenciaController {
     } else {
       solicitante = { rol: req.auth!.rol };
     }
-    const asistencias = await this.asistenciaService.listarPorAlumno(req.params.alumnoId, solicitante);
+    const asistencias = await this.asistenciaService.listarPorAlumno(String(req.params.alumnoId), solicitante);
     res.status(200).json(asistencias);
   };
 }

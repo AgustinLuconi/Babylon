@@ -17,7 +17,7 @@ export class CicloController {
   };
 
   marcarActivo = async (req: Request, res: Response) => {
-    const ciclo = await this.cicloService.marcarActivo(req.params.id);
+    const ciclo = await this.cicloService.marcarActivo(String(req.params.id));
     res.status(200).json(ciclo);
   };
 }

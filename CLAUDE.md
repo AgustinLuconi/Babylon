@@ -79,7 +79,7 @@ Las entidades secundarias normalmente no tienen su propio `*.repository.ts` — 
 
 ### Errores de dominio (`core/errors.ts`)
 
-`DomainError` es abstracta; toda subclase declara su propio `statusCode`. El `errorHandler` central (`core/middlewares/errorHandler.ts`) traduce cualquier `DomainError` a HTTP automáticamente — los controllers solo hacen `throw`, nunca `res.status(...)` para errores de negocio (y gracias a `express-async-errors`, ni siquiera necesitan `try/catch`).
+`DomainError` es abstracta; toda subclase declara su propio `statusCode`. El `errorHandler` central (`core/middlewares/errorHandler.ts`) traduce cualquier `DomainError` a HTTP automáticamente — los controllers solo hacen `throw`, nunca `res.status(...)` para errores de negocio, y ni siquiera necesitan `try/catch`: **Express 5** reenvía nativamente a `next(err)` cuando un handler async rechaza una promesa (`express-async-errors`, que hacía esto en Express 4, se sacó en la migración a Express 5 — dejó de funcionar porque parcheaba un archivo interno, `express/lib/router/layer`, que cambió de lugar en la v5; el paquete además quedó redundante).
 
 | Clase | HTTP | Cuándo |
 |---|---|---|

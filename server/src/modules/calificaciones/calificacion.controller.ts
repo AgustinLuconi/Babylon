@@ -31,21 +31,21 @@ export class CalificacionController {
 
   listarEvaluacionesPorCurso = async (req: Request, res: Response) => {
     const profesorId = await this.resolverProfesorIdSiCorresponde(req);
-    const evaluaciones = await this.calificacionService.listarEvaluacionesPorCurso(req.params.cursoId, profesorId);
+    const evaluaciones = await this.calificacionService.listarEvaluacionesPorCurso(String(req.params.cursoId), profesorId);
     res.status(200).json(evaluaciones);
   };
 
   listarNotasCierrePorCurso = async (req: Request, res: Response) => {
     const profesorId = await this.resolverProfesorIdSiCorresponde(req);
     const periodo = req.query.periodo === "noviembre" ? "noviembre" : "julio";
-    const notas = await this.calificacionService.listarNotasCierrePorCurso(req.params.cursoId, periodo, profesorId);
+    const notas = await this.calificacionService.listarNotasCierrePorCurso(String(req.params.cursoId), periodo, profesorId);
     res.status(200).json(notas);
   };
 
   listarCalificacionesDeEvaluacion = async (req: Request, res: Response) => {
     const profesorId = await this.resolverProfesorIdSiCorresponde(req);
     const calificaciones = await this.calificacionService.listarCalificacionesDeEvaluacion(
-      req.params.id,
+      String(req.params.id),
       profesorId,
     );
     res.status(200).json(calificaciones);
@@ -60,14 +60,14 @@ export class CalificacionController {
 
   publicarEvaluacion = async (req: Request, res: Response) => {
     const profesor = await this.profesorService.buscarPorUsuarioId(req.auth!.sub);
-    const evaluacion = await this.calificacionService.publicarEvaluacion(req.params.id, profesor.id);
+    const evaluacion = await this.calificacionService.publicarEvaluacion(String(req.params.id), profesor.id);
     res.status(200).json(evaluacion);
   };
 
   cargarCalificaciones = async (req: Request, res: Response) => {
     const datos = cargarCalificacionesSchema.parse(req.body);
     const profesor = await this.profesorService.buscarPorUsuarioId(req.auth!.sub);
-    const calificaciones = await this.calificacionService.cargarCalificaciones(req.params.id, datos, profesor.id);
+    const calificaciones = await this.calificacionService.cargarCalificaciones(String(req.params.id), datos, profesor.id);
     res.status(201).json(calificaciones);
   };
 
@@ -80,14 +80,14 @@ export class CalificacionController {
 
   publicarNotaCierre = async (req: Request, res: Response) => {
     const profesor = await this.profesorService.buscarPorUsuarioId(req.auth!.sub);
-    const notaCierre = await this.calificacionService.publicarNotaCierre(req.params.id, profesor.id);
+    const notaCierre = await this.calificacionService.publicarNotaCierre(String(req.params.id), profesor.id);
     res.status(200).json(notaCierre);
   };
 
   listarCalificacionesPorAlumno = async (req: Request, res: Response) => {
     const solicitante = await this.resolverSolicitante(req);
     const calificaciones = await this.calificacionService.listarCalificacionesDeAlumno(
-      req.params.alumnoId,
+      String(req.params.alumnoId),
       solicitante,
     );
     res.status(200).json(calificaciones);
@@ -95,7 +95,7 @@ export class CalificacionController {
 
   listarNotasCierrePorAlumno = async (req: Request, res: Response) => {
     const solicitante = await this.resolverSolicitante(req);
-    const notas = await this.calificacionService.listarNotasCierreDeAlumno(req.params.alumnoId, solicitante);
+    const notas = await this.calificacionService.listarNotasCierreDeAlumno(String(req.params.alumnoId), solicitante);
     res.status(200).json(notas);
   };
 }
