@@ -5,7 +5,7 @@ export const crearPadreSchema = z.object({
   apellido: z.string().min(1, "El apellido es requerido"),
   dni: z.string().min(1, "El DNI es requerido"),
   telefono: z.string().optional(),
-  email: z.string().email("Email inválido"),
+  email: z.email("Email inválido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
   vinculo: z.enum(["padre", "madre", "tutor"]),
 });
@@ -32,7 +32,7 @@ export const actualizarPadreSchema = z.object({
   apellido: z.string().min(1).optional(),
   direccion: z.string().optional(),
   telefono: z.string().optional(),
-  email: z.string().email("Email inválido").optional(),
+  email: z.email("Email inválido").optional(),
   vinculo: z.enum(["padre", "madre", "tutor"]).optional(),
 });
 

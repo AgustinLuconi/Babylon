@@ -5,7 +5,7 @@ export const crearProfesorSchema = z.object({
   apellido: z.string().min(1, "El apellido es requerido"),
   dni: z.string().min(1, "El DNI es requerido"),
   telefono: z.string().optional(),
-  email: z.string().email("Email inválido"),
+  email: z.email("Email inválido"),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
 });
 
@@ -18,7 +18,7 @@ export const actualizarProfesorSchema = z.object({
   apellido: z.string().min(1, "El apellido es requerido").optional(),
   dni: z.string().min(1, "El DNI es requerido").optional(),
   telefono: z.string().optional(),
-  email: z.string().email("Email inválido").optional(),
+  email: z.email("Email inválido").optional(),
   estado: z.enum(["activo", "inactivo"]).optional(),
 });
 
