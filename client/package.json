@@ -16,7 +16,7 @@
     "@tanstack/react-table": "^8.20.5",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.446.0",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.53.0",
