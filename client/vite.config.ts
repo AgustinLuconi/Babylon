@@ -7,7 +7,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      // import.meta.dirname (Node 20.11+) en vez de __dirname: Vite avisa que
+      // __dirname no es compatible con el nuevo configLoader "native".
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {
