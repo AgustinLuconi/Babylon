@@ -137,7 +137,7 @@ Cada carpeta dentro de `modules/` (server) o `features/` (client) es autoconteni
 
 ### Requisitos previos
 - Node.js 24 LTS (versión fijada en `.nvmrc`: `nvm use`)
-- pnpm 11 (`corepack enable` o `npm i -g pnpm`)
+- pnpm 11, instalado con su instalador propio (`curl -fsSL https://get.pnpm.io/install.sh | sh -`, ver pnpm.io/installation) — **sin corepack**, que dejará de venir incluido en las próximas versiones de Node
 - Docker y Docker Compose
 
 ### 1. Clonar el repositorio
