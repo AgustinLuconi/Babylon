@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AuthorizationError, ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { UnitOfWork } from "../../core/ports";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
+import type { CuotaService } from "../cuotas/cuota.service";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { AlumnoRepository } from "./alumno.repository";
@@ -20,6 +21,7 @@ export class AlumnoService {
     private readonly cursoRepo: CursoRepository,
     private readonly profesorRepo: ProfesorRepository,
     private readonly cicloRepo: CicloRepository,
+    private readonly cuotaService: CuotaService,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -126,6 +128,9 @@ export class AlumnoService {
           );
         }
       }
+      // Cuota del mes de inscripción (si hay valor de cuota cargado y el mes
+      // es lectivo); las de los meses siguientes las genera la tarea periódica.
+      await this.cuotaService.generarCuotaInicial(creado, new Date(), tx);
       return creado;
     });
   }

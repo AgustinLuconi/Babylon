@@ -19,6 +19,18 @@ export class PrismaCuotaRepository implements CuotaRepository {
     return this.client(tx).cuota.findMany({ where: { alumnoId } });
   }
 
+  async findByMesYAnio(mes: number, anio: number, tx?: unknown): Promise<Cuota[]> {
+    return this.client(tx).cuota.findMany({ where: { mes, anio } });
+  }
+
+  async marcarVencidas(vencimientoAnteriorA: Date, tx?: unknown): Promise<number> {
+    const { count } = await this.client(tx).cuota.updateMany({
+      where: { estado: "pendiente", vencimiento: { lt: vencimientoAnteriorA } },
+      data: { estado: "vencida" },
+    });
+    return count;
+  }
+
   async findAll(tx?: unknown): Promise<Cuota[]> {
     return this.client(tx).cuota.findMany();
   }

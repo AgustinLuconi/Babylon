@@ -58,6 +58,7 @@ export interface ReporteAlumnoResumen {
   notaCierreNoviembre: { nota: number | null; estado: string } | null;
   asistenciaPct: number | null;
   cuotasPagas: number;
+  cuotasPendientes: number;
   cuotasVencidas: number;
   deudaTotal: number;
   montoPagadoTotal: number;
@@ -214,8 +215,11 @@ export class ReporteService {
 
     const alumnosActivos = alumnos.filter((a) => a.estado === "activo").length;
 
-    const cuotasPagadas = cuotas.filter((c) => c.estado === "pagada").length;
-    const cuotasAlDiaPct = cuotas.length > 0 ? Math.round((cuotasPagadas / cuotas.length) * 100) : 100;
+    // "Al día" se mide sobre las cuotas que ya vencieron o se pagaron: una cuota
+    // pendiente (todavía no vence) no cuenta ni a favor ni en contra.
+    const cuotasExigibles = cuotas.filter((c) => c.estado !== "pendiente");
+    const cuotasPagadas = cuotasExigibles.filter((c) => c.estado === "pagada").length;
+    const cuotasAlDiaPct = cuotasExigibles.length > 0 ? Math.round((cuotasPagadas / cuotasExigibles.length) * 100) : 100;
 
     const presentes = asistencias.filter((a) => a.estado === "presente" || a.estado === "tarde").length;
     const asistenciaPromedioPct = asistencias.length > 0 ? Math.round((presentes / asistencias.length) * 100) : 0;
@@ -341,7 +345,7 @@ export class ReporteService {
     const mesAnterior = mesActual === 1 ? 12 : mesActual - 1;
 
     const pctCuotasAlDia = (mes: number, anio: number): number | null => {
-      const delMes = cuotas.filter((c) => c.mes === mes && c.anio === anio);
+      const delMes = cuotas.filter((c) => c.mes === mes && c.anio === anio && c.estado !== "pendiente");
       if (delMes.length === 0) return null;
       return Math.round((delMes.filter((c) => c.estado === "pagada").length / delMes.length) * 100);
     };
@@ -453,8 +457,9 @@ export class ReporteService {
         notaCierreNoviembre: notaCierrePorAlumnoPeriodo(alumno.id, "noviembre"),
         asistenciaPct,
         cuotasPagas: cuotasAlumno.filter((c) => c.estado === "pagada").length,
+        cuotasPendientes: cuotasAlumno.filter((c) => c.estado === "pendiente").length,
         cuotasVencidas: cuotasAlumno.filter((c) => c.estado === "vencida").length,
-        deudaTotal: cuotasAlumno.filter((c) => c.estado !== "pagada").reduce((a, c) => a + c.montoFinal, 0),
+        deudaTotal: cuotasAlumno.filter((c) => c.estado === "vencida").reduce((a, c) => a + c.montoFinal, 0),
         montoPagadoTotal: pagosAlumno.reduce((a, p) => a + p.monto, 0),
         ultimoPago: ultimoPago ? { mes: ultimoPago.mes, anio: ultimoPago.anio } : null,
       };

@@ -45,6 +45,7 @@ export interface ReporteAlumnoResumen {
   notaCierreNoviembre: NotaCierreResumen | null;
   asistenciaPct: number | null;
   cuotasPagas: number;
+  cuotasPendientes: number;
   cuotasVencidas: number;
   deudaTotal: number;
   montoPagadoTotal: number;

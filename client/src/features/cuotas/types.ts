@@ -1,4 +1,4 @@
-export type EstadoCuota = "pagada" | "vencida";
+export type EstadoCuota = "pendiente" | "pagada" | "vencida";
 export type MetodoPago = "efectivo" | "transferencia" | "mercadopago" | "otro";
 
 export const METODO_PAGO_LABELS: Record<MetodoPago, string> = {
@@ -38,4 +38,12 @@ export interface RegistrarPagoInput {
   // AAAA-MM-DD; si falta, el server usa hoy.
   fechaPago?: string;
   notas?: string;
+}
+
+// Estado "más urgente" del conjunto de cuotas de un alumno: vencida > pendiente
+// > pagada. undefined si no tiene ninguna.
+export function estadoMasUrgente(cuotas: { estado: EstadoCuota }[]): EstadoCuota | undefined {
+  if (cuotas.some((c) => c.estado === "vencida")) return "vencida";
+  if (cuotas.some((c) => c.estado === "pendiente")) return "pendiente";
+  return cuotas.length > 0 ? "pagada" : undefined;
 }

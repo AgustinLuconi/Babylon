@@ -16,6 +16,8 @@ import { alumnoRoutes } from "./modules/alumnos/alumno.routes";
 import { cursoRoutes } from "./modules/cursos/curso.routes";
 import { asistenciaRoutes } from "./modules/asistencia/asistencia.routes";
 import { cuotaRoutes } from "./modules/cuotas/cuota.routes";
+import { iniciarMantenimientoDeCuotas } from "./modules/cuotas/cuota.scheduler";
+import { configuracionRoutes } from "./modules/configuraciones/configuracion.routes";
 import { documentoRoutes } from "./modules/documentos/documento.routes";
 import { calificacionRoutes } from "./modules/calificaciones/calificacion.routes";
 import { observacionRoutes } from "./modules/observaciones/observacion.routes";
@@ -38,6 +40,7 @@ app.use("/api/profesores", profesorRoutes(container.profesorController));
 app.use("/api/alumnos", alumnoRoutes(container.alumnoController));
 app.use("/api/cursos", cursoRoutes(container.cursoController));
 app.use("/api/asistencia", asistenciaRoutes(container.asistenciaController));
+app.use("/api/configuracion", configuracionRoutes(container.configuracionController));
 app.use("/api/cuotas", cuotaRoutes(container.cuotaController));
 app.use("/api/documentos", documentoRoutes(container.documentoController));
 app.use("/api/calificaciones", calificacionRoutes(container.calificacionController));
@@ -49,4 +52,5 @@ app.use(errorHandler);
 
 app.listen(config.PORT, "0.0.0.0", () => {
   console.log(`Babylon API escuchando en http://localhost:${config.PORT}`);
+  iniciarMantenimientoDeCuotas(container.cuotaService);
 });

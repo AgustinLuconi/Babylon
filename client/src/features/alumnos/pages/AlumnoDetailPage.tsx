@@ -23,7 +23,7 @@ import { NIVEL_GRUPO, NIVEL_LABELS } from "@/features/cursos/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
 import { useCuotasPorAlumno } from "@/features/cuotas/hooks/useCuotasPorAlumno";
 import { useRegistrarPago } from "@/features/cuotas/hooks/useRegistrarPago";
-import { METODO_PAGO_LABELS, type Cuota, type EstadoCuota, type MetodoPago } from "@/features/cuotas/types";
+import { estadoMasUrgente, METODO_PAGO_LABELS, type Cuota, type EstadoCuota, type MetodoPago } from "@/features/cuotas/types";
 import { useDocumentosPorAlumno } from "@/features/documentos/hooks/useDocumentosPorAlumno";
 import { useMarcarAutorizacionManual } from "@/features/documentos/hooks/useMarcarAutorizacionManual";
 import { useMarcarCargado } from "@/features/documentos/hooks/useMarcarCargado";
@@ -41,12 +41,14 @@ import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
 
-const CUOTA_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
+const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
+  pendiente: "warning",
   vencida: "danger",
 };
 const CUOTA_LABELS: Record<EstadoCuota, string> = {
   pagada: "Al día",
+  pendiente: "Pendiente",
   vencida: "Vencida",
 };
 
@@ -291,9 +293,7 @@ export default function AlumnoDetailPage() {
   };
 
   const estadoCuotaActual = useMemo(() => {
-    if (!cuotas || cuotas.length === 0) return undefined;
-    if (cuotas.some((c) => c.estado === "vencida")) return "vencida" as const;
-    return "pagada" as const;
+    return cuotas ? estadoMasUrgente(cuotas) : undefined;
   }, [cuotas]);
 
   if (!alumno) {

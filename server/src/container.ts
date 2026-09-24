@@ -31,6 +31,9 @@ import { AsistenciaController } from "./modules/asistencia/asistencia.controller
 
 import { PrismaCuotaRepository } from "./modules/cuotas/cuota.repository.prisma";
 import { CuotaService } from "./modules/cuotas/cuota.service";
+import { PrismaConfiguracionRepository } from "./modules/configuraciones/configuracion.repository.prisma";
+import { ConfiguracionService } from "./modules/configuraciones/configuracion.service";
+import { ConfiguracionController } from "./modules/configuraciones/configuracion.controller";
 import { CuotaController } from "./modules/cuotas/cuota.controller";
 
 import { PrismaDocumentoRepository } from "./modules/documentos/documento.repository.prisma";
@@ -62,6 +65,7 @@ const alumnoRepository = new PrismaAlumnoRepository(prisma);
 const cursoRepository = new PrismaCursoRepository(prisma);
 const asistenciaRepository = new PrismaAsistenciaRepository(prisma);
 const cuotaRepository = new PrismaCuotaRepository(prisma);
+const configuracionRepository = new PrismaConfiguracionRepository(prisma);
 const documentoRepository = new PrismaDocumentoRepository(prisma);
 const calificacionRepository = new PrismaCalificacionRepository(prisma);
 const observacionRepository = new PrismaObservacionRepository(prisma);
@@ -73,10 +77,18 @@ const usuarioService = new UsuarioService(usuarioRepository, profesorRepository,
 const cicloService = new CicloService(cicloRepository, unitOfWork);
 const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, unitOfWork);
-const alumnoService = new AlumnoService(alumnoRepository, cursoRepository, profesorRepository, cicloRepository, unitOfWork);
+const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, cicloRepository, configuracionRepository, unitOfWork);
+const configuracionService = new ConfiguracionService(configuracionRepository);
+const alumnoService = new AlumnoService(
+  alumnoRepository,
+  cursoRepository,
+  profesorRepository,
+  cicloRepository,
+  cuotaService,
+  unitOfWork,
+);
 const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork);
 const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork);
-const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, unitOfWork);
 const documentoService = new DocumentoService(documentoRepository, alumnoRepository);
 const calificacionService = new CalificacionService(
   calificacionRepository,
@@ -90,6 +102,9 @@ const reporteService = new ReporteService(prisma);
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {
+  // Expuesto para la tarea periódica de cuotas (ver server.ts).
+  cuotaService,
+  configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
   cicloController: new CicloController(cicloService),
   padreController: new PadreController(padreService),

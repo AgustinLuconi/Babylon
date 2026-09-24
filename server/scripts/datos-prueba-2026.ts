@@ -178,6 +178,13 @@ async function crear() {
         await prisma.pago.create({ data: { id: `${P}pago-${pagoN}`, cuotaId, fechaPago: fecha, metodo, monto: montoFinal, registradoPor: secretario.id } });
       }
     }
+
+    // Algunas familias ya tienen generada la cuota de octubre (pendiente, vence el 10/10):
+    // sirve para ver los estados "Pendiente" antes de que la genere la tarea periódica.
+    if (!nuevo && idx % 4 === 0) {
+      const descuentoOct = hermano ? Math.round(curso.base * 0.1) : 0;
+      await prisma.cuota.create({ data: { id: `${P}cuota-${idx + 1}-10`, alumnoId: id, mes: 10, anio: 2026, montoBase: curso.base, descuento: descuentoOct, montoFinal: curso.base - descuentoOct, vencimiento: utc(2026, 10, 10), estado: "pendiente" } });
+    }
   }
 
   // Asistencia: cada clase entre el 3/8 y hoy

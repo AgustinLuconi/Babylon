@@ -34,12 +34,14 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-const CUOTA_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
+const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
+  pendiente: "warning",
   vencida: "danger",
 };
 const CUOTA_LABELS: Record<EstadoCuota, string> = {
   pagada: "Al día",
+  pendiente: "Pendiente",
   vencida: "Vencida",
 };
 
@@ -256,7 +258,7 @@ export default function ParentDashboardPage() {
               className="num-display tnum mt-1.5"
               style={{
                 fontSize: 22,
-                color: cuotaActual ? (cuotaActual.estado === "pagada" ? "var(--brand)" : "var(--danger)") : "var(--text)",
+                color: cuotaActual ? { pagada: "var(--brand)", pendiente: "var(--warning)", vencida: "var(--danger)" }[cuotaActual.estado] : "var(--text)",
               }}
             >
               {cuotaActual ? CUOTA_LABELS[cuotaActual.estado] : "—"}

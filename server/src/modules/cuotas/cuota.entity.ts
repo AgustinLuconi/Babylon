@@ -1,4 +1,4 @@
-export type EstadoCuota = "pagada" | "vencida";
+export type EstadoCuota = "pendiente" | "pagada" | "vencida";
 
 export interface Cuota {
   id: string;

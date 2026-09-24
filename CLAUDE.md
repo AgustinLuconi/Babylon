@@ -38,7 +38,7 @@ pnpm lint        # ESLint (flat config en eslint.config.js)
 pnpm build       # typecheck + build de producción
 ```
 
-**Datos de prueba del ciclo 2026 (`server/scripts/datos-prueba-2026.ts`)**: los datos reales están en el ciclo 2025; el 2026 solo tiene datos de prueba, todos con id que empieza con `prueba-` (cursos, alumnos, padres, cuotas, pagos, asistencia, evaluaciones, chats…). `pnpm exec tsx scripts/datos-prueba-2026.ts crear` los regenera (borra y recrea) y `... borrar` los elimina sin tocar nada real. Cuentas de padre de prueba: `p1..p6@prueba.babylon.test` / `prueba1234` (p1 tiene dos hijos → descuento por hermanos). **Borrarlos con `borrar` antes de cargar datos reales del 2026.** El modelo de cuota solo tiene `pagada`/`vencida` (no existe "pendiente"), por eso `CuotasPage` no tiene pestaña/KPI "Pendientes" como el prototipo. **Ojo: nada en el sistema genera cuotas** (ni al inscribir ni mensualmente; no hay monto por curso) — las del 2025 entraron por importación y las de prueba por el script; falta definir esa regla de negocio.
+**Datos de prueba del ciclo 2026 (`server/scripts/datos-prueba-2026.ts`)**: los datos reales están en el ciclo 2025; el 2026 solo tiene datos de prueba, todos con id que empieza con `prueba-` (cursos, alumnos, padres, cuotas, pagos, asistencia, evaluaciones, chats…). `pnpm exec tsx scripts/datos-prueba-2026.ts crear` los regenera (borra y recrea) y `... borrar` los elimina sin tocar nada real. Cuentas de padre de prueba: `p1..p6@prueba.babylon.test` / `prueba1234` (p1 tiene dos hijos → descuento por hermanos). **Borrarlos con `borrar` antes de cargar datos reales del 2026.** Incluye algunas cuotas de octubre `pendiente` (ids `prueba-cuota-N-10`).
 
 ### Infraestructura
 ```bash
@@ -138,6 +138,18 @@ Las entidades secundarias normalmente no tienen su propio `*.repository.ts` — 
 
 `AsistenciaController` y `DocumentoController` ya **no** usan `req.auth.sub` directamente como `profesorId`/`padreId` (esa simplificación de FASE 3/4 quedó resuelta en FASE 5): ahora llaman a `ProfesorService.buscarPorUsuarioId` / `PadreService.buscarPorUsuarioId` para resolver la entidad real antes de invocar el service correspondiente.
 
+### Cuotas: generación automática, estados y valor global
+
+**Estados** (`EstadoCuota`): `pendiente` (todavía no venció) → `pagada` (se cobró) o `vencida` (pasó el día 10 sin cobrarse). Nadie marca "vencida" a mano: la tarea periódica lo hace.
+
+**Valor de la cuota**: un único monto global (`Configuracion.valorCuota`, módulo `configuraciones/`, `GET|PATCH /api/configuracion`; el PATCH es solo admin, el GET también secretario). Se edita en Configuración → "Cuota mensual". **Sin valor cargado no se genera ninguna cuota.** Un cambio de valor rige solo para las cuotas que se generen después; las ya generadas conservan su monto. No hay valores por curso ni por nivel (el instituto hoy cobra igual a todos).
+
+**Generación** (`CuotaService`, reglas de calendario puras en `cuotas/cuota.calendario.ts`): una cuota por alumno activo del **ciclo activo** y por mes lectivo (**marzo a noviembre**), solo si el año del ciclo activo coincide con el año actual. Nace `pendiente`, con `montoBase` = valor global y el 10% de descuento si `aplicaDescuentoHermanos`. Vence el **día 10**; si se genera después del 10 de su propio mes (inscripción a mitad de mes, o valor cargado tarde) vence el **último día del mes** para no nacer vencida. `@@unique([alumnoId, mes, anio])` la hace idempotente.
+- **Al inscribir** (`AlumnoService.inscribirAlumno`, dentro de la misma transacción): se crea la cuota del mes de inscripción (`generarCuotaInicial`). No hay cuotas retroactivas ni por adelantado.
+- **Cada mes, sola** (`cuota.scheduler.ts`, arrancado desde `server.ts`): al levantar el server y luego cada hora corre `mantenerCuotas()` = `marcarVencidas` (pendiente con vencimiento anterior a hoy → vencida; el propio día 10 todavía se puede pagar) + `generarCuotasDelMes`. Sin cron externo ni dependencia nueva: si el server estuvo apagado el día 1, se pone al día apenas vuelve.
+- Reportes: "al día %" y "tasa de cobranza" se calculan sobre cuotas exigibles (pagadas + vencidas; las pendientes no cuentan). "Deuda"/"Adeuda" = solo vencidas.
+- **Ojo al probar**: con un valor cargado y el server corriendo, el scheduler crea cuotas de verdad para los alumnos del ciclo activo (`prueba-*` incluidos, que no llevan id `prueba-` y `borrar` no las elimina). Dejar `valorCuota` en null (o borrar esas cuotas) al terminar de probar.
+
 ### Alta de Secretario: por qué no tiene módulo propio
 
 A diferencia de `Padre` (`dni`, `telefono`, `vinculo`) y `Profesor` (`dni`, `telefono`), **`Secretario` no tiene ningún campo propio que no esté ya en `Usuario`** (`nombre`, `email`, `password`) — por eso no existe `modules/secretarios/` ni una entidad `Secretario`: crear un módulo completo (entity+schema+repository+service+controller+routes) para no guardar ningún dato adicional sería ceremonial sin necesidad real. El alta vive directo en `UsuarioService.crearSecretario`/`UsuarioController` (montados en `/api/auth`, igual que `login`, porque ese es el módulo que ya posee `Usuario`), simplemente creando un `Usuario` con `roles: ["secretario"]`. `crearSecretario`/`crearAdministrador`/`listarUsuarios` devuelven `Omit<Usuario, "passwordHash">` — nunca se expone el hash por la API.
@@ -170,6 +182,7 @@ A diferencia de `Padre` (`dni`, `telefono`, `vinculo`) y `Profesor` (`dni`, `tel
 | `GET /api/cuotas/alumnos/:alumnoId` | admin, secretario, padre | Listado — padre solo de su propio hijo (mismo patrón `Solicitante` que `asistencia`/`calificaciones`) |
 | `GET /api/cuotas` | admin, secretario | Todas las cuotas del instituto (`CuotasPage` admin, join client-side con alumnos/cursos) |
 | `GET /api/cuotas/pagos` | admin, secretario | Todos los pagos (para historial "pagada el 10/07 · Efectivo" y KPI "cobrado este mes") |
+| `GET /api/configuracion` \| `PATCH /api/configuracion` | admin, secretario \| admin | Valor global de la cuota mensual (ver "Cuotas: generación automática") |
 | `POST /api/cuotas/pagos` | admin, secretario | `RegistrarPago` — `metodo` (`efectivo`/`transferencia`/`tarjeta`/`mercadopago`/`otro`), `fechaPago` opcional (AAAA-MM-DD, no futura; por defecto hoy) y `notas` opcional (≤200). Todo-o-nada vía `UnitOfWork` |
 | `POST /api/documentos/autorizacion-imagen` | padre | `AutorizarImagen` — una sola vez, `ConflictError` (409) si ya estaba autorizada |
 | `GET /api/documentos/alumnos/:alumnoId/autorizacion-imagen` | admin, secretario, padre | Estado actual (`Documento \| null`) — padre solo de su propio hijo |

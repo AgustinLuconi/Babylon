@@ -379,11 +379,12 @@ function ReporteFinanciero({ rows }: { rows: ReporteAlumnoResumen[] }) {
 
   const exportar = () =>
     descargarCsv(
-      ["Alumno", "Curso", "Pagas", "Vencidas", "Adeuda", "Último pago"],
+      ["Alumno", "Curso", "Pagas", "Pendientes", "Vencidas", "Adeuda", "Último pago"],
       rows.map((r) => [
         r.alumnoNombre,
         r.cursoNombre ?? "—",
         r.cuotasPagas,
+        r.cuotasPendientes,
         r.cuotasVencidas,
         r.deudaTotal ? formatMonto(r.deudaTotal) : "—",
         r.ultimoPago ? `${MESES[r.ultimoPago.mes - 1]} ${r.ultimoPago.anio}` : "—",
@@ -409,6 +410,7 @@ function ReporteFinanciero({ rows }: { rows: ReporteAlumnoResumen[] }) {
               <th>Alumno</th>
               <th>Curso</th>
               <th>Pagas</th>
+              <th>Pendientes</th>
               <th>Vencidas</th>
               <th>Adeuda</th>
               <th>Último pago</th>
@@ -426,6 +428,9 @@ function ReporteFinanciero({ rows }: { rows: ReporteAlumnoResumen[] }) {
                 <td style={{ color: "var(--text-muted)" }}>{r.cursoNombre ?? "—"}</td>
                 <td className="tnum" style={{ color: "var(--brand)" }}>
                   {r.cuotasPagas}
+                </td>
+                <td className="tnum" style={{ color: r.cuotasPendientes ? "var(--warning)" : "var(--text-faint)" }}>
+                  {r.cuotasPendientes}
                 </td>
                 <td className="tnum" style={{ color: r.cuotasVencidas ? "var(--danger)" : "var(--text-faint)" }}>
                   {r.cuotasVencidas}

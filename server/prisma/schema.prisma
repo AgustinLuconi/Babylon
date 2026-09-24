@@ -65,6 +65,7 @@ enum EstadoAsistencia {
 }
 
 enum EstadoCuota {
+  pendiente
   pagada
   vencida
 }
@@ -256,6 +257,9 @@ model Cuota {
 
   alumno Alumno @relation(fields: [alumnoId], references: [id])
   pago   Pago?
+
+  // Una sola cuota por alumno y mes: hace idempotente la generación automática.
+  @@unique([alumnoId, mes, anio])
 }
 
 model Pago {
@@ -383,4 +387,12 @@ model Mensaje {
   fecha     DateTime
 
   chat Chat @relation(fields: [chatId], references: [id])
+}
+
+// Ajustes globales del instituto. Hay una única fila (id fijo "instituto").
+model Configuracion {
+  id         String @id
+  // Valor de la cuota mensual, igual para todos los cursos. Sin valor cargado
+  // no se generan cuotas.
+  valorCuota Float?
 }

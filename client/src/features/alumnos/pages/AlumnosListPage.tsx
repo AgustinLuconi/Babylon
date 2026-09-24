@@ -10,19 +10,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDni, normalizarTexto } from "@/core/lib/utils";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCuotas } from "@/features/cuotas/hooks/useCuotas";
-import type { EstadoCuota } from "@/features/cuotas/types";
+import { estadoMasUrgente, type Cuota, type EstadoCuota } from "@/features/cuotas/types";
 import { usePadres } from "@/features/padres/hooks/usePadres";
 import type { Padre } from "@/features/padres/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
 import { NIVEL_GRUPO, type Curso } from "@/features/cursos/types";
 import { useAlumnos } from "../hooks/useAlumnos";
 
-const CUOTA_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
+const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
+  pendiente: "warning",
   vencida: "danger",
 };
 const CUOTA_LABELS: Record<EstadoCuota, string> = {
   pagada: "Al día",
+  pendiente: "Pendiente",
   vencida: "Vencida",
 };
 
@@ -64,12 +66,13 @@ export default function AlumnosListPage() {
   }, [cursos]);
 
   const estadoCuotaPorAlumno = useMemo(() => {
+    // Se muestra siempre lo más urgente: vencida > pendiente > pagada.
+    const porAlumno = new Map<string, Cuota[]>();
+    for (const cuota of cuotas ?? []) porAlumno.set(cuota.alumnoId, [...(porAlumno.get(cuota.alumnoId) ?? []), cuota]);
     const mapa = new Map<string, EstadoCuota>();
-    for (const cuota of cuotas ?? []) {
-      const actual = mapa.get(cuota.alumnoId);
-      // Prioridad: vencida > pagada, para mostrar siempre lo más urgente.
-      if (cuota.estado === "vencida") mapa.set(cuota.alumnoId, "vencida");
-      else if (!actual) mapa.set(cuota.alumnoId, "pagada");
+    for (const [alumnoId, delAlumno] of porAlumno) {
+      const estado = estadoMasUrgente(delAlumno);
+      if (estado) mapa.set(alumnoId, estado);
     }
     return mapa;
   }, [cuotas]);
@@ -146,6 +149,7 @@ export default function AlumnosListPage() {
           >
             <option value="todas">Todas las cuotas</option>
             <option value="pagada">Al día</option>
+            <option value="pendiente">Pendiente</option>
             <option value="vencida">Vencida</option>
           </Select>
           <Select value={filtroCurso} onChange={(e) => actualizarFiltro(setFiltroCurso)(e.target.value)} className="w-auto">

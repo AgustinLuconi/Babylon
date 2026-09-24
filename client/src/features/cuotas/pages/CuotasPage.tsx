@@ -17,12 +17,14 @@ import { usePagos } from "../hooks/usePagos";
 import { useRegistrarPago } from "../hooks/useRegistrarPago";
 import { METODO_PAGO_LABELS, type EstadoCuota, type MetodoPago, type Pago } from "../types";
 
-const ESTADO_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
+const ESTADO_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
+  pendiente: "warning",
   vencida: "danger",
 };
 const ESTADO_LABELS: Record<EstadoCuota, string> = {
   pagada: "Cobrada",
+  pendiente: "Pendiente",
   vencida: "Vencida",
 };
 
@@ -32,9 +34,8 @@ const MESES = [
 ];
 
 const METODOS: MetodoPago[] = ["efectivo", "transferencia", "mercadopago", "otro"];
-const METODOS_ORDEN_MODAL = METODOS;
 
-type Tab = "vencida" | "pagada" | "todas";
+type Tab = "vencida" | "pendiente" | "pagada" | "todas";
 
 export default function CuotasPage() {
   const { data: alumnos } = useAlumnos();
@@ -88,12 +89,17 @@ export default function CuotasPage() {
     return fecha.getUTCMonth() === hoy.getUTCMonth() && fecha.getUTCFullYear() === hoy.getUTCFullYear();
   });
   const vencidas = (cuotas ?? []).filter((c) => c.estado === "vencida");
+  const pendientes = (cuotas ?? []).filter((c) => c.estado === "pendiente");
   const pagadas = (cuotas ?? []).filter((c) => c.estado === "pagada");
   const deudaTotal = vencidas.reduce((a, c) => a + c.montoFinal, 0);
-  const tasaCobranza = cuotas && cuotas.length > 0 ? Math.round((pagadas.length / cuotas.length) * 100) : 0;
+  // Se mide sobre las cuotas ya exigibles (cobradas + vencidas): una pendiente
+  // todavía no vence, no cuenta ni a favor ni en contra.
+  const exigibles = pagadas.length + vencidas.length;
+  const tasaCobranza = exigibles > 0 ? Math.round((pagadas.length / exigibles) * 100) : 0;
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "vencida", label: "Vencidas", count: vencidas.length },
+    { id: "pendiente", label: "Pendientes", count: pendientes.length },
     { id: "pagada", label: "Cobradas", count: pagadas.length },
     { id: "todas", label: "Todas", count: (cuotas ?? []).length },
   ];
@@ -155,13 +161,14 @@ export default function CuotasPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard
           label="Cobrado este mes"
           value={formatMonto(cobradoEsteMes.reduce((a, c) => a + c.montoFinal, 0))}
           sub={`${cobradoEsteMes.length} cuota${cobradoEsteMes.length !== 1 ? "s" : ""}`}
         />
         <KpiCard label="Deuda total" value={formatMonto(deudaTotal)} sub={`${vencidas.length} cuota${vencidas.length !== 1 ? "s" : ""}`} />
+        <KpiCard label="Pendientes" value={String(pendientes.length)} sub="por vencer" />
         <KpiCard label="Tasa de cobranza" value={`${tasaCobranza}%`} />
       </div>
 
@@ -406,9 +413,9 @@ export default function CuotasPage() {
 
           {payAlumnoId && (
             <div>
-              <label className="mb-1.5 block text-[12.5px] font-medium">Cuotas vencidas</label>
+              <label className="mb-1.5 block text-[12.5px] font-medium">Cuotas pendientes / vencidas</label>
               {cuotasDelAlumnoSeleccionado.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">Este alumno no tiene cuotas vencidas.</p>
+                <p className="text-[12.5px] text-muted-foreground">Este alumno no tiene cuotas pendientes ni vencidas.</p>
               ) : (
                 <div className="space-y-1.5">
                   {cuotasDelAlumnoSeleccionado.map((c) => {
@@ -473,7 +480,7 @@ export default function CuotasPage() {
           <div>
             <label className="mb-1.5 block text-[12.5px] font-medium">Método de pago</label>
             <div className="grid grid-cols-2 gap-1.5">
-              {METODOS_ORDEN_MODAL.map((m) => (
+              {METODOS.map((m) => (
                 <button
                   key={m}
                   onClick={() => setMetodo(m)}

@@ -16,7 +16,7 @@ import { normalizarTexto } from "@/core/lib/utils";
 import { useAlumnos } from "@/features/alumnos/hooks/useAlumnos";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCuotas } from "@/features/cuotas/hooks/useCuotas";
-import type { EstadoCuota } from "@/features/cuotas/types";
+import { estadoMasUrgente, type Cuota, type EstadoCuota } from "@/features/cuotas/types";
 import { asistenciaService } from "@/features/asistencia/asistenciaService";
 import { useProfesores } from "@/features/profesores/hooks/useProfesores";
 import { useCrearCurso } from "../hooks/useCrearCurso";
@@ -56,12 +56,14 @@ const cursoSchema = z.object({
 type CursoFormInput = z.input<typeof cursoSchema>;
 type CursoForm = z.output<typeof cursoSchema>;
 
-const CUOTA_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
+const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
+  pendiente: "warning",
   vencida: "danger",
 };
 const CUOTA_LABELS: Record<EstadoCuota, string> = {
   pagada: "Al día",
+  pendiente: "Pendiente",
   vencida: "Vencida",
 };
 
@@ -451,11 +453,12 @@ function NominaCurso({ curso, onVolver }: { curso: Curso; onVolver: () => void }
   const alumnosDelCurso = useMemo(() => (alumnos ?? []).filter((a) => a.cursoId === curso.id), [alumnos, curso.id]);
 
   const estadoCuotaPorAlumno = useMemo(() => {
+    const porAlumno = new Map<string, Cuota[]>();
+    for (const c of cuotas ?? []) porAlumno.set(c.alumnoId, [...(porAlumno.get(c.alumnoId) ?? []), c]);
     const mapa = new Map<string, EstadoCuota>();
-    for (const c of cuotas ?? []) {
-      const actual = mapa.get(c.alumnoId);
-      if (c.estado === "vencida") mapa.set(c.alumnoId, "vencida");
-      else if (!actual) mapa.set(c.alumnoId, "pagada");
+    for (const [alumnoId, delAlumno] of porAlumno) {
+      const estado = estadoMasUrgente(delAlumno);
+      if (estado) mapa.set(alumnoId, estado);
     }
     return mapa;
   }, [cuotas]);
