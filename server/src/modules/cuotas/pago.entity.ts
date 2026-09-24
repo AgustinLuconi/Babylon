@@ -1,4 +1,4 @@
-export type MetodoPago = "efectivo" | "transferencia" | "tarjeta" | "mercadopago" | "otro";
+export type MetodoPago = "efectivo" | "transferencia" | "mercadopago" | "otro";
 
 export interface Pago {
   id: string;

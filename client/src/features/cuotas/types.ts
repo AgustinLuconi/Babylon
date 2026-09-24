@@ -1,10 +1,9 @@
 export type EstadoCuota = "pagada" | "vencida";
-export type MetodoPago = "efectivo" | "transferencia" | "tarjeta" | "mercadopago" | "otro";
+export type MetodoPago = "efectivo" | "transferencia" | "mercadopago" | "otro";
 
 export const METODO_PAGO_LABELS: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
-  tarjeta: "Tarjeta",
   mercadopago: "Mercado Pago",
   otro: "Otro",
 };

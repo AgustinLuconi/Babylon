@@ -72,7 +72,6 @@ enum EstadoCuota {
 enum MetodoPago {
   efectivo
   transferencia
-  tarjeta
   mercadopago
   otro
 }

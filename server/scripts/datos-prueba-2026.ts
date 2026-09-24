@@ -174,7 +174,7 @@ async function crear() {
         pagoN++;
         const hoy = mes === 9 && azar() < 0.2;
         const fecha = hoy ? new Date(Date.UTC(2026, 8, 23, 14, 30)) : new Date(Date.UTC(2026, mes - 1, 2 + Math.floor(azar() * 14), 13 + Math.floor(azar() * 5), 10));
-        const metodo: MetodoPago = elegir(["efectivo", "transferencia", "tarjeta"]);
+        const metodo: MetodoPago = elegir(["efectivo", "transferencia", "mercadopago"]);
         await prisma.pago.create({ data: { id: `${P}pago-${pagoN}`, cuotaId, fechaPago: fecha, metodo, monto: montoFinal, registradoPor: secretario.id } });
       }
     }
