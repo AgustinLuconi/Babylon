@@ -38,7 +38,7 @@ pnpm lint        # ESLint (flat config en eslint.config.js)
 pnpm build       # typecheck + build de producción
 ```
 
-**Datos de prueba del ciclo 2026 (`server/scripts/datos-prueba-2026.ts`)**: los datos reales están en el ciclo 2025; el 2026 solo tiene datos de prueba, todos con id que empieza con `prueba-` (cursos, alumnos, padres, cuotas, pagos, asistencia, evaluaciones, chats…). `pnpm exec tsx scripts/datos-prueba-2026.ts crear` los regenera (borra y recrea) y `... borrar` los elimina sin tocar nada real. Cuentas de padre de prueba: `p1..p6@prueba.babylon.test` / `prueba1234` (p1 tiene dos hijos → descuento por hermanos). **Borrarlos con `borrar` antes de cargar datos reales del 2026.** El modelo de cuota solo tiene `pagada`/`vencida` (no existe "pendiente"), por eso `CuotasPage` no tiene pestaña/KPI "Pendientes" como el prototipo.
+**Datos de prueba del ciclo 2026 (`server/scripts/datos-prueba-2026.ts`)**: los datos reales están en el ciclo 2025; el 2026 solo tiene datos de prueba, todos con id que empieza con `prueba-` (cursos, alumnos, padres, cuotas, pagos, asistencia, evaluaciones, chats…). `pnpm exec tsx scripts/datos-prueba-2026.ts crear` los regenera (borra y recrea) y `... borrar` los elimina sin tocar nada real. Cuentas de padre de prueba: `p1..p6@prueba.babylon.test` / `prueba1234` (p1 tiene dos hijos → descuento por hermanos). **Borrarlos con `borrar` antes de cargar datos reales del 2026.** El modelo de cuota solo tiene `pagada`/`vencida` (no existe "pendiente"), por eso `CuotasPage` no tiene pestaña/KPI "Pendientes" como el prototipo. **Ojo: nada en el sistema genera cuotas** (ni al inscribir ni mensualmente; no hay monto por curso) — las del 2025 entraron por importación y las de prueba por el script; falta definir esa regla de negocio.
 
 ### Infraestructura
 ```bash
@@ -170,7 +170,7 @@ A diferencia de `Padre` (`dni`, `telefono`, `vinculo`) y `Profesor` (`dni`, `tel
 | `GET /api/cuotas/alumnos/:alumnoId` | admin, secretario, padre | Listado — padre solo de su propio hijo (mismo patrón `Solicitante` que `asistencia`/`calificaciones`) |
 | `GET /api/cuotas` | admin, secretario | Todas las cuotas del instituto (`CuotasPage` admin, join client-side con alumnos/cursos) |
 | `GET /api/cuotas/pagos` | admin, secretario | Todos los pagos (para historial "pagada el 10/07 · Efectivo" y KPI "cobrado este mes") |
-| `POST /api/cuotas/pagos` | admin, secretario | `RegistrarPago` |
+| `POST /api/cuotas/pagos` | admin, secretario | `RegistrarPago` — `metodo` (`efectivo`/`transferencia`/`tarjeta`/`mercadopago`/`otro`), `fechaPago` opcional (AAAA-MM-DD, no futura; por defecto hoy) y `notas` opcional (≤200). Todo-o-nada vía `UnitOfWork` |
 | `POST /api/documentos/autorizacion-imagen` | padre | `AutorizarImagen` — una sola vez, `ConflictError` (409) si ya estaba autorizada |
 | `GET /api/documentos/alumnos/:alumnoId/autorizacion-imagen` | admin, secretario, padre | Estado actual (`Documento \| null`) — padre solo de su propio hijo |
 | `GET /api/calificaciones/cursos/:cursoId/evaluaciones` | admin, secretario, profesor | Listado — profesor solo las de sus propios cursos |

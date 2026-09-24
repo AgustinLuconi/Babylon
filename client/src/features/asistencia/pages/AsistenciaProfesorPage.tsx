@@ -292,11 +292,11 @@ export default function AsistenciaProfesorPage() {
                     </p>
                     {hasAlert ? (
                       <p className="mt-0.5 flex items-center gap-1 text-[11.5px]" style={{ color: "var(--danger)" }}>
-                        <AlertTriangle size={10} /> <span className="tnum">{ausencias}</span> ausencias este mes
+                        <AlertTriangle size={10} /> <span className="tnum">{ausencias}</span> ausencia{ausencias !== 1 ? "s" : ""} este mes
                       </p>
                     ) : (
                       <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                        <span className="tnum">{ausencias}</span> ausencias en el mes
+                        <span className="tnum">{ausencias}</span> ausencia{ausencias !== 1 ? "s" : ""} en el mes
                       </p>
                     )}
                   </div>

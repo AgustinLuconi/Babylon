@@ -551,7 +551,7 @@ export default function ParentDashboardPage() {
                   className="mt-3 flex items-start gap-2 border-t pt-3 text-[11.5px] text-muted-foreground"
                   style={{ borderColor: "var(--border-hex)" }}
                 >
-                  El pago se realiza directamente en el instituto (efectivo, transferencia o tarjeta).
+                  El pago se realiza directamente en el instituto. Aceptamos efectivo, transferencia y Mercado Pago.
                 </p>
               )}
             </div>

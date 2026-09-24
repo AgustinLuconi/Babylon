@@ -7,7 +7,7 @@ import { Input } from "@/core/components/ui/input";
 import { KpiCard } from "@/core/components/ui/kpi-card";
 import { Modal } from "@/core/components/ui/modal";
 import { ApiError } from "@/core/lib/apiClient";
-import { formatDni, formatMonto, normalizarTexto } from "@/core/lib/utils";
+import { formatDni, formatMonto, hoyLocalISO, normalizarTexto } from "@/core/lib/utils";
 import { useAlumnos } from "@/features/alumnos/hooks/useAlumnos";
 import type { Alumno } from "@/features/alumnos/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
@@ -31,7 +31,8 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const METODOS: MetodoPago[] = ["efectivo", "transferencia", "tarjeta"];
+const METODOS: MetodoPago[] = ["efectivo", "transferencia", "mercadopago", "otro"];
+const METODOS_ORDEN_MODAL = METODOS;
 
 type Tab = "vencida" | "pagada" | "todas";
 
@@ -50,6 +51,8 @@ export default function CuotasPage() {
   const [payBusqueda, setPayBusqueda] = useState("");
   const [cuotaIdsSeleccionadas, setCuotaIdsSeleccionadas] = useState<string[]>([]);
   const [metodo, setMetodo] = useState<MetodoPago>("efectivo");
+  const [fechaPago, setFechaPago] = useState(hoyLocalISO());
+  const [notas, setNotas] = useState("");
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -113,6 +116,8 @@ export default function CuotasPage() {
     setPayAlumnoId(alumnoId);
     setCuotaIdsSeleccionadas(cuotaId ? [cuotaId] : []);
     setMetodo("efectivo");
+    setFechaPago(hoyLocalISO());
+    setNotas("");
     setModalOpen(true);
   };
 
@@ -139,7 +144,7 @@ export default function CuotasPage() {
 
   const confirmarPago = async () => {
     if (cuotaIdsSeleccionadas.length === 0) return;
-    await registrarPago.mutateAsync({ cuotaIds: cuotaIdsSeleccionadas, metodo });
+    await registrarPago.mutateAsync({ cuotaIds: cuotaIdsSeleccionadas, metodo, fechaPago, notas: notas.trim() || undefined });
     setModalOpen(false);
     setToast(
       `${cuotaIdsSeleccionadas.length} cuota${cuotaIdsSeleccionadas.length !== 1 ? "s" : ""} registrada${cuotaIdsSeleccionadas.length !== 1 ? "s" : ""} correctamente`,
@@ -324,7 +329,7 @@ export default function CuotasPage() {
               </Button>
               <Button
                 className="flex-1"
-                disabled={cuotaIdsSeleccionadas.length === 0 || registrarPago.isPending}
+                disabled={cuotaIdsSeleccionadas.length === 0 || !fechaPago || registrarPago.isPending}
                 onClick={confirmarPago}
               >
                 {registrarPago.isPending
@@ -467,8 +472,8 @@ export default function CuotasPage() {
 
           <div>
             <label className="mb-1.5 block text-[12.5px] font-medium">Método de pago</label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {METODOS.map((m) => (
+            <div className="grid grid-cols-2 gap-1.5">
+              {METODOS_ORDEN_MODAL.map((m) => (
                 <button
                   key={m}
                   onClick={() => setMetodo(m)}
@@ -483,6 +488,24 @@ export default function CuotasPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12.5px] font-medium">Fecha de pago</label>
+            <Input type="date" value={fechaPago} max={hoyLocalISO()} onChange={(e) => setFechaPago(e.target.value)} />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[12.5px] font-medium">
+              Notas <span className="font-normal" style={{ color: "var(--text-faint)" }}>· opcional</span>
+            </label>
+            <textarea
+              value={notas}
+              onChange={(e) => setNotas(e.target.value.slice(0, 200))}
+              rows={3}
+              placeholder="Ej: pago parcial acordado con la familia"
+              className="input w-full resize-none"
+            />
           </div>
 
           {registrarPago.isError && (

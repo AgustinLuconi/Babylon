@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AuthorizationError, ConflictError, EntityNotFoundError } from "../../core/errors";
+import { AuthorizationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Rol, UnitOfWork } from "../../core/ports";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { CuotaRepository } from "./cuota.repository";
@@ -47,6 +47,12 @@ export class CuotaService {
   }
 
   async registrarPago(datos: RegistrarPagoInput): Promise<Pago[]> {
+    // La fecha llega como calendario (AAAA-MM-DD, medianoche UTC, igual que el
+    // resto de las fechas calendario); sin fecha se usa el instante actual.
+    const fechaPago = datos.fechaPago ? new Date(`${datos.fechaPago}T00:00:00.000Z`) : new Date();
+    if (fechaPago.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+      throw new ValidationError("La fecha de pago no puede ser futura");
+    }
     return this.unitOfWork.runInTransaction(async (tx) => {
       const pagosRegistrados: Pago[] = [];
 
@@ -62,10 +68,11 @@ export class CuotaService {
         const pago: Pago = {
           id: randomUUID(),
           cuotaId: cuota.id,
-          fechaPago: new Date(),
+          fechaPago,
           metodo: datos.metodo,
           monto: cuota.montoFinal,
           registradoPor: datos.registradoPor,
+          notas: datos.notas || null,
         };
 
         await this.cuotaRepo.registrarPago(pago, tx);

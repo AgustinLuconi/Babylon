@@ -1,10 +1,12 @@
 export type EstadoCuota = "pagada" | "vencida";
-export type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
+export type MetodoPago = "efectivo" | "transferencia" | "tarjeta" | "mercadopago" | "otro";
 
 export const METODO_PAGO_LABELS: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
   transferencia: "Transferencia",
   tarjeta: "Tarjeta",
+  mercadopago: "Mercado Pago",
+  otro: "Otro",
 };
 
 export interface Cuota {
@@ -28,9 +30,13 @@ export interface Pago {
   metodo: MetodoPago;
   monto: number;
   registradoPor: string;
+  notas?: string | null;
 }
 
 export interface RegistrarPagoInput {
   cuotaIds: string[];
   metodo: MetodoPago;
+  // AAAA-MM-DD; si falta, el server usa hoy.
+  fechaPago?: string;
+  notas?: string;
 }
