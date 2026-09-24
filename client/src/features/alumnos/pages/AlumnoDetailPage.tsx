@@ -525,7 +525,7 @@ export default function AlumnoDetailPage() {
             </Card>
           ) : (
             <Panel
-              title={`Evaluaciones · ${PERIODO_LABELS[periodo]}`}
+              title={`Evaluaciones · ${periodo === "julio" ? "1° Cierre" : "2° Cierre"}`}
               action={
                 <span className="text-[12px] text-muted-foreground">
                   Promedio <span className="tnum font-semibold" style={{ color: "var(--brand)" }}>{promedioPeriodo}</span>
@@ -573,7 +573,7 @@ export default function AlumnoDetailPage() {
                   );
                 })()}
                 <div className="min-w-[180px] flex-1">
-                  <p className="eyebrow">Nota de cierre — {PERIODO_LABELS[periodo]}</p>
+                  <p className="eyebrow">Nota de cierre — {periodo === "julio" ? "1° Cierre (Julio)" : "2° Cierre (Noviembre)"}</p>
                   <p className="mt-1 text-[13.5px] font-semibold">Nota final del período definida por el profesor</p>
                   {notaCierrePeriodo.observacion && <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">&quot;{notaCierrePeriodo.observacion}&quot;</p>}
                 </div>
@@ -623,7 +623,7 @@ export default function AlumnoDetailPage() {
               <p className="text-sm text-muted-foreground">Cargando…</p>
             ) : (
               mesAsistencia && (
-                <div className="mx-auto max-w-[300px]">
+                <div>
                   <AttendanceCalendar registros={asistencias ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
                 </div>
               )
@@ -759,11 +759,14 @@ export default function AlumnoDetailPage() {
           {observacionesVisibles?.map((observacion) => (
             <Card key={observacion.id}>
               <CardContent className="flex items-start gap-3 p-4">
-                <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="sm" />
+                <Avatar name={observacion.emisorNombre} size="sm" tone="brand" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Badge variant="secondary">{nombresPorCategoria.get(observacion.categoria) ?? observacion.categoria}</Badge>
-                    <span className="tnum text-[11.5px] text-muted-foreground">{formatFecha(observacion.fecha)}</span>
+                    <span className="text-[12.5px] font-semibold">{observacion.emisorNombre}</span>
+                    <span className="flex items-center gap-2">
+                      <Badge variant="secondary">{nombresPorCategoria.get(observacion.categoria) ?? observacion.categoria}</Badge>
+                      <span className="tnum text-[11.5px] text-muted-foreground">{formatFecha(observacion.fecha)}</span>
+                    </span>
                   </div>
                   <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{observacion.texto}</p>
                 </div>

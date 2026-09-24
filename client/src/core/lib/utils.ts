@@ -66,3 +66,9 @@ export function formatearVariacionPp(pp: number): { delta: string; tono: "positi
 export function formatDni(dni: string): string {
   return /^\d{7,8}$/.test(dni) ? dni.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : dni;
 }
+
+const NOMBRES_MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+// 1..12 -> "Agosto"
+export function nombreMes(mes: number): string {
+  return NOMBRES_MES[mes - 1] ?? String(mes);
+}

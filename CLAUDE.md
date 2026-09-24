@@ -38,6 +38,8 @@ pnpm lint        # ESLint (flat config en eslint.config.js)
 pnpm build       # typecheck + build de producción
 ```
 
+**Datos de prueba del ciclo 2026 (`server/scripts/datos-prueba-2026.ts`)**: los datos reales están en el ciclo 2025; el 2026 solo tiene datos de prueba, todos con id que empieza con `prueba-` (cursos, alumnos, padres, cuotas, pagos, asistencia, evaluaciones, chats…). `pnpm exec tsx scripts/datos-prueba-2026.ts crear` los regenera (borra y recrea) y `... borrar` los elimina sin tocar nada real. Cuentas de padre de prueba: `p1..p6@prueba.babylon.test` / `prueba1234` (p1 tiene dos hijos → descuento por hermanos). **Borrarlos con `borrar` antes de cargar datos reales del 2026.** El modelo de cuota solo tiene `pagada`/`vencida` (no existe "pendiente"), por eso `CuotasPage` no tiene pestaña/KPI "Pendientes" como el prototipo.
+
 ### Infraestructura
 ```bash
 docker compose up -d   # levanta únicamente PostgreSQL (server y client corren con pnpm dev, no en Docker)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCheck, Info } from "lucide-react";
+import { Badge } from "@/core/components/ui/badge";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
@@ -43,6 +44,12 @@ const ESTADOS: { id: EstadoAsistencia; label: string }[] = [
   { id: "tarde", label: "Tarde" },
   { id: "ausente", label: "Ausente" },
 ];
+
+const ESTADO_BADGE: Record<EstadoAsistencia, "success" | "warning" | "danger"> = {
+  presente: "success",
+  tarde: "warning",
+  ausente: "danger",
+};
 
 const ESTADO_COLOR: Record<EstadoAsistencia, string> = {
   presente: "var(--brand)",
@@ -293,6 +300,7 @@ export default function AsistenciaProfesorPage() {
                       </p>
                     )}
                   </div>
+                  {estado && <Badge variant={ESTADO_BADGE[estado]}>{ESTADOS.find((e) => e.id === estado)?.label}</Badge>}
                 </div>
 
                 <div className="grid grid-cols-3 gap-1.5">
@@ -310,6 +318,7 @@ export default function AsistenciaProfesorPage() {
                           border: `1px solid ${active ? ESTADO_COLOR[st.id] : "var(--border-hex)"}`,
                         }}
                       >
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? ESTADO_COLOR[st.id] : "var(--text-faint)" }} />
                         {st.label}
                       </button>
                     );

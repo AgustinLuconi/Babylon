@@ -14,7 +14,7 @@ import type { EstadoCuota } from "@/features/cuotas/types";
 import { usePadres } from "@/features/padres/hooks/usePadres";
 import type { Padre } from "@/features/padres/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
-import { NIVEL_GRUPO, NIVEL_LABELS, type Curso } from "@/features/cursos/types";
+import { NIVEL_GRUPO, type Curso } from "@/features/cursos/types";
 import { useAlumnos } from "../hooks/useAlumnos";
 
 const CUOTA_VARIANT: Record<EstadoCuota, "success" | "danger"> = {
@@ -223,9 +223,9 @@ export default function AlumnosListPage() {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="tnum font-mono" style={{ color: "var(--text-muted)" }}>{formatDni(alumno.dni)}</TableCell>
+                <TableCell className="tnum" style={{ color: "var(--text-muted)" }}>{formatDni(alumno.dni)}</TableCell>
                 <TableCell>
-                  {curso && <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{NIVEL_LABELS[curso.nivel]}</span>}
+                  {curso && <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{curso.nombre}</span>}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {padre ? `${padre.nombre} ${padre.apellido}` : "—"}
@@ -298,7 +298,7 @@ export default function AlumnosListPage() {
                 )}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-[12px]" style={{ borderColor: "var(--border-hex)" }}>
-                <div>{curso && <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{NIVEL_LABELS[curso.nivel]}</span>}</div>
+                <div>{curso && <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{curso.nombre}</span>}</div>
                 <div className="text-muted-foreground">
                   <span className="text-[11px]">Tutor </span>
                   {padre ? `${padre.nombre} ${padre.apellido}` : "—"}

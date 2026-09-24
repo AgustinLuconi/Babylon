@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, Check, ChevronLeft, ChevronRight, FileSignature, FileText, Upload } from "lucide-react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, Eye, FileSignature, FileText, Upload } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
@@ -10,7 +10,7 @@ import { calcularEdad, formatFecha, formatMonto } from "@/core/lib/utils";
 import { NIVEL_GRUPO, type NivelCurso } from "@/features/cursos/types";
 import { useCalificacionesDeAlumno } from "@/features/calificaciones/hooks/useCalificacionesDeAlumno";
 import { useNotasCierreDeAlumno } from "@/features/calificaciones/hooks/useNotasCierreDeAlumno";
-import { PERIODO_LABELS, TIPO_EVALUACION_LABELS } from "@/features/calificaciones/types";
+import { TIPO_EVALUACION_LABELS } from "@/features/calificaciones/types";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
 import { useCuotasPorAlumno } from "@/features/cuotas/hooks/useCuotasPorAlumno";
@@ -414,10 +414,10 @@ export default function ParentDashboardPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="eyebrow" style={{ color: "var(--brand)" }}>
-                    Nota de cierre — {PERIODO_LABELS[cierreVisible.periodo]}
+                    Nota de cierre — {cierreVisible.periodo === "julio" ? "1° Cierre (Julio)" : "2° Cierre (Noviembre)"}
                   </p>
                   <p className="mt-1 text-[13.5px] font-semibold" style={{ color: "var(--brand)" }}>
-                    Nota final del período: {cierreVisible.nota} / 10
+                    Nota final del período: {cierreVisible.nota}{/^\d+([.,]\d+)?$/.test(String(cierreVisible.nota)) ? " / 10" : ""}
                   </p>
                   {cierreVisible.observacion && (
                     <p className="mt-1.5 text-[12px] text-muted-foreground">"{cierreVisible.observacion}"</p>
@@ -611,7 +611,7 @@ export default function ParentDashboardPage() {
                         )
                       ) : doc?.estado === "cargado" ? (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => {
                             if (!doc?.urlArchivo) {
@@ -621,7 +621,7 @@ export default function ParentDashboardPage() {
                             window.open(doc.urlArchivo, "_blank");
                           }}
                         >
-                          Ver
+                          <Eye className="mr-1.5" size={12} /> Ver
                         </Button>
                       ) : (
                         <Button

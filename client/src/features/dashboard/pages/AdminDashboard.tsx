@@ -5,7 +5,7 @@ import { Avatar } from "@/core/components/ui/avatar";
 import { Panel } from "@/core/components/ui/panel";
 import { KpiCard } from "@/core/components/ui/kpi-card";
 import { MiniBars } from "@/core/components/ui/mini-bars";
-import { formatearVariacionPp, formatFechaLarga, formatMonto } from "@/core/lib/utils";
+import { formatearVariacionPp, formatFechaLarga, formatMonto, nombreMes } from "@/core/lib/utils";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useResumenDashboard } from "@/features/reportes/hooks/useResumenDashboard";
 import { NIVEL_GRUPO, type NivelCurso } from "@/features/cursos/types";
@@ -68,7 +68,8 @@ export default function AdminDashboard() {
     return { delta, deltaTone: tono, sub: `vs ${mesAnterior}` };
   };
 
-  const totalDebt = resumen?.cuotasVencidas.reduce((a, f) => a + f.monto, 0) ?? 0;
+  const totalDebt = resumen?.cuotasVencidasTotal.monto ?? 0;
+  const cantidadVencidas = resumen?.cuotasVencidasTotal.cantidad ?? 0;
 
   const composicion = (["kids", "teens", "adults", "cambridge"] as const).map((grupo) => {
     const total = Object.entries(resumen?.composicionPorNivel ?? {}).reduce(
@@ -88,8 +89,8 @@ export default function AdminDashboard() {
           </h2>
           {resumen && (
             <p className="mt-1.5 text-[13.5px] text-muted-foreground">
-              {resumen.cuotasVencidas.length > 0
-                ? `${resumen.cuotasVencidas.length} cuota${resumen.cuotasVencidas.length !== 1 ? "s" : ""} vencida${resumen.cuotasVencidas.length !== 1 ? "s" : ""} suman ${formatMonto(totalDebt)}. `
+              {cantidadVencidas > 0
+                ? `${cantidadVencidas} cuota${cantidadVencidas !== 1 ? "s" : ""} vencida${cantidadVencidas !== 1 ? "s" : ""} suman ${formatMonto(totalDebt)}. `
                 : "No hay cuotas vencidas. "}
               La asistencia promedio es del {resumen.asistenciaPromedioPct}%.
             </p>
@@ -188,7 +189,7 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td style={{ color: "var(--text-muted)" }}>
-                            {f.mes}/{f.anio}
+                            {nombreMes(f.mes)} {f.anio}
                           </td>
                           <td
                             className="tnum"
@@ -209,6 +210,27 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 )}
+                {resumen?.cuotasVencidas.map((f, i) => (
+                  <div
+                    key={`m-${i}`}
+                    className="flex items-center gap-3 px-4 py-3 md:hidden"
+                    style={{ borderBottom: i < resumen.cuotasVencidas.length - 1 ? "1px solid var(--border-hex)" : "none" }}
+                  >
+                    <Avatar name={f.alumnoNombre} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium">{f.alumnoNombre}</p>
+                      <p className="truncate text-[11.5px] text-muted-foreground">
+                        {f.cursoNombre} · {nombreMes(f.mes)} {f.anio}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="tnum text-[13px] font-semibold">{formatMonto(f.monto)}</p>
+                      <p className="tnum text-[11px]" style={{ color: f.diasVencido >= 30 ? "var(--danger)" : "var(--warning)" }}>
+                        {f.diasVencido} d. atraso
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </Panel>
             </div>
 

@@ -66,6 +66,7 @@ export interface ResumenDashboard {
   docentesCount: number;
   nivelesCount: number;
   cuotasVencidas: CuotaVencidaResumen[];
+  cuotasVencidasTotal: { cantidad: number; monto: number; alumnos: number };
   proximasEvaluaciones: EvaluacionProximaResumen[];
   composicionPorNivel: Record<string, number>;
   actividadReciente: ActividadResumen[];

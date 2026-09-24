@@ -78,7 +78,7 @@ export default function InscribirAlumnoPage() {
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
   const [cursoId, setCursoId] = useState("");
 
-  const alumnoForm = useForm<AlumnoForm>({ resolver: zodResolver(alumnoSchema) });
+  const alumnoForm = useForm<AlumnoForm>({ resolver: zodResolver(alumnoSchema), defaultValues: { ciudad: "San Luis" } });
   const padreForm = useForm<NuevoPadreForm>({ resolver: zodResolver(nuevoPadreSchema) });
 
   const padresFiltrados = useMemo(() => {

@@ -3,7 +3,7 @@ import { DollarSign, Search } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
 import { Panel } from "@/core/components/ui/panel";
-import { formatFechaLarga, formatMonto } from "@/core/lib/utils";
+import { formatFechaLarga, formatMonto, nombreMes } from "@/core/lib/utils";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useResumenDashboard } from "@/features/reportes/hooks/useResumenDashboard";
 import { NIVEL_GRUPO, type NivelCurso } from "@/features/cursos/types";
@@ -17,7 +17,8 @@ export default function SecretarioDashboard() {
   const hora = new Date().getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 20 ? "Buenas tardes" : "Buenas noches";
 
-  const totalVencido = resumen?.cuotasVencidas.reduce((a, f) => a + f.monto, 0) ?? 0;
+  const totalVencido = resumen?.cuotasVencidasTotal.monto ?? 0;
+  const cantidadVencidas = resumen?.cuotasVencidasTotal.cantidad ?? 0;
 
   return (
     <div className="space-y-7">
@@ -29,8 +30,8 @@ export default function SecretarioDashboard() {
           </h2>
           {resumen && (
             <p className="mt-1.5 text-[13.5px] text-muted-foreground">
-              {resumen.cuotasVencidas.length > 0
-                ? `Hay ${resumen.cuotasVencidas.length} cuota${resumen.cuotasVencidas.length !== 1 ? "s" : ""} vencida${resumen.cuotasVencidas.length !== 1 ? "s" : ""} por ${formatMonto(totalVencido)} para gestionar hoy.`
+              {cantidadVencidas > 0
+                ? `Hay ${cantidadVencidas} cuota${cantidadVencidas !== 1 ? "s" : ""} vencida${cantidadVencidas !== 1 ? "s" : ""} por ${formatMonto(totalVencido)} para gestionar hoy.`
                 : "No hay cuotas vencidas pendientes de gestionar."}
             </p>
           )}
@@ -61,8 +62,7 @@ export default function SecretarioDashboard() {
                 {formatMonto(totalVencido)}
               </div>
               <div className="mt-2 text-[12px] text-muted-foreground">
-                {resumen.cuotasVencidas.length} cuota{resumen.cuotasVencidas.length !== 1 ? "s" : ""} ·{" "}
-                {new Set(resumen.cuotasVencidas.map((f) => f.alumnoId)).size} alumnos
+                {cantidadVencidas} cuota{cantidadVencidas !== 1 ? "s" : ""} · {resumen.cuotasVencidasTotal.alumnos} alumnos
               </div>
             </button>
 
@@ -141,7 +141,7 @@ export default function SecretarioDashboard() {
                             )}
                           </td>
                           <td style={{ color: "var(--text-muted)" }}>
-                            {f.mes}/{f.anio}
+                            {nombreMes(f.mes)} {f.anio}
                           </td>
                           <td
                             className="tnum"
@@ -174,7 +174,7 @@ export default function SecretarioDashboard() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium">{f.alumnoNombre}</p>
                         <p className="text-[11.5px] text-muted-foreground">
-                          {f.cursoNombre} · {f.mes}/{f.anio}
+                          {f.cursoNombre} · {nombreMes(f.mes)} {f.anio}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">

@@ -83,7 +83,9 @@ export interface ResumenDashboard {
   cursosActivos: number;
   docentesCount: number;
   nivelesCount: number;
+  // Las más atrasadas (máx. 5), para la tabla; los totales cuentan TODAS las vencidas.
   cuotasVencidas: CuotaVencidaResumen[];
+  cuotasVencidasTotal: { cantidad: number; monto: number; alumnos: number };
   proximasEvaluaciones: EvaluacionProximaResumen[];
   composicionPorNivel: Record<string, number>;
   actividadReciente: ActividadResumen[];
@@ -223,8 +225,13 @@ export class ReporteService {
     const nivelesCount = new Set(cursos.map((c) => c.nivel)).size;
 
     const ahora = new Date();
-    const cuotasVencidas: CuotaVencidaResumen[] = cuotas
-      .filter((c) => c.estado === "vencida")
+    const vencidas = cuotas.filter((c) => c.estado === "vencida");
+    const cuotasVencidasTotal = {
+      cantidad: vencidas.length,
+      monto: vencidas.reduce((a, c) => a + c.montoFinal, 0),
+      alumnos: new Set(vencidas.map((c) => c.alumnoId)).size,
+    };
+    const cuotasVencidas: CuotaVencidaResumen[] = vencidas
       .map((c) => ({
         alumnoId: c.alumno.id,
         alumnoNombre: `${c.alumno.nombre} ${c.alumno.apellido}`,
@@ -236,7 +243,7 @@ export class ReporteService {
         diasVencido: Math.max(0, Math.floor((ahora.getTime() - c.vencimiento.getTime()) / (1000 * 60 * 60 * 24))),
       }))
       .sort((a, b) => b.diasVencido - a.diasVencido)
-      .slice(0, 8);
+      .slice(0, 5);
 
     const proximasEvaluaciones: EvaluacionProximaResumen[] = evaluaciones.map((e) => ({
       evaluacionId: e.id,
@@ -271,7 +278,7 @@ export class ReporteService {
           tipo: "payment",
           actor: `${p.cuota.alumno.nombre} ${p.cuota.alumno.apellido}`,
           verbo: "pagó la cuota de",
-          objetivo: `${p.cuota.mes}/${p.cuota.anio}`,
+          objetivo: `${NOMBRES_MES[p.cuota.mes - 1].charAt(0).toUpperCase()}${NOMBRES_MES[p.cuota.mes - 1].slice(1)} ${p.cuota.anio}`,
           fecha: p.fechaPago,
         }),
       ),
@@ -286,7 +293,7 @@ export class ReporteService {
       ),
     ]
       .sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
-      .slice(0, 10);
+      .slice(0, 5);
 
     const inicioHoy = inicioDeHoyUtc();
     const pagosHoy = pagos.filter((p) => p.fechaPago >= inicioHoy);
@@ -307,6 +314,7 @@ export class ReporteService {
       docentesCount,
       nivelesCount,
       cuotasVencidas,
+      cuotasVencidasTotal,
       proximasEvaluaciones,
       composicionPorNivel,
       actividadReciente,
