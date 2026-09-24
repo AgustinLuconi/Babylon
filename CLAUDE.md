@@ -148,7 +148,7 @@ Las entidades secundarias normalmente no tienen su propio `*.repository.ts` — 
 - **Al inscribir** (`AlumnoService.inscribirAlumno`, dentro de la misma transacción): se crea la cuota del mes de inscripción (`generarCuotaInicial`). No hay cuotas retroactivas ni por adelantado.
 - **Cada mes, sola** (`cuota.scheduler.ts`, arrancado desde `server.ts`): al levantar el server y luego cada hora corre `mantenerCuotas()` = `marcarVencidas` (pendiente con vencimiento anterior a hoy → vencida; el propio día 10 todavía se puede pagar) + `generarCuotasDelMes`. Sin cron externo ni dependencia nueva: si el server estuvo apagado el día 1, se pone al día apenas vuelve.
 - Reportes: "al día %" y "tasa de cobranza" se calculan sobre cuotas exigibles (pagadas + vencidas; las pendientes no cuentan). "Deuda"/"Adeuda" = solo vencidas.
-- **Ojo al probar**: con un valor cargado y el server corriendo, el scheduler crea cuotas de verdad para los alumnos del ciclo activo (`prueba-*` incluidos, que no llevan id `prueba-` y `borrar` no las elimina). Dejar `valorCuota` en null (o borrar esas cuotas) al terminar de probar.
+- **Ojo al probar**: con un valor cargado y el server corriendo, el scheduler crea cuotas de verdad para los alumnos del ciclo activo, incluidos los de prueba; llevan un id UUID (no `prueba-`), así que `borrar` no las elimina. Dejar `valorCuota` en null (o borrar esas cuotas) al terminar de probar.
 
 ### Alta de Secretario: por qué no tiene módulo propio
 
