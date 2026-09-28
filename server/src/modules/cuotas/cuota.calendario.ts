@@ -1,4 +1,7 @@
-// Reglas de calendario de las cuotas — funciones puras, sin acceso a datos.
+// Reglas de calendario de las cuotas — funciones puras, sin acceso a datos. Los
+// días y meses se cuentan en hora de Argentina (ver core/fechas.ts).
+import { fechaHoraEnArgentina } from "../../core/fechas";
+
 
 // Ciclo lectivo: de marzo a noviembre. Fuera de esos meses no se generan cuotas.
 export const MES_INICIO_CICLO = 3;
@@ -19,16 +22,10 @@ export function esMesLectivo(mes: number): boolean {
 // mes (alta a mitad de mes, o valor de cuota cargado tarde) vence el último día
 // de ese mes, para no nacer ya vencida.
 export function vencimientoDelMes(mes: number, anio: number, hoy: Date): Date {
-  const esMesActual = hoy.getFullYear() === anio && hoy.getMonth() + 1 === mes;
-  if (esMesActual && hoy.getDate() > DIA_VENCIMIENTO) {
+  const hoyAr = fechaHoraEnArgentina(hoy);
+  const esMesActual = hoyAr.anio === anio && hoyAr.mes === mes;
+  if (esMesActual && hoyAr.dia > DIA_VENCIMIENTO) {
     return new Date(Date.UTC(anio, mes, 0));
   }
   return new Date(Date.UTC(anio, mes - 1, DIA_VENCIMIENTO));
-}
-
-// Medianoche UTC del día calendario local de `hoy`: una cuota está vencida si su
-// vencimiento es anterior a este instante (el propio día de vencimiento todavía
-// se puede pagar).
-export function inicioDeHoyUtc(hoy: Date): Date {
-  return new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()));
 }

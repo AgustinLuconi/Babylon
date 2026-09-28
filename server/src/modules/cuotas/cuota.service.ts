@@ -9,7 +9,8 @@ import type { CuotaRepository } from "./cuota.repository";
 import type { Cuota } from "./cuota.entity";
 import type { Pago } from "./pago.entity";
 import type { RegistrarPagoInput } from "./cuota.schema";
-import { esMesLectivo, inicioDeHoyUtc, PORCENTAJE_DESCUENTO_HERMANOS, vencimientoDelMes } from "./cuota.calendario";
+import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
+import { esMesLectivo, PORCENTAJE_DESCUENTO_HERMANOS, vencimientoDelMes } from "./cuota.calendario";
 
 export interface Solicitante {
   rol: Rol;
@@ -101,8 +102,7 @@ export class CuotaService {
   // que generar: mes fuera del ciclo lectivo, sin ciclo activo de este año, o
   // sin valor de cuota cargado.
   private async contextoDeGeneracion(hoy: Date, tx?: unknown) {
-    const mes = hoy.getMonth() + 1;
-    const anio = hoy.getFullYear();
+    const { mes, anio } = fechaHoraEnArgentina(hoy);
     if (!esMesLectivo(mes)) return null;
     const ciclo = await this.cicloRepo.findActivo(tx);
     if (!ciclo || ciclo.anio !== anio) return null;

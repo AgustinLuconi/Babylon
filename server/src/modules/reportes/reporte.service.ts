@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
 
 export interface CuotaVencidaResumen {
   alumnoId: string;
@@ -34,11 +35,6 @@ const NOMBRES_MES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
-
-function inicioDeHoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
-}
 
 const CATEGORIA_LABELS: Record<string, string> = {
   academico: "Académico",
@@ -228,7 +224,7 @@ export class ReporteService {
     const docentesCount = new Set(cursos.map((c) => c.profesorId)).size;
     const nivelesCount = new Set(cursos.map((c) => c.nivel)).size;
 
-    const ahora = new Date();
+    const inicioHoy = inicioDeHoyUtc();
     const vencidas = cuotas.filter((c) => c.estado === "vencida");
     const cuotasVencidasTotal = {
       cantidad: vencidas.length,
@@ -244,7 +240,7 @@ export class ReporteService {
         mes: c.mes,
         anio: c.anio,
         monto: c.montoFinal,
-        diasVencido: Math.max(0, Math.floor((ahora.getTime() - c.vencimiento.getTime()) / (1000 * 60 * 60 * 24))),
+        diasVencido: Math.max(0, Math.round((inicioHoy.getTime() - c.vencimiento.getTime()) / (1000 * 60 * 60 * 24))),
       }))
       .sort((a, b) => b.diasVencido - a.diasVencido)
       .slice(0, 5);
@@ -299,7 +295,6 @@ export class ReporteService {
       .sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
       .slice(0, 5);
 
-    const inicioHoy = inicioDeHoyUtc();
     const pagosHoy = pagos.filter((p) => p.fechaPago >= inicioHoy);
     const cobradoHoyMonto = pagosHoy.reduce((a, p) => a + p.monto, 0);
     const cobradoHoyCount = pagosHoy.length;
@@ -336,9 +331,7 @@ export class ReporteService {
     cuotas: { mes: number; anio: number; estado: string }[],
     asistencias: { estado: string; fecha: Date }[],
   ): TendenciasDashboard | null {
-    const hoy = new Date();
-    const anioActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth() + 1;
+    const { anio: anioActual, mes: mesActual } = fechaHoraEnArgentina();
     if (anioCiclo !== undefined && anioCiclo !== anioActual) return null;
 
     const anioAnterior = mesActual === 1 ? anioActual - 1 : anioActual;
