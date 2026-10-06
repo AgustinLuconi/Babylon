@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
 import type { Rol } from "../../core/ports";
 import type { UsuarioRepository } from "./usuario.repository";
+import type { TokenRecuperacion } from "./tokenRecuperacion.entity";
 import type { Usuario } from "./usuario.entity";
 
 type FilaUsuario = Awaited<ReturnType<PrismaClient["usuario"]["findUniqueOrThrow"]>>;
@@ -55,5 +56,26 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
     } catch {
       throw new EntityNotFoundError("Usuario", id);
     }
+  }
+
+  async crearTokenRecuperacion(token: TokenRecuperacion, tx?: unknown): Promise<TokenRecuperacion> {
+    return this.client(tx).tokenRecuperacion.create({ data: token });
+  }
+
+  async findTokenRecuperacionPorHash(hash: string, tx?: unknown): Promise<TokenRecuperacion | null> {
+    return this.client(tx).tokenRecuperacion.findUnique({ where: { hash } });
+  }
+
+  async findTokensRecuperacionDesde(usuarioId: string, desde: Date, tx?: unknown): Promise<TokenRecuperacion[]> {
+    return this.client(tx).tokenRecuperacion.findMany({ where: { usuarioId, creadoEn: { gte: desde } } });
+  }
+
+  async invalidarTokensRecuperacion(usuarioId: string, ahora: Date, tx?: unknown): Promise<void> {
+    await this.client(tx).tokenRecuperacion.updateMany({ where: { usuarioId, usadoEn: null }, data: { usadoEn: ahora } });
+  }
+
+  async marcarTokenRecuperacionUsado(id: string, ahora: Date, tx?: unknown): Promise<boolean> {
+    const { count } = await this.client(tx).tokenRecuperacion.updateMany({ where: { id, usadoEn: null }, data: { usadoEn: ahora } });
+    return count === 1;
   }
 }

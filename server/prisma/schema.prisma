@@ -139,6 +139,8 @@ model Usuario {
 
   padre    Padre?
   profesor Profesor?
+
+  tokensRecuperacion TokenRecuperacion[]
 }
 
 model Padre {
@@ -401,4 +403,19 @@ model Configuracion {
   // Valor de la cuota mensual, igual para todos los cursos. Sin valor cargado
   // no se generan cuotas.
   valorCuota Float?
+}
+
+// Enlace de recuperación de contraseña. Se guarda solo el SHA-256 del token
+// (el token viaja únicamente en el correo). Vence a la hora y es de un solo uso.
+model TokenRecuperacion {
+  id        String    @id
+  usuarioId String
+  hash      String    @unique
+  creadoEn  DateTime
+  expiraEn  DateTime
+  usadoEn   DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, creadoEn])
 }

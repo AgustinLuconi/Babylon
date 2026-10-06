@@ -96,7 +96,7 @@ const mailer: Mailer = config.SMTP_HOST
   : new ConsoleMailer();
 
 // --- Servicios ---
-const usuarioService = new UsuarioService(usuarioRepository, profesorRepository, unitOfWork);
+const usuarioService = new UsuarioService(usuarioRepository, profesorRepository, unitOfWork, mailer);
 const cicloService = new CicloService(cicloRepository, unitOfWork);
 const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, unitOfWork);

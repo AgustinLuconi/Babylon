@@ -1,13 +1,22 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
 import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { Rol, UnitOfWork } from "../../core/ports";
+import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
+import { correoRecuperacion } from "./correoRecuperacion";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
 import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
+
+const RONDAS_BCRYPT = 10;
+const VIGENCIA_ENLACE_MS = 60 * 60 * 1000;
+const MAX_ENLACES_POR_HORA = 3;
+const ESPERA_ENTRE_ENLACES_MS = 60 * 1000;
+const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo.";
+
+const hashDeToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
 
@@ -34,6 +43,7 @@ export class UsuarioService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly profesorRepo: ProfesorRepository,
     private readonly unitOfWork: UnitOfWork,
+    private readonly mailer: Mailer,
   ) {}
 
   async autenticar({ email, password, rolElegido, recordarme }: CredencialesInput): Promise<ResultadoAutenticacion> {
@@ -98,7 +108,7 @@ export class UsuarioService {
       id: randomUUID(),
       nombre: datos.nombre,
       email: datos.email,
-      passwordHash: await bcrypt.hash(datos.password, 10),
+      passwordHash: await bcrypt.hash(datos.password, RONDAS_BCRYPT),
       roles: [rol],
       estado: "activo",
       fechaCreacion: new Date(),
@@ -140,5 +150,53 @@ export class UsuarioService {
 
     const { passwordHash: _passwordHash, ...usuarioSinPassword } = actualizado;
     return usuarioSinPassword;
+  }
+
+  // Siempre termina sin error, exista o no la cuenta: la respuesta no puede
+  // revelar qué emails están registrados. Si la cuenta superó su límite de
+  // pedidos, tampoco se envía nada.
+  async solicitarRecuperacion(email: string, ahora: Date = new Date()): Promise<void> {
+    const usuario = await this.usuarioRepo.findByEmail(email);
+    if (!usuario || usuario.estado !== "activo") return;
+
+    const recientes = await this.usuarioRepo.findTokensRecuperacionDesde(usuario.id, new Date(ahora.getTime() - VIGENCIA_ENLACE_MS));
+    if (recientes.length >= MAX_ENLACES_POR_HORA) return;
+    if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return;
+
+    const token = randomBytes(32).toString("base64url");
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
+      await this.usuarioRepo.crearTokenRecuperacion(
+        { id: randomUUID(), usuarioId: usuario.id, hash: hashDeToken(token), creadoEn: ahora, expiraEn: new Date(ahora.getTime() + VIGENCIA_ENLACE_MS), usadoEn: null },
+        tx,
+      );
+    });
+
+    // Sin esperar al SMTP: la respuesta tarda lo mismo exista o no la cuenta.
+    const enlace = `${config.APP_URL}/restablecer-contrasena?token=${token}`;
+    void this.mailer
+      .enviar(correoRecuperacion(usuario.nombre, usuario.email, enlace))
+      .catch((error) => console.error(`[correo] no se pudo enviar la recuperación a ${usuario.email}:`, error));
+  }
+
+  // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
+  // las sesiones abiertas (contrasenaCambiadaEn, ver authMiddleware).
+  async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
+    const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      const registro = await this.usuarioRepo.findTokenRecuperacionPorHash(hashDeToken(token), tx);
+      if (!registro || registro.usadoEn || registro.expiraEn.getTime() <= ahora.getTime()) {
+        throw new ValidationError(ENLACE_INVALIDO);
+      }
+      // Marcado atómico: si dos pedidos usan el mismo enlace a la vez, solo uno gana.
+      if (!(await this.usuarioRepo.marcarTokenRecuperacionUsado(registro.id, ahora, tx))) {
+        throw new ValidationError(ENLACE_INVALIDO);
+      }
+      const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
+      if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
+
+      await this.usuarioRepo.update(usuario.id, { ...usuario, passwordHash, contrasenaCambiadaEn: ahora }, tx);
+      await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
+    });
   }
 }

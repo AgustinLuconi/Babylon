@@ -35,3 +35,15 @@ export const cambiarEstadoUsuarioSchema = z.object({
   estado: z.enum(["activo", "inactivo"]),
 });
 export type CambiarEstadoUsuarioInput = z.infer<typeof cambiarEstadoUsuarioSchema>;
+
+export const olvideContrasenaSchema = z.object({
+  email: z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() : v), z.email("Email inválido")),
+});
+
+export const restablecerContrasenaSchema = z.object({
+  token: z.string().min(1, "Falta el enlace"),
+  password: z
+    .string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .max(72, "La contraseña puede tener como máximo 72 caracteres"),
+});
