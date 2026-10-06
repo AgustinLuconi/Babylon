@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/core/components/layout/AppLayout";
 import LoginPage from "@/features/auth/pages/LoginPage";
+import OlvideContrasenaPage from "@/features/auth/pages/OlvideContrasenaPage";
+import RestablecerContrasenaPage from "@/features/auth/pages/RestablecerContrasenaPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import AlumnosListPage from "@/features/alumnos/pages/AlumnosListPage";
 import AlumnoDetailPage from "@/features/alumnos/pages/AlumnoDetailPage";
@@ -24,6 +26,8 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/olvide-contrasena" element={<OlvideContrasenaPage />} />
+      <Route path="/restablecer-contrasena" element={<RestablecerContrasenaPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
