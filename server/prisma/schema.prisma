@@ -134,6 +134,8 @@ model Usuario {
   roles         Rol[]
   estado        EstadoUsuario
   fechaCreacion DateTime
+  // Último cambio de contraseña: invalida los tokens emitidos antes (ver authMiddleware).
+  contrasenaCambiadaEn DateTime?
 
   padre    Padre?
   profesor Profesor?

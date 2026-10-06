@@ -17,3 +17,13 @@ export interface Repository<T, ID = string> {
 export interface UnitOfWork<TContext = unknown> {
   runInTransaction<T>(work: (context: TContext) => Promise<T>): Promise<T>;
 }
+
+// Lo que authMiddleware necesita saber de una cuenta para aceptar su token.
+// core/ no puede importar modules/, así que container.ts le inyecta la
+// implementación con configurarValidadorDeSesion().
+export interface EstadoDeSesion {
+  activo: boolean;
+  contrasenaCambiadaEn: Date | null;
+}
+
+export type ValidadorDeSesion = (usuarioId: string) => Promise<EstadoDeSesion | null>;

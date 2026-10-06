@@ -8,6 +8,8 @@ export const credencialesSchema = z.object({
   // Solo se necesita cuando la cuenta tiene más de un rol habilitado y ya se
   // sabe con cuál se quiere entrar (segundo paso del login).
   rolElegido: rolSchema.optional(),
+  // "Mantener sesión iniciada": token de JWT_EXPIRES_IN_RECORDAR en vez de JWT_EXPIRES_IN.
+  recordarme: z.boolean().optional(),
 });
 
 export type CredencialesInput = z.infer<typeof credencialesSchema>;

@@ -36,7 +36,7 @@ export class UsuarioService {
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async autenticar({ email, password, rolElegido }: CredencialesInput): Promise<ResultadoAutenticacion> {
+  async autenticar({ email, password, rolElegido, recordarme }: CredencialesInput): Promise<ResultadoAutenticacion> {
     const usuario = await this.usuarioRepo.findByEmail(email);
 
     // Mismo mensaje genérico para usuario inexistente, inactivo o contraseña
@@ -62,7 +62,7 @@ export class UsuarioService {
     }
 
     const token = jwt.sign({ sub: usuario.id, rol: rolActivo }, config.JWT_SECRET, {
-      expiresIn: config.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+      expiresIn: (recordarme ? config.JWT_EXPIRES_IN_RECORDAR : config.JWT_EXPIRES_IN) as jwt.SignOptions["expiresIn"],
     });
 
     return {

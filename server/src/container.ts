@@ -1,3 +1,4 @@
+import { configurarValidadorDeSesion } from "./core/middlewares/authMiddleware";
 import { prisma } from "./core/database";
 import { PrismaUnitOfWork } from "./core/adapters/PrismaUnitOfWork";
 
@@ -58,6 +59,10 @@ import { ReporteController } from "./modules/reportes/reporte.controller";
 // --- Repositorios: Prisma real, conectado a PostgreSQL. Los datos de
 // desarrollo ya no se siembran acá — correr `npm run prisma:seed`. ---
 const usuarioRepository = new PrismaUsuarioRepository(prisma);
+configurarValidadorDeSesion(async (usuarioId) => {
+  const usuario = await usuarioRepository.findById(usuarioId);
+  return usuario ? { activo: usuario.estado === "activo", contrasenaCambiadaEn: usuario.contrasenaCambiadaEn ?? null } : null;
+});
 const cicloRepository = new PrismaCicloRepository(prisma);
 const padreRepository = new PrismaPadreRepository(prisma);
 const profesorRepository = new PrismaProfesorRepository(prisma);

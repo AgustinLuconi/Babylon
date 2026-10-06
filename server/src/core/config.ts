@@ -7,6 +7,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL es requerida"),
   JWT_SECRET: z.string().min(1, "JWT_SECRET es requerida"),
   JWT_EXPIRES_IN: z.string().default("8h"),
+  // Duración del token cuando se marca "Mantener sesión iniciada".
+  JWT_EXPIRES_IN_RECORDAR: z.string().default("30d"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
