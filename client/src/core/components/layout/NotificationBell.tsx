@@ -1,27 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CalendarClock, DollarSign, FileWarning } from "lucide-react";
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useResumenDashboard } from "@/features/reportes/hooks/useResumenDashboard";
-import { formatMonto } from "@/core/lib/utils";
+import { AlertCircle, Bell, Clock, Info } from "lucide-react";
+import { useNotificaciones } from "@/features/notificaciones/hooks/useNotificaciones";
+import type { TonoNotificacion } from "@/features/notificaciones/types";
 
-interface ItemNotificacion {
-  id: string;
-  icono: typeof DollarSign;
-  tono: "danger" | "warning" | "info";
-  texto: string;
-  onClick: () => void;
-}
+const ICONO = { danger: AlertCircle, warning: Clock, info: Info } as const;
+const COLOR: Record<TonoNotificacion, string> = { danger: "var(--danger)", warning: "var(--warning)", info: "var(--info)" };
 
-// Solo admin/secretario tienen un agregado real (`/api/reportes/dashboard`)
-// del que derivar notificaciones honestas — no se fabrica contenido para
-// los demás roles, se muestra un estado vacío real hasta que exista una
-// fuente de datos equivalente para profesor/padre.
+// Avisos derivados del estado actual (algo pendiente o vencido), calculados en
+// el server para cada rol (GET /api/notificaciones). No hay "leído": un aviso
+// desaparece cuando se resuelve lo que señala.
 export function NotificationBell() {
-  const { usuario } = useAuth();
   const navigate = useNavigate();
-  const puedeVerResumen = usuario?.rol === "admin" || usuario?.rol === "secretario";
-  const { data: resumen } = useResumenDashboard({ enabled: puedeVerResumen });
+  const { data: notificaciones } = useNotificaciones();
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -34,40 +25,7 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", onClickFuera);
   }, [abierto]);
 
-  const items = useMemo<ItemNotificacion[]>(() => {
-    if (!resumen) return [];
-    const lista: ItemNotificacion[] = [];
-    for (const f of resumen.cuotasVencidas.slice(0, 5)) {
-      lista.push({
-        id: `cuota-${f.alumnoId}-${f.mes}-${f.anio}`,
-        icono: DollarSign,
-        tono: "danger",
-        texto: `Cuota vencida: ${f.alumnoNombre} — ${formatMonto(f.monto)}`,
-        onClick: () => navigate("/cuotas"),
-      });
-    }
-    if (resumen.documentacionPendienteCount > 0) {
-      lista.push({
-        id: "documentacion-pendiente",
-        icono: FileWarning,
-        tono: "warning",
-        texto: `${resumen.documentacionPendienteCount} alumno${resumen.documentacionPendienteCount !== 1 ? "s" : ""} con autorización de imagen pendiente`,
-        onClick: () => navigate("/alumnos"),
-      });
-    }
-    for (const ev of resumen.proximasEvaluaciones.slice(0, 3)) {
-      lista.push({
-        id: `evaluacion-${ev.evaluacionId}`,
-        icono: CalendarClock,
-        tono: "info",
-        texto: `Evaluación próxima: ${ev.nombre} — ${ev.cursoNombre}`,
-        onClick: () => navigate("/reportes"),
-      });
-    }
-    return lista;
-  }, [resumen, navigate]);
-
-  const colorTono = { danger: "var(--danger)", warning: "var(--warning)", info: "var(--info)" } as const;
+  const items = notificaciones ?? [];
 
   return (
     <div className="relative" ref={ref}>
@@ -91,26 +49,27 @@ export function NotificationBell() {
             <p className="text-[13px] font-semibold">Notificaciones</p>
           </div>
           <div className="max-h-80 overflow-y-auto">
-            {!puedeVerResumen && (
-              <p className="px-4 py-6 text-center text-[12.5px] text-muted-foreground">No hay notificaciones nuevas.</p>
+            {items.length === 0 && (
+              <p className="px-4 py-6 text-center text-[12.5px] text-muted-foreground">No hay nada pendiente.</p>
             )}
-            {puedeVerResumen && items.length === 0 && (
-              <p className="px-4 py-6 text-center text-[12.5px] text-muted-foreground">No hay notificaciones nuevas.</p>
-            )}
-            {items.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  item.onClick();
-                  setAbierto(false);
-                }}
-                className="flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left last:border-b-0 hover:bg-accent"
-                style={{ borderColor: "var(--border-hex)" }}
-              >
-                <item.icono size={14} className="mt-0.5 shrink-0" style={{ color: colorTono[item.tono] }} />
-                <span className="text-[12.5px] leading-relaxed">{item.texto}</span>
-              </button>
-            ))}
+            {items.map((n) => {
+              const Icono = ICONO[n.tono];
+              return (
+                <button
+                  key={n.id}
+                  data-notificacion
+                  onClick={() => {
+                    navigate(n.ruta);
+                    setAbierto(false);
+                  }}
+                  className="flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left last:border-b-0 hover:bg-accent"
+                  style={{ borderColor: "var(--border-hex)" }}
+                >
+                  <Icono size={14} className="mt-0.5 shrink-0" style={{ color: COLOR[n.tono] }} />
+                  <span className="text-[12.5px] leading-relaxed">{n.texto}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
