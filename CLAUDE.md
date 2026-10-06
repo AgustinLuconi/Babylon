@@ -184,7 +184,7 @@ A diferencia de `Padre` (`dni`, `telefono`, `vinculo`) y `Profesor` (`dni`, `tel
 | `GET /api/cuotas` | admin, secretario | Todas las cuotas del instituto (`CuotasPage` admin, join client-side con alumnos/cursos) |
 | `GET /api/cuotas/pagos` | admin, secretario | Todos los pagos (para historial "pagada el 10/07 · Efectivo" y KPI "cobrado este mes") |
 | `GET /api/configuracion` \| `PATCH /api/configuracion` | admin, secretario \| admin | Valor global de la cuota mensual (ver "Cuotas: generación automática") |
-| `POST /api/cuotas/pagos` | admin, secretario | `RegistrarPago` — `metodo` (`efectivo`/`transferencia`/`tarjeta`/`mercadopago`/`otro`), `fechaPago` opcional (AAAA-MM-DD, no futura; por defecto hoy) y `notas` opcional (≤200). Todo-o-nada vía `UnitOfWork` |
+| `POST /api/cuotas/pagos` | admin, secretario | `RegistrarPago` — `metodo` (`efectivo`/`transferencia`/`mercadopago`/`otro`), `fechaPago` opcional (AAAA-MM-DD, no futura; por defecto hoy) y `notas` opcional (≤200). Todo-o-nada vía `UnitOfWork` |
 | `POST /api/documentos/autorizacion-imagen` | padre | `AutorizarImagen` — una sola vez, `ConflictError` (409) si ya estaba autorizada |
 | `GET /api/documentos/alumnos/:alumnoId/autorizacion-imagen` | admin, secretario, padre | Estado actual (`Documento \| null`) — padre solo de su propio hijo |
 | `GET /api/calificaciones/cursos/:cursoId/evaluaciones` | admin, secretario, profesor | Listado — profesor solo las de sus propios cursos |
