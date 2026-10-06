@@ -10,6 +10,10 @@ const envSchema = z.object({
   // Duración del token cuando se marca "Mantener sesión iniciada".
   JWT_EXPIRES_IN_RECORDAR: z.string().default("30d"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  // Detrás de un proxy o plataforma de despliegue: "true", la cantidad de
+  // saltos ("1") o "false". Sin esto todos los usuarios compartirían la IP del
+  // proxy y se bloquearían entre sí en los límites de pedidos.
+  TRUST_PROXY: z.string().default("false"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

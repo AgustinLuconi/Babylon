@@ -23,7 +23,10 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
   }
 
   async findByEmail(email: string, tx?: unknown): Promise<Usuario | null> {
-    const fila = await this.client(tx).usuario.findUnique({ where: { email } });
+    // Sin distinguir mayúsculas ni espacios: " Admin@Babylon.test " es la misma cuenta.
+    const fila = await this.client(tx).usuario.findFirst({
+      where: { email: { equals: email.trim(), mode: "insensitive" } },
+    });
     return fila ? aEntidad(fila) : null;
   }
 
