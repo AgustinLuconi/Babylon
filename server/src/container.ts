@@ -32,6 +32,8 @@ import { AsistenciaController } from "./modules/asistencia/asistencia.controller
 
 import { PrismaCuotaRepository } from "./modules/cuotas/cuota.repository.prisma";
 import { CuotaService } from "./modules/cuotas/cuota.service";
+import { NotificacionService } from "./modules/notificaciones/notificacion.service";
+import { NotificacionController } from "./modules/notificaciones/notificacion.controller";
 import { PrismaConfiguracionRepository } from "./modules/configuraciones/configuracion.repository.prisma";
 import { ConfiguracionService } from "./modules/configuraciones/configuracion.service";
 import { ConfiguracionController } from "./modules/configuraciones/configuracion.controller";
@@ -104,11 +106,14 @@ const calificacionService = new CalificacionService(
 const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository);
 const chatService = new ChatService(chatRepository, usuarioRepository);
 const reporteService = new ReporteService(prisma);
+const notificacionService = new NotificacionService(prisma, reporteService);
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {
   // Expuesto para la tarea periódica de cuotas (ver server.ts).
   cuotaService,
+  // Expuesto para verificar los avisos con fechas fijas.
+  notificacionService,
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
   cicloController: new CicloController(cicloService),
@@ -123,4 +128,5 @@ export const container = {
   observacionController: new ObservacionController(observacionService, padreService, profesorService),
   chatController: new ChatController(chatService, padreService),
   reporteController: new ReporteController(reporteService),
+  notificacionController: new NotificacionController(notificacionService, padreService, profesorService),
 };

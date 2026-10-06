@@ -301,6 +301,8 @@ model Evaluacion {
   periodo PeriodoAcademico
   escala  EscalaEvaluacion
   estado  EstadoEvaluacion
+  // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
+  publicadaEn DateTime?
 
   curso          Curso          @relation(fields: [cursoId], references: [id])
   calificaciones Calificacion[]
@@ -327,6 +329,8 @@ model NotaCierre {
   nota        String
   observacion String?
   estado      EstadoEvaluacion
+  // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
+  publicadaEn DateTime?
 
   alumno Alumno @relation(fields: [alumnoId], references: [id])
   curso  Curso  @relation(fields: [cursoId], references: [id])

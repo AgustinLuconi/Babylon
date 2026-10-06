@@ -83,7 +83,7 @@ Mismo criterio que `reportes/`: composición de lectura sobre otros módulos, as
 service consulta Prisma directo. Un solo endpoint:
 
 `GET /api/notificaciones` — todos los roles autenticados. Devuelve
-`{ id, tipo, tono: "danger" | "warning" | "info", texto, ruta }[]`, ya filtrado y
+`{ id, tono: "danger" | "warning" | "info", texto, ruta }[]`, ya filtrado y
 ordenado (danger → warning → info), con un máximo de 10 avisos. "Hoy" y las ventanas de
 días se calculan en hora de Argentina (`core/fechas.ts`).
 
@@ -92,6 +92,8 @@ días se calculan en hora de Argentina (`core/fechas.ts`).
 | Admin / Secretario | Cuotas vencidas (las 5 más atrasadas, una por cuota); alumnos con autorización de imagen pendiente (un aviso con el total); próximas evaluaciones (hasta 3). Es exactamente lo que hoy muestra la campana, movido al server. |
 | Profesor (solo sus cursos) | Clase de hoy cuyo horario ya empezó y sin asistencia registrada para esa fecha (`warning`); evaluaciones en `borrador` con al menos una nota cargada (`info`, "lista para publicar"); notas de cierre en `borrador` (`info`, un aviso por curso y período). |
 | Padre (solo sus hijos) | Cuota `vencida` (`danger`, una por cuota); cuota `pendiente` que vence en ≤5 días (`warning`); documentación pendiente (`warning`); calificación o nota de cierre **publicada** en los últimos 7 días (`info`); observación recibida en los últimos 7 días (`info`). |
+
+Para las novedades del padre, `Evaluacion` y `NotaCierre` ganan `publicadaEn DateTime?`, que se completa al publicar; lo publicado antes de este cambio no genera aviso.
 
 Las reglas de privacidad existentes se mantienen: el padre nunca ve nada en `borrador`
 ni de alumnos ajenos; el profesor solo ve sus propios cursos.
