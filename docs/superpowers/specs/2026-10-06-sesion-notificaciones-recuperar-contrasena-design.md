@@ -1,6 +1,6 @@
 # Sesión persistente, notificaciones por rol y recuperación de contraseña
 
-Fecha: 2026-10-06 · Estado: aprobado en conversación, pendiente de revisión escrita
+Fecha: 2026-10-06 · Estado: aprobado (límites de login/IP ajustados el 2026-10-06)
 
 ## Contexto y objetivo
 
@@ -140,9 +140,12 @@ Dos capas, porque protegen cosas distintas:
 | Qué | Dónde | Límite | Por qué |
 |---|---|---|---|
 | Pedidos de enlace por **cuenta** | Service, contando filas de `TokenRecuperacion` | máx. **3 por hora** y al menos **60 s** entre uno y otro | Que nadie pueda llenar de correos la casilla de otra persona. Vive en la base, así que sobrevive a reinicios. Si se supera, **no se envía** el correo pero la respuesta es la misma (no revela nada). |
-| Pedidos a `olvide-contrasena` por **IP** | Middleware (`express-rate-limit`) | **10 cada 15 min** | Frenar a quien prueba muchos emails distintos. Responde 429 "Demasiados intentos, probá de nuevo en unos minutos". |
-| Pedidos a `restablecer-contrasena` por **IP** | Middleware | **10 cada 15 min** | Frenar la adivinación de tokens (de por sí inviable con 32 bytes). |
-| **Login** por **IP** | Middleware | **20 cada 15 min** | Ya que se agrega el mecanismo, se cubre también la fuerza bruta de contraseñas, que hoy no tiene ningún límite. Los logins exitosos no cuentan. |
+| Pedidos a `olvide-contrasena` por **IP** | Middleware (`express-rate-limit`) | **5 cada 15 min** | Frenar a quien prueba muchos emails distintos. Responde 429 "Demasiados intentos, probá de nuevo en unos minutos". |
+| Pedidos a `restablecer-contrasena` por **IP** | Middleware | **5 cada 15 min** | Frenar la adivinación de tokens (de por sí inviable con 32 bytes). |
+| **Login fallido** por **IP + email** | Middleware | **5 cada 15 min** | Fuerza bruta contra una cuenta concreta. La clave combina IP y email (normalizado a minúsculas), así que un padre que se equivoca no bloquea a otro que comparte su red. |
+| **Login fallido** por **IP** (cualquier email) | Middleware | **20 cada 15 min** | Techo general contra quien prueba muchas cuentas desde una IP. Es más alto que el anterior porque muchos usuarios legítimos pueden compartir una IP (wifi del instituto, datos móviles detrás de CGNAT). |
+
+En los dos límites de login, **los intentos exitosos no cuentan** (`skipSuccessfulRequests`).
 
 Detalles:
 
@@ -207,7 +210,7 @@ No hay test runner configurado; se verifica como en el resto del proyecto:
   usado dos veces, vencido y con token inventado → 400; pedir dos enlaces → el primero
   deja de servir; las sesiones previas quedan cortadas; email inexistente → misma
   respuesta y mismo tiempo; límites por cuenta (4.º pedido en una hora no envía) y por IP
-  (429); login con más de 20 intentos fallidos → 429.
+  (429); 6.º login fallido con el mismo email desde la misma IP → 429, y un login de otro email desde esa IP sigue funcionando; 21 fallidos con emails distintos → 429.
 - Envío real por SMTP: queda para cuando el instituto defina la cuenta de correo.
 
 ## Fuera de alcance
