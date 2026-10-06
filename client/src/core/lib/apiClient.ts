@@ -2,6 +2,9 @@ import { useSessionStore } from "@/core/store/sessionStore";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Varios pedidos pueden responder 401 a la vez: se redirige una sola vez.
+let redirigiendoAlLogin = false;
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -26,6 +29,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
+    // Sesión vencida o invalidada en el server: se cierra y se vuelve al login.
+    // Solo si había token (las pantallas públicas no redirigen) y no es el
+    // propio login (credenciales incorrectas también responden 401).
+    // Se borra la sesión guardada sin tocar el estado en memoria: si se llamara a
+    // cerrarSesion(), ProtectedRoute redirigiría a /login antes que esta línea y
+    // se perdería el aviso. La recarga arranca ya sin sesión.
+    if (res.status === 401 && token && !path.startsWith("/api/auth/login") && !redirigiendoAlLogin) {
+      redirigiendoAlLogin = true;
+      useSessionStore.persist.clearStorage();
+      window.location.replace("/login?motivo=sesion-vencida");
+    }
     const body = await res.json().catch(() => ({}));
     throw new ApiError(body.error ?? `Error ${res.status}`, res.status, body.details);
   }

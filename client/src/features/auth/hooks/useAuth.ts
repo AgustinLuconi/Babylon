@@ -10,12 +10,12 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: (credenciales: CredencialesInput) => authService.login(credenciales),
-    onSuccess: (resultado) => {
+    onSuccess: (resultado, credenciales) => {
       // Si la cuenta tiene más de un rol y todavía no se eligió ninguno, el
       // backend no manda token — hay que esperar a que el usuario elija.
       if (resultado.requiereSeleccionRol) return;
 
-      iniciarSesion(resultado.token, resultado.usuario);
+      iniciarSesion(resultado.token, resultado.usuario, credenciales.recordarme ?? false);
       navigate("/dashboard", { replace: true });
     },
   });

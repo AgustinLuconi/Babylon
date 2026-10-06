@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,9 +12,16 @@ import { ROL_LABELS, type Rol } from "../types";
 const loginSchema = z.object({
   email: z.email("Ingresá un email válido"),
   password: z.string().min(1, "La contraseña es requerida"),
+  recordarme: z.boolean().optional(),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
+
+// Avisos que llegan por ?motivo= desde otras pantallas.
+const MENSAJES_MOTIVO: Record<string, { texto: string; tono: "warning" | "success" }> = {
+  "sesion-vencida": { texto: "Tu sesión venció, ingresá de nuevo.", tono: "warning" },
+  "contrasena-actualizada": { texto: "Contraseña actualizada, ya podés ingresar.", tono: "success" },
+};
 
 function BrandPanel() {
   return (
@@ -84,7 +92,9 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
+  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { recordarme: false } });
+  const [params] = useSearchParams();
+  const aviso = MENSAJES_MOTIVO[params.get("motivo") ?? ""];
 
   const login = useLogin();
   const [credenciales, setCredenciales] = useState<LoginForm | null>(null);
@@ -138,6 +148,15 @@ export default function LoginPage() {
                 ? "Esta cuenta tiene más de un rol habilitado."
                 : "Ingresá con tu cuenta institucional para continuar."}
             </p>
+
+            {aviso && !seleccionRol && (
+              <p
+                className="mt-6 rounded border px-3.5 py-3 text-[12.5px]"
+                style={{ borderColor: `var(--${aviso.tono})`, background: `var(--${aviso.tono}-soft)`, color: `var(--${aviso.tono})` }}
+              >
+                {aviso.texto}
+              </p>
+            )}
 
             {seleccionRol ? (
               <div className="mt-8 space-y-2.5">
@@ -212,6 +231,11 @@ export default function LoginPage() {
                   </div>
                   {errors.password && <p className="mt-1.5 text-[12px] text-destructive">{errors.password.message}</p>}
                 </div>
+
+                <label className="flex cursor-pointer items-center gap-2 text-[12.5px]" style={{ color: "var(--text-muted)" }}>
+                  <input type="checkbox" className="h-3.5 w-3.5 accent-[var(--brand)]" {...register("recordarme")} />
+                  Mantener sesión iniciada
+                </label>
 
                 {error && (
                   <div
