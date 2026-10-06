@@ -1,7 +1,11 @@
 import "dotenv/config";
 import { z } from "zod";
 
-const envSchema = z.object({
+// Variables vacías en el .env (SMTP_HOST="") cuentan como no configuradas.
+const opcional = z.string().optional().transform((v) => v || undefined);
+
+const envSchema = z
+  .object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL es requerida"),
@@ -14,7 +18,25 @@ const envSchema = z.object({
   // saltos ("1") o "false". Sin esto todos los usuarios compartirían la IP del
   // proxy y se bloquearían entre sí en los límites de pedidos.
   TRUST_PROXY: z.string().default("false"),
-});
+  // Envío de correos (recuperación de contraseña). Sin SMTP_HOST, los correos se
+  // escriben en la consola del server; en producción es obligatorio.
+  SMTP_HOST: opcional,
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
+  SMTP_USER: opcional,
+  SMTP_PASS: opcional,
+  MAIL_FROM: z.string().default("Babylon English Institute <no-reply@babylon.local>"),
+  // Base de los enlaces que van en los correos (la URL del client).
+  APP_URL: opcional,
+  })
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === "production") {
+      for (const clave of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"] as const) {
+        if (!env[clave]) ctx.addIssue({ code: "custom", path: [clave], message: `${clave} es requerida en producción` });
+      }
+    }
+  })
+  .transform((env) => ({ ...env, APP_URL: env.APP_URL ?? env.CORS_ORIGIN }));
 
 const parsedEnv = envSchema.safeParse(process.env);
 

@@ -1,6 +1,10 @@
 import { configurarValidadorDeSesion } from "./core/middlewares/authMiddleware";
 import { prisma } from "./core/database";
 import { PrismaUnitOfWork } from "./core/adapters/PrismaUnitOfWork";
+import { ConsoleMailer } from "./core/adapters/ConsoleMailer";
+import { SmtpMailer } from "./core/adapters/SmtpMailer";
+import { config } from "./core/config";
+import type { Mailer } from "./core/ports";
 
 import { PrismaUsuarioRepository } from "./modules/usuarios/usuario.repository.prisma";
 import { UsuarioService } from "./modules/usuarios/usuario.service";
@@ -79,6 +83,18 @@ const observacionRepository = new PrismaObservacionRepository(prisma);
 const chatRepository = new PrismaChatRepository(prisma);
 const unitOfWork = new PrismaUnitOfWork(prisma);
 
+// Correo: SMTP real si está configurado; si no, se escribe en la consola (desarrollo).
+const mailer: Mailer = config.SMTP_HOST
+  ? new SmtpMailer({
+      host: config.SMTP_HOST,
+      port: config.SMTP_PORT,
+      secure: config.SMTP_SECURE,
+      user: config.SMTP_USER ?? "",
+      pass: config.SMTP_PASS ?? "",
+      from: config.MAIL_FROM,
+    })
+  : new ConsoleMailer();
+
 // --- Servicios ---
 const usuarioService = new UsuarioService(usuarioRepository, profesorRepository, unitOfWork);
 const cicloService = new CicloService(cicloRepository, unitOfWork);
@@ -114,6 +130,8 @@ export const container = {
   cuotaService,
   // Expuesto para verificar los avisos con fechas fijas.
   notificacionService,
+  // Expuesto para verificar el adaptador de correo elegido.
+  mailer,
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
   cicloController: new CicloController(cicloService),

@@ -27,3 +27,16 @@ export interface EstadoDeSesion {
 }
 
 export type ValidadorDeSesion = (usuarioId: string) => Promise<EstadoDeSesion | null>;
+
+export interface MensajeCorreo {
+  para: string;
+  asunto: string;
+  texto: string;
+  html: string;
+}
+
+// Envío de correos. container.ts elige el adaptador: SMTP real si está
+// configurado, consola en desarrollo.
+export interface Mailer {
+  enviar(mensaje: MensajeCorreo): Promise<void>;
+}
