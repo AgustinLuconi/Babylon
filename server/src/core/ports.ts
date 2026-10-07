@@ -17,3 +17,26 @@ export interface Repository<T, ID = string> {
 export interface UnitOfWork<TContext = unknown> {
   runInTransaction<T>(work: (context: TContext) => Promise<T>): Promise<T>;
 }
+
+// Lo que authMiddleware necesita saber de una cuenta para aceptar su token.
+// core/ no puede importar modules/, así que container.ts le inyecta la
+// implementación con configurarValidadorDeSesion().
+export interface EstadoDeSesion {
+  activo: boolean;
+  sesionesValidasDesde: Date | null;
+}
+
+export type ValidadorDeSesion = (usuarioId: string) => Promise<EstadoDeSesion | null>;
+
+export interface MensajeCorreo {
+  para: string;
+  asunto: string;
+  texto: string;
+  html: string;
+}
+
+// Envío de correos. container.ts elige el adaptador: SMTP real si está
+// configurado, consola en desarrollo.
+export interface Mailer {
+  enviar(mensaje: MensajeCorreo): Promise<void>;
+}

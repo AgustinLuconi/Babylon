@@ -23,8 +23,12 @@ import { calificacionRoutes } from "./modules/calificaciones/calificacion.routes
 import { observacionRoutes } from "./modules/observaciones/observacion.routes";
 import { chatRoutes } from "./modules/chats/chat.routes";
 import { reporteRoutes } from "./modules/reportes/reporte.routes";
+import { notificacionRoutes } from "./modules/notificaciones/notificacion.routes";
 
 const app = express();
+
+const trustProxy = config.TRUST_PROXY;
+app.set("trust proxy", trustProxy === "false" ? false : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
 app.use(cors({ origin: config.CORS_ORIGIN }));
 app.use(express.json());
@@ -47,6 +51,7 @@ app.use("/api/calificaciones", calificacionRoutes(container.calificacionControll
 app.use("/api/observaciones", observacionRoutes(container.observacionController));
 app.use("/api/chats", chatRoutes(container.chatController));
 app.use("/api/reportes", reporteRoutes(container.reporteController));
+app.use("/api/notificaciones", notificacionRoutes(container.notificacionController));
 
 app.use(errorHandler);
 

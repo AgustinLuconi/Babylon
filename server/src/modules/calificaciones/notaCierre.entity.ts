@@ -8,4 +8,6 @@ export interface NotaCierre {
   nota: string;
   observacion?: string;
   estado: EstadoEvaluacion;
+  // Cuándo se publicó (null si se publicó antes de que existiera el campo).
+  publicadaEn?: Date | null;
 }

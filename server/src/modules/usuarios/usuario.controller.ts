@@ -1,5 +1,12 @@
 import type { Request, Response } from "express";
-import { cambiarEstadoUsuarioSchema, crearAdministradorSchema, crearSecretarioSchema, credencialesSchema } from "./usuario.schema";
+import {
+  cambiarEstadoUsuarioSchema,
+  crearAdministradorSchema,
+  crearSecretarioSchema,
+  credencialesSchema,
+  olvideContrasenaSchema,
+  restablecerContrasenaSchema,
+} from "./usuario.schema";
 import type { UsuarioService } from "./usuario.service";
 
 export class UsuarioController {
@@ -32,5 +39,19 @@ export class UsuarioController {
     const datos = cambiarEstadoUsuarioSchema.parse(req.body);
     const usuario = await this.usuarioService.cambiarEstado(String(req.params.id), datos, req.auth!.sub);
     res.status(200).json(usuario);
+  };
+
+  olvideContrasena = async (req: Request, res: Response) => {
+    const { email } = olvideContrasenaSchema.parse(req.body);
+    await this.usuarioService.solicitarRecuperacion(email);
+    res.status(200).json({
+      mensaje: "Si el email está registrado, te enviamos un enlace para restablecer la contraseña. Revisá también la carpeta de spam.",
+    });
+  };
+
+  restablecerContrasena = async (req: Request, res: Response) => {
+    const { token, password } = restablecerContrasenaSchema.parse(req.body);
+    await this.usuarioService.restablecerContrasena(token, password);
+    res.status(204).end();
   };
 }

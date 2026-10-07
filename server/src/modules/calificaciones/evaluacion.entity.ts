@@ -12,4 +12,6 @@ export interface Evaluacion {
   periodo: PeriodoAcademico;
   escala: EscalaEvaluacion;
   estado: EstadoEvaluacion;
+  // Cuándo se publicó (null si se publicó antes de que existiera el campo).
+  publicadaEn?: Date | null;
 }

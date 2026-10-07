@@ -1,5 +1,10 @@
+import { configurarValidadorDeSesion } from "./core/middlewares/authMiddleware";
 import { prisma } from "./core/database";
 import { PrismaUnitOfWork } from "./core/adapters/PrismaUnitOfWork";
+import { ConsoleMailer } from "./core/adapters/ConsoleMailer";
+import { SmtpMailer } from "./core/adapters/SmtpMailer";
+import { config } from "./core/config";
+import type { Mailer } from "./core/ports";
 
 import { PrismaUsuarioRepository } from "./modules/usuarios/usuario.repository.prisma";
 import { UsuarioService } from "./modules/usuarios/usuario.service";
@@ -31,6 +36,8 @@ import { AsistenciaController } from "./modules/asistencia/asistencia.controller
 
 import { PrismaCuotaRepository } from "./modules/cuotas/cuota.repository.prisma";
 import { CuotaService } from "./modules/cuotas/cuota.service";
+import { NotificacionService } from "./modules/notificaciones/notificacion.service";
+import { NotificacionController } from "./modules/notificaciones/notificacion.controller";
 import { PrismaConfiguracionRepository } from "./modules/configuraciones/configuracion.repository.prisma";
 import { ConfiguracionService } from "./modules/configuraciones/configuracion.service";
 import { ConfiguracionController } from "./modules/configuraciones/configuracion.controller";
@@ -58,6 +65,10 @@ import { ReporteController } from "./modules/reportes/reporte.controller";
 // --- Repositorios: Prisma real, conectado a PostgreSQL. Los datos de
 // desarrollo ya no se siembran acá — correr `npm run prisma:seed`. ---
 const usuarioRepository = new PrismaUsuarioRepository(prisma);
+configurarValidadorDeSesion(async (usuarioId) => {
+  const usuario = await usuarioRepository.findById(usuarioId);
+  return usuario ? { activo: usuario.estado === "activo", sesionesValidasDesde: usuario.sesionesValidasDesde ?? null } : null;
+});
 const cicloRepository = new PrismaCicloRepository(prisma);
 const padreRepository = new PrismaPadreRepository(prisma);
 const profesorRepository = new PrismaProfesorRepository(prisma);
@@ -72,8 +83,20 @@ const observacionRepository = new PrismaObservacionRepository(prisma);
 const chatRepository = new PrismaChatRepository(prisma);
 const unitOfWork = new PrismaUnitOfWork(prisma);
 
+// Correo: SMTP real si está configurado; si no, se escribe en la consola (desarrollo).
+const mailer: Mailer = config.SMTP_HOST
+  ? new SmtpMailer({
+      host: config.SMTP_HOST,
+      port: config.SMTP_PORT,
+      secure: config.SMTP_SECURE,
+      user: config.SMTP_USER ?? "",
+      pass: config.SMTP_PASS ?? "",
+      from: config.MAIL_FROM,
+    })
+  : new ConsoleMailer();
+
 // --- Servicios ---
-const usuarioService = new UsuarioService(usuarioRepository, profesorRepository, unitOfWork);
+const usuarioService = new UsuarioService(usuarioRepository, profesorRepository, unitOfWork, mailer);
 const cicloService = new CicloService(cicloRepository, unitOfWork);
 const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, unitOfWork);
@@ -99,11 +122,16 @@ const calificacionService = new CalificacionService(
 const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository);
 const chatService = new ChatService(chatRepository, usuarioRepository);
 const reporteService = new ReporteService(prisma);
+const notificacionService = new NotificacionService(prisma);
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {
   // Expuesto para la tarea periódica de cuotas (ver server.ts).
   cuotaService,
+  // Expuesto para verificar los avisos con fechas fijas.
+  notificacionService,
+  // Expuesto para verificar el adaptador de correo elegido.
+  mailer,
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
   cicloController: new CicloController(cicloService),
@@ -118,4 +146,5 @@ export const container = {
   observacionController: new ObservacionController(observacionService, padreService, profesorService),
   chatController: new ChatController(chatService, padreService),
   reporteController: new ReporteController(reporteService),
+  notificacionController: new NotificacionController(notificacionService, padreService, profesorService),
 };

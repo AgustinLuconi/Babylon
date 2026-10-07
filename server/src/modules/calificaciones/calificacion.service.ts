@@ -89,7 +89,11 @@ export class CalificacionService {
     }
     await this.verificarDuenoDelCurso(evaluacion.cursoId, profesorId);
 
-    return this.calificacionRepo.actualizarEvaluacion(evaluacionId, { ...evaluacion, estado: "publicada" });
+    return this.calificacionRepo.actualizarEvaluacion(evaluacionId, {
+      ...evaluacion,
+      estado: "publicada",
+      publicadaEn: evaluacion.publicadaEn ?? new Date(),
+    });
   }
 
   // Todo o nada: si algún alumno de la lista no pertenece a la nómina del
@@ -152,7 +156,11 @@ export class CalificacionService {
     }
     await this.verificarDuenoDelCurso(notaCierre.cursoId, profesorId);
 
-    return this.calificacionRepo.guardarNotaCierre({ ...notaCierre, estado: "publicada" });
+    return this.calificacionRepo.guardarNotaCierre({
+      ...notaCierre,
+      estado: "publicada",
+      publicadaEn: notaCierre.publicadaEn ?? new Date(),
+    });
   }
 
   async listarCalificacionesDeAlumno(alumnoId: string, solicitante: Solicitante): Promise<CalificacionConEvaluacion[]> {

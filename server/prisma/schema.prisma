@@ -134,9 +134,14 @@ model Usuario {
   roles         Rol[]
   estado        EstadoUsuario
   fechaCreacion DateTime
+  // Los tokens emitidos antes de este momento ya no valen (ver authMiddleware). Se marca al
+  // cambiar la contraseña y al desactivar la cuenta: reactivarla no revive sesiones viejas.
+  sesionesValidasDesde DateTime?
 
   padre    Padre?
   profesor Profesor?
+
+  tokensRecuperacion TokenRecuperacion[]
 }
 
 model Padre {
@@ -299,6 +304,8 @@ model Evaluacion {
   periodo PeriodoAcademico
   escala  EscalaEvaluacion
   estado  EstadoEvaluacion
+  // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
+  publicadaEn DateTime?
 
   curso          Curso          @relation(fields: [cursoId], references: [id])
   calificaciones Calificacion[]
@@ -325,6 +332,8 @@ model NotaCierre {
   nota        String
   observacion String?
   estado      EstadoEvaluacion
+  // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
+  publicadaEn DateTime?
 
   alumno Alumno @relation(fields: [alumnoId], references: [id])
   curso  Curso  @relation(fields: [cursoId], references: [id])
@@ -395,4 +404,19 @@ model Configuracion {
   // Valor de la cuota mensual, igual para todos los cursos. Sin valor cargado
   // no se generan cuotas.
   valorCuota Float?
+}
+
+// Enlace de recuperación de contraseña. Se guarda solo el SHA-256 del token
+// (el token viaja únicamente en el correo). Vence a la hora y es de un solo uso.
+model TokenRecuperacion {
+  id        String    @id
+  usuarioId String
+  hash      String    @unique
+  creadoEn  DateTime
+  expiraEn  DateTime
+  usadoEn   DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, creadoEn])
 }

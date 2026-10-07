@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { UnitOfWork } from "../../core/ports";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
-import type { Usuario } from "../usuarios/usuario.entity";
+import { conEstado, type Usuario } from "../usuarios/usuario.entity";
 import type { ProfesorRepository } from "./profesor.repository";
 import type { Profesor } from "./profesor.entity";
 import type { ActualizarProfesorInput, CrearProfesorInput, CrearProfesorSinCuentaInput } from "./profesor.schema";
@@ -115,10 +115,9 @@ export class ProfesorService {
           await this.usuarioRepo.update(
             usuario.id,
             {
-              ...usuario,
+              ...conEstado(usuario, actualizado.estado),
               nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
               email: datos.email ?? usuario.email,
-              estado: actualizado.estado,
             },
             tx,
           );

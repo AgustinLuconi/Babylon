@@ -43,18 +43,19 @@ probar por separado.
 - `POST /api/auth/login` acepta `recordarme?: boolean` (default `false`).
 - Config: `JWT_EXPIRES_IN` (default `8h`) se mantiene para la sesión corta; se agrega
   `JWT_EXPIRES_IN_RECORDAR` (default `30d`).
-- `Usuario` gana `contrasenaCambiadaEn DateTime?` (migración aditiva, `null` para las
+- `Usuario` gana `sesionesValidasDesde DateTime?` (migración aditiva, `null` para las
   cuentas existentes).
+- Se marca `sesionesValidasDesde` también al **desactivar** una cuenta (ver más abajo): reactivarla no revive las sesiones viejas.
 - **Validación de sesión en cada pedido**: además de verificar el JWT, `authMiddleware`
   busca la cuenta (una consulta por clave primaria) y responde 401 si:
   - la cuenta no existe o está `inactivo`, o
-  - el token se emitió (`iat`) antes de `contrasenaCambiadaEn`.
+  - el token se emitió (`iat`) antes de `sesionesValidasDesde`.
 
   Así, desactivar una cuenta o cambiar su contraseña corta todas sus sesiones abiertas
   de inmediato, sin importar si duraban 30 días.
 - `core/` no puede depender de `modules/`: el middleware recibe la consulta como una
   función inyectada. `core/ports.ts` declara la interfaz
-  `ValidadorDeSesion = (usuarioId) => Promise<{ activo: boolean; contrasenaCambiadaEn: Date | null } | null>`,
+  `ValidadorDeSesion = (usuarioId) => Promise<{ activo: boolean; sesionesValidasDesde: Date | null } | null>`,
   `container.ts` la implementa con `UsuarioRepository` y la registra al arrancar
   (`configurarValidadorDeSesion(...)`), de modo que las ~14 rutas que ya importan
   `authMiddleware` no cambian.
@@ -83,7 +84,7 @@ Mismo criterio que `reportes/`: composición de lectura sobre otros módulos, as
 service consulta Prisma directo. Un solo endpoint:
 
 `GET /api/notificaciones` — todos los roles autenticados. Devuelve
-`{ id, tipo, tono: "danger" | "warning" | "info", texto, ruta }[]`, ya filtrado y
+`{ id, tono: "danger" | "warning" | "info", texto, ruta }[]`, ya filtrado y
 ordenado (danger → warning → info), con un máximo de 10 avisos. "Hoy" y las ventanas de
 días se calculan en hora de Argentina (`core/fechas.ts`).
 
@@ -92,6 +93,8 @@ días se calculan en hora de Argentina (`core/fechas.ts`).
 | Admin / Secretario | Cuotas vencidas (las 5 más atrasadas, una por cuota); alumnos con autorización de imagen pendiente (un aviso con el total); próximas evaluaciones (hasta 3). Es exactamente lo que hoy muestra la campana, movido al server. |
 | Profesor (solo sus cursos) | Clase de hoy cuyo horario ya empezó y sin asistencia registrada para esa fecha (`warning`); evaluaciones en `borrador` con al menos una nota cargada (`info`, "lista para publicar"); notas de cierre en `borrador` (`info`, un aviso por curso y período). |
 | Padre (solo sus hijos) | Cuota `vencida` (`danger`, una por cuota); cuota `pendiente` que vence en ≤5 días (`warning`); documentación pendiente (`warning`); calificación o nota de cierre **publicada** en los últimos 7 días (`info`); observación recibida en los últimos 7 días (`info`). |
+
+Para las novedades del padre, `Evaluacion` y `NotaCierre` ganan `publicadaEn DateTime?`, que se completa al publicar; lo publicado antes de este cambio no genera aviso.
 
 Las reglas de privacidad existentes se mantienen: el padre nunca ve nada en `borrador`
 ni de alumnos ajenos; el profesor solo ve sus propios cursos.
