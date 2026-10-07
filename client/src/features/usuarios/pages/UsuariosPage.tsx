@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { passwordNueva } from "@/core/lib/validacion";
 import { AlertTriangle, UserPlus } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -55,7 +56,7 @@ const cuentaSchema = z
     // requerido" del superRefine de abajo.
     vinculo: z.union([z.enum(["padre", "madre", "tutor"]), z.literal("")]).optional(),
     email: z.email("Email inválido"),
-    password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+    password: passwordNueva,
   })
   .superRefine((datos, ctx) => {
     if (datos.rol === "profesor" || datos.rol === "padre") {

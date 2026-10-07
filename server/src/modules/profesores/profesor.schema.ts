@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { passwordNueva } from "../../core/validacion";
 
 export const crearProfesorSchema = z.object({
   nombre: z.string().min(1, "El nombre es requerido"),
@@ -6,7 +7,7 @@ export const crearProfesorSchema = z.object({
   dni: z.string().min(1, "El DNI es requerido"),
   telefono: z.string().optional(),
   email: z.email("Email inválido"),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  password: passwordNueva,
 });
 
 export type CrearProfesorInput = z.infer<typeof crearProfesorSchema>;

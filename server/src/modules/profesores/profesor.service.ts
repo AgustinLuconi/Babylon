@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { UnitOfWork } from "../../core/ports";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
-import { conEstado, type Usuario } from "../usuarios/usuario.entity";
+import type { Usuario } from "../usuarios/usuario.entity";
 import type { ProfesorRepository } from "./profesor.repository";
 import type { Profesor } from "./profesor.entity";
 import type { ActualizarProfesorInput, CrearProfesorInput, CrearProfesorSinCuentaInput } from "./profesor.schema";
@@ -46,6 +46,7 @@ export class ProfesorService {
         roles: ["profesor"],
         estado: "activo",
         fechaCreacion: new Date(),
+        versionSesion: 0,
       };
       await this.usuarioRepo.create(usuario, tx);
 
@@ -112,12 +113,14 @@ export class ProfesorService {
               throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
             }
           }
-          await this.usuarioRepo.update(
+          // Solo los campos que cambian (no se reescribe la fila). Desactivar al profesor corta sus sesiones para siempre.
+          await this.usuarioRepo.actualizarParcial(
             usuario.id,
             {
-              ...conEstado(usuario, actualizado.estado),
               nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
-              email: datos.email ?? usuario.email,
+              ...(datos.email ? { email: datos.email } : {}),
+              estado: actualizado.estado,
+              invalidarSesiones: actualizado.estado === "inactivo",
             },
             tx,
           );

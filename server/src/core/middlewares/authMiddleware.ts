@@ -33,9 +33,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  let payload: AuthPayload & { iat?: number };
+  let payload: AuthPayload & { v?: number };
   try {
-    payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload & { iat?: number };
+    payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload & { v?: number };
   } catch {
     res.status(401).json({ error: "Token inválido o expirado" });
     return;
@@ -44,15 +44,12 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (!validadorDeSesion) {
     throw new Error("authMiddleware: falta configurar el validador de sesión");
   }
-  // Una cuenta desactivada, o a la que se le invalidaron las sesiones (cambio de
-  // contraseña, desactivación) después de emitido el token, pierde la sesión en el
-  // próximo pedido aunque el token no haya vencido. `iat` está en segundos: se
-  // compara contra el segundo del cambio, así un login hecho en el mismo segundo
-  // que el cambio sigue siendo válido.
+  // Una cuenta desactivada, o cuyas sesiones se invalidaron (cambio de contraseña, desactivación) después
+  // de emitido el token, pierde la sesión en el próximo pedido aunque el token no haya vencido. El token lleva la
+  // versión de sesión con la que se emitió (`v`; los emitidos antes de existir este campo cuentan como 0) y solo
+  // vale mientras coincida con la de la cuenta: no depende del reloj, así que no hay ventana de un segundo.
   const estado = await validadorDeSesion(payload.sub);
-  const desdeEnSegundos = estado?.sesionesValidasDesde ? Math.floor(estado.sesionesValidasDesde.getTime() / 1000) : null;
-  const emitidoAntes = desdeEnSegundos !== null && (payload.iat ?? 0) < desdeEnSegundos;
-  if (!estado || !estado.activo || emitidoAntes) {
+  if (!estado || !estado.activo || (payload.v ?? 0) !== estado.versionSesion) {
     res.status(401).json({ error: "Tu sesión ya no es válida, ingresá de nuevo" });
     return;
   }

@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
 import type { Rol } from "../../core/ports";
-import type { UsuarioRepository } from "./usuario.repository";
+import type { CambiosUsuario, UsuarioRepository } from "./usuario.repository";
 import type { TokenRecuperacion } from "./tokenRecuperacion.entity";
 import type { Usuario } from "./usuario.entity";
 
@@ -56,6 +56,22 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
   async delete(id: string, tx?: unknown): Promise<void> {
     try {
       await this.client(tx).usuario.delete({ where: { id } });
+    } catch {
+      throw new EntityNotFoundError("Usuario", id);
+    }
+  }
+
+  async actualizarParcial(id: string, { invalidarSesiones, ...campos }: CambiosUsuario, tx?: unknown): Promise<Usuario> {
+    try {
+      const fila = await this.client(tx).usuario.update({
+        where: { id },
+        data: {
+          ...campos,
+          ...(campos.email !== undefined ? { email: normalizarEmail(campos.email) } : {}),
+          ...(invalidarSesiones ? { versionSesion: { increment: 1 } } : {}),
+        },
+      });
+      return aEntidad(fila);
     } catch {
       throw new EntityNotFoundError("Usuario", id);
     }

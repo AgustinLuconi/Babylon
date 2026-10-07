@@ -145,6 +145,8 @@ export class CalificacionService {
       nota: datos.nota,
       observacion: datos.observacion,
       estado: "borrador",
+      // Vuelve a ser borrador: cuando se publique de nuevo cuenta como una publicación nueva (avisa al padre).
+      publicadaEn: null,
     };
     return this.calificacionRepo.guardarNotaCierre(notaCierre);
   }

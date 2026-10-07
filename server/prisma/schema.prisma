@@ -134,9 +134,11 @@ model Usuario {
   roles         Rol[]
   estado        EstadoUsuario
   fechaCreacion DateTime
-  // Los tokens emitidos antes de este momento ya no valen (ver authMiddleware). Se marca al
-  // cambiar la contraseña y al desactivar la cuenta: reactivarla no revive sesiones viejas.
-  sesionesValidasDesde DateTime?
+  // Versión de las sesiones: el token lleva la versión con la que se emitió (`v`) y solo vale mientras
+  // coincida (ver authMiddleware). Se incrementa al cambiar la contraseña y al desactivar la cuenta, así que
+  // corta TODAS las sesiones anteriores al instante (incluso las del mismo segundo) y reactivar la cuenta
+  // no las revive.
+  versionSesion Int @default(0)
 
   padre    Padre?
   profesor Profesor?

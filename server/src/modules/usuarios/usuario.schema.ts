@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { passwordNueva } from "../../core/validacion";
 
 const rolSchema = z.enum(["admin", "secretario", "profesor", "padre"]);
 
@@ -21,7 +22,7 @@ export type CredencialesInput = z.infer<typeof credencialesSchema>;
 export const crearSecretarioSchema = z.object({
   nombre: z.string().min(1, "El nombre es requerido"),
   email: z.email("Email inválido"),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  password: passwordNueva,
 });
 
 export type CrearSecretarioInput = z.infer<typeof crearSecretarioSchema>;
@@ -42,8 +43,5 @@ export const olvideContrasenaSchema = z.object({
 
 export const restablecerContrasenaSchema = z.object({
   token: z.string().min(1, "Falta el enlace"),
-  password: z
-    .string()
-    .min(8, "La contraseña debe tener al menos 8 caracteres")
-    .max(72, "La contraseña puede tener como máximo 72 caracteres"),
+  password: passwordNueva,
 });
