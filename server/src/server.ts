@@ -28,7 +28,7 @@ import { notificacionRoutes } from "./modules/notificaciones/notificacion.routes
 const app = express();
 
 const trustProxy = config.TRUST_PROXY;
-app.set("trust proxy", trustProxy === "true" ? true : trustProxy === "false" ? false : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+app.set("trust proxy", trustProxy === "false" ? false : /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
 app.use(cors({ origin: config.CORS_ORIGIN }));
 app.use(express.json());

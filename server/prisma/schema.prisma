@@ -416,7 +416,7 @@ model TokenRecuperacion {
   expiraEn  DateTime
   usadoEn   DateTime?
 
-  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId, creadoEn])
 }

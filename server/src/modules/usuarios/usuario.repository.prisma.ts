@@ -7,6 +7,9 @@ import type { Usuario } from "./usuario.entity";
 
 type FilaUsuario = Awaited<ReturnType<PrismaClient["usuario"]["findUniqueOrThrow"]>>;
 
+// Sin espacios y en minúsculas: " Admin@Babylon.test " es la misma cuenta que "admin@babylon.test".
+const normalizarEmail = (email: string) => email.trim().toLowerCase();
+
 function aEntidad(fila: FilaUsuario): Usuario {
   return { ...fila, roles: fila.roles as Rol[] };
 }
@@ -24,10 +27,10 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
   }
 
   async findByEmail(email: string, tx?: unknown): Promise<Usuario | null> {
-    // Sin distinguir mayúsculas ni espacios: " Admin@Babylon.test " es la misma cuenta.
-    const fila = await this.client(tx).usuario.findFirst({
-      where: { email: { equals: email.trim(), mode: "insensitive" } },
-    });
+    // Los emails se guardan normalizados (ver normalizarEmail), así que alcanza con una búsqueda
+    // exacta por el índice único. No se usa `mode: "insensitive"`: Prisma lo traduce a ILIKE, donde
+    // "_" y "%" funcionan como comodines y "a_min@x" encontraría la cuenta "admin@x".
+    const fila = await this.client(tx).usuario.findUnique({ where: { email: normalizarEmail(email) } });
     return fila ? aEntidad(fila) : null;
   }
 
@@ -37,13 +40,13 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
   }
 
   async create(entidad: Usuario, tx?: unknown): Promise<Usuario> {
-    const fila = await this.client(tx).usuario.create({ data: entidad });
+    const fila = await this.client(tx).usuario.create({ data: { ...entidad, email: normalizarEmail(entidad.email) } });
     return aEntidad(fila);
   }
 
   async update(id: string, entidad: Usuario, tx?: unknown): Promise<Usuario> {
     try {
-      const fila = await this.client(tx).usuario.update({ where: { id }, data: entidad });
+      const fila = await this.client(tx).usuario.update({ where: { id }, data: { ...entidad, email: normalizarEmail(entidad.email) } });
       return aEntidad(fila);
     } catch {
       throw new EntityNotFoundError("Usuario", id);

@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useSessionStore } from "@/core/store/sessionStore";
 import { authService } from "../authService";
@@ -7,6 +7,7 @@ import type { CredencialesInput } from "../types";
 export function useLogin() {
   const iniciarSesion = useSessionStore((s) => s.iniciarSesion);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (credenciales: CredencialesInput) => authService.login(credenciales),
@@ -15,6 +16,9 @@ export function useLogin() {
       // backend no manda token — hay que esperar a que el usuario elija.
       if (resultado.requiereSeleccionRol) return;
 
+      // La caché de consultas es del navegador, no del usuario: se vacía para que nadie vea, ni por un
+      // instante, datos de la sesión anterior (avisos, listados de otra familia, etc.).
+      queryClient.clear();
       iniciarSesion(resultado.token, resultado.usuario, credenciales.recordarme ?? false);
       navigate("/dashboard", { replace: true });
     },
@@ -26,9 +30,11 @@ export function useAuth() {
   const token = useSessionStore((s) => s.token);
   const cerrarSesion = useSessionStore((s) => s.cerrarSesion);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const logout = () => {
     cerrarSesion();
+    queryClient.clear();
     navigate("/login", { replace: true });
   };
 

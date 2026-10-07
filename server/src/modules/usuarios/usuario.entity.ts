@@ -17,3 +17,9 @@ export interface Usuario {
   // Los tokens emitidos antes de este momento dejan de valer (cambio de contraseña o desactivación).
   sesionesValidasDesde?: Date | null;
 }
+
+// Cambia el estado de una cuenta. Al desactivarla se cortan sus sesiones para siempre
+// (`sesionesValidasDesde`): reactivarla más tarde no revive los tokens que tenía emitidos.
+export function conEstado(usuario: Usuario, estado: EstadoUsuario, ahora: Date = new Date()): Usuario {
+  return { ...usuario, estado, sesionesValidasDesde: estado === "inactivo" ? ahora : usuario.sesionesValidasDesde };
+}

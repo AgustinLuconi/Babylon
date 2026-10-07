@@ -144,13 +144,20 @@ export class NotificacionService {
       }
     }
 
-    const conDocPendiente = await this.prisma.documento.findMany({
-      where: { alumnoId: { in: ids }, estado: "pendiente" },
-      distinct: ["alumnoId"],
-      select: { alumnoId: true },
-    });
-    for (const d of conDocPendiente) {
-      lista.push({ id: `documentacion-${d.alumnoId}`, tono: "warning", texto: `${nombreHijo.get(d.alumnoId)} tiene documentación pendiente`, ruta: "/mis-hijos/documentacion" });
+    // Mismo criterio que el panel del padre: la autorización de imagen debe estar "autorizada" y el
+    // formulario y la copia del DNI "cargados". No tener ninguna fila de un documento también es
+    // pendiente (un alumno recién inscripto todavía no tiene ninguna).
+    const documentos = await this.prisma.documento.findMany({ where: { alumnoId: { in: ids } } });
+    for (const hijo of hijos) {
+      const delHijo = documentos.filter((d) => d.alumnoId === hijo.id);
+      const estadoDe = (tipo: string) => delHijo.find((d) => d.tipo === tipo)?.estado;
+      const pendiente =
+        estadoDe("autorizacion_imagen") !== "autorizado" ||
+        estadoDe("formulario_inscripcion") !== "cargado" ||
+        estadoDe("copia_dni") !== "cargado";
+      if (pendiente) {
+        lista.push({ id: `documentacion-${hijo.id}`, tono: "warning", texto: `${hijo.nombre} tiene documentación pendiente`, ruta: "/mis-hijos/documentacion" });
+      }
     }
 
     // Novedades de los últimos 7 días. Nunca borradores: solo lo publicado.

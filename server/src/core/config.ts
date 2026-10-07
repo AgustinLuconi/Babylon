@@ -14,10 +14,15 @@ const envSchema = z
   // Duración del token cuando se marca "Mantener sesión iniciada".
   JWT_EXPIRES_IN_RECORDAR: z.string().default("30d"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
-  // Detrás de un proxy o plataforma de despliegue: "true", la cantidad de
-  // saltos ("1") o "false". Sin esto todos los usuarios compartirían la IP del
+  // Detrás de un proxy o plataforma de despliegue: la cantidad de saltos ("1") o "false". Sin esto todos los usuarios compartirían la IP del
   // proxy y se bloquearían entre sí en los límites de pedidos.
-  TRUST_PROXY: z.string().default("false"),
+  TRUST_PROXY: z
+    .string()
+    .default("false")
+    // "true" haría confiar en el primer X-Forwarded-For, que manda el propio cliente: cualquiera
+    // esquivaría los límites por IP mandando un encabezado cualquiera. Hay que indicar cuántos
+    // proxies hay delante (número de saltos), o "false".
+    .refine((v) => v !== "true", 'TRUST_PROXY="true" no es seguro: indicá la cantidad de proxies delante (ej. "1") o "false"'),
   // Envío de correos (recuperación de contraseña). Sin SMTP_HOST, los correos se
   // escriben en la consola del server; en producción es obligatorio.
   SMTP_HOST: opcional,

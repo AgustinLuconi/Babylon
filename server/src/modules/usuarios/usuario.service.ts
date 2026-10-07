@@ -7,7 +7,7 @@ import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
 import type { UsuarioRepository } from "./usuario.repository";
-import type { Usuario } from "./usuario.entity";
+import { conEstado, type Usuario } from "./usuario.entity";
 import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
@@ -140,10 +140,7 @@ export class UsuarioService {
     }
 
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
-      // Al desactivar se cortan las sesiones abiertas para siempre: reactivar la cuenta
-      // más tarde no tiene que revivir los tokens que tenía emitidos.
-      const sesionesValidasDesde = estado === "inactivo" ? new Date() : usuario.sesionesValidasDesde;
-      const resultado = await this.usuarioRepo.update(id, { ...usuario, estado, sesionesValidasDesde }, tx);
+      const resultado = await this.usuarioRepo.update(id, conEstado(usuario, estado), tx);
       const profesor = await this.profesorRepo.findByUsuarioId(id, tx);
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
