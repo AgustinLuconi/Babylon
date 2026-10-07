@@ -170,18 +170,23 @@ export class UsuarioService {
   }
 
   private async enviarEnlaceDeRecuperacion(usuario: Usuario, ahora: Date): Promise<void> {
-    const recientes = await this.usuarioRepo.findTokensRecuperacionDesde(usuario.id, new Date(ahora.getTime() - VIGENCIA_ENLACE_MS));
-    if (recientes.length >= MAX_ENLACES_POR_HORA) return;
-    if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return;
-
     const token = randomBytes(32).toString("base64url");
-    await this.unitOfWork.runInTransaction(async (tx) => {
+    // Las comprobaciones y el alta del token van juntas bajo un bloqueo de la cuenta: si no,
+    // varios pedidos simultáneos leerían "ningún enlace reciente" a la vez y pasarían todos.
+    const creado = await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
+      const recientes = await this.usuarioRepo.findTokensRecuperacionDesde(usuario.id, new Date(ahora.getTime() - VIGENCIA_ENLACE_MS), tx);
+      if (recientes.length >= MAX_ENLACES_POR_HORA) return false;
+      if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return false;
+
       await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
       await this.usuarioRepo.crearTokenRecuperacion(
         { id: randomUUID(), usuarioId: usuario.id, hash: hashDeToken(token), creadoEn: ahora, expiraEn: new Date(ahora.getTime() + VIGENCIA_ENLACE_MS), usadoEn: null },
         tx,
       );
+      return true;
     });
+    if (!creado) return;
 
     const enlace = `${config.APP_URL}/restablecer-contrasena?token=${token}`;
     await this.mailer.enviar(correoRecuperacion(usuario.nombre, usuario.email, enlace)).catch((error) =>

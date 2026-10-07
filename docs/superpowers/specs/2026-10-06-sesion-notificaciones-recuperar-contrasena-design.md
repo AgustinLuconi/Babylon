@@ -43,18 +43,19 @@ probar por separado.
 - `POST /api/auth/login` acepta `recordarme?: boolean` (default `false`).
 - Config: `JWT_EXPIRES_IN` (default `8h`) se mantiene para la sesión corta; se agrega
   `JWT_EXPIRES_IN_RECORDAR` (default `30d`).
-- `Usuario` gana `contrasenaCambiadaEn DateTime?` (migración aditiva, `null` para las
+- `Usuario` gana `sesionesValidasDesde DateTime?` (migración aditiva, `null` para las
   cuentas existentes).
+- Se marca `sesionesValidasDesde` también al **desactivar** una cuenta (ver más abajo): reactivarla no revive las sesiones viejas.
 - **Validación de sesión en cada pedido**: además de verificar el JWT, `authMiddleware`
   busca la cuenta (una consulta por clave primaria) y responde 401 si:
   - la cuenta no existe o está `inactivo`, o
-  - el token se emitió (`iat`) antes de `contrasenaCambiadaEn`.
+  - el token se emitió (`iat`) antes de `sesionesValidasDesde`.
 
   Así, desactivar una cuenta o cambiar su contraseña corta todas sus sesiones abiertas
   de inmediato, sin importar si duraban 30 días.
 - `core/` no puede depender de `modules/`: el middleware recibe la consulta como una
   función inyectada. `core/ports.ts` declara la interfaz
-  `ValidadorDeSesion = (usuarioId) => Promise<{ activo: boolean; contrasenaCambiadaEn: Date | null } | null>`,
+  `ValidadorDeSesion = (usuarioId) => Promise<{ activo: boolean; sesionesValidasDesde: Date | null } | null>`,
   `container.ts` la implementa con `UsuarioRepository` y la registra al arrancar
   (`configurarValidadorDeSesion(...)`), de modo que las ~14 rutas que ya importan
   `authMiddleware` no cambian.

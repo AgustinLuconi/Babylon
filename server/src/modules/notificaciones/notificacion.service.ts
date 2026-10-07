@@ -1,6 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
-import type { ReporteService } from "../reportes/reporte.service";
 
 // Avisos de la campana: se derivan del estado actual (algo pendiente o vencido
 // que hay que atender), no de un historial de eventos — no existe "leído". Igual
@@ -33,31 +32,49 @@ function ordenar(lista: Notificacion[]): Notificacion[] {
 }
 
 export class NotificacionService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly reporteService: ReporteService,
-  ) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
-  // Admin/Secretario: lo mismo que mostraba la campana derivándolo en el client.
+  // Admin/Secretario. Son los mismos avisos que muestra el resumen del panel (cuotas más
+  // atrasadas, documentación pendiente, próximas evaluaciones), pero con consultas
+  // livianas: el resumen completo recorre todas las cuotas, pagos y asistencias.
   async listarParaStaff(): Promise<Notificacion[]> {
-    const resumen = await this.reporteService.obtenerResumenDashboard();
-    const lista: Notificacion[] = resumen.cuotasVencidas.slice(0, 5).map((c) => ({
+    const [vencidas, sinAutorizacionDeImagen, proximasEvaluaciones] = await Promise.all([
+      // Las más atrasadas son las de vencimiento más antiguo.
+      this.prisma.cuota.findMany({
+        where: { estado: "vencida" },
+        // `id` desempata las que vencen el mismo día, para que los avisos sean estables entre consultas.
+        orderBy: [{ vencimiento: "asc" }, { id: "asc" }],
+        take: 5,
+        include: { alumno: true },
+      }),
+      this.prisma.alumno.count({
+        where: { documentos: { none: { tipo: "autorizacion_imagen", estado: "autorizado" } } },
+      }),
+      // `fecha` es medianoche UTC (fecha calendario): se compara contra el inicio del día argentino.
+      this.prisma.evaluacion.findMany({
+        where: { fecha: { gte: inicioDeHoyUtc() } },
+        orderBy: { fecha: "asc" },
+        take: 3,
+        include: { curso: true },
+      }),
+    ]);
+
+    const lista: Notificacion[] = vencidas.map((c) => ({
       id: `cuota-${c.alumnoId}-${c.mes}-${c.anio}`,
       tono: "danger",
-      texto: `Cuota vencida: ${c.alumnoNombre} — ${formatMonto(c.monto)}`,
+      texto: `Cuota vencida: ${c.alumno.nombre} ${c.alumno.apellido} — ${formatMonto(c.montoFinal)}`,
       ruta: "/cuotas",
     }));
-    if (resumen.documentacionPendienteCount > 0) {
-      const n = resumen.documentacionPendienteCount;
+    if (sinAutorizacionDeImagen > 0) {
       lista.push({
         id: "documentacion-pendiente",
         tono: "warning",
-        texto: `${n} alumno${n !== 1 ? "s" : ""} con autorización de imagen pendiente`,
+        texto: `${sinAutorizacionDeImagen} alumno${sinAutorizacionDeImagen !== 1 ? "s" : ""} con autorización de imagen pendiente`,
         ruta: "/alumnos",
       });
     }
-    for (const e of resumen.proximasEvaluaciones.slice(0, 3)) {
-      lista.push({ id: `evaluacion-${e.evaluacionId}`, tono: "info", texto: `Evaluación próxima: ${e.nombre} — ${e.cursoNombre}`, ruta: "/reportes" });
+    for (const e of proximasEvaluaciones) {
+      lista.push({ id: `evaluacion-${e.id}`, tono: "info", texto: `Evaluación próxima: ${e.nombre} — ${e.curso.nombre}`, ruta: "/reportes" });
     }
     return ordenar(lista);
   }

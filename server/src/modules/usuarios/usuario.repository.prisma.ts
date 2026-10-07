@@ -58,6 +58,10 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
     }
   }
 
+  async bloquearCuenta(usuarioId: string, tx: unknown): Promise<void> {
+    await this.client(tx).$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${usuarioId}, 0))`;
+  }
+
   async crearTokenRecuperacion(token: TokenRecuperacion, tx?: unknown): Promise<TokenRecuperacion> {
     return this.client(tx).tokenRecuperacion.create({ data: token });
   }
