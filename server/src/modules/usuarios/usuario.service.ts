@@ -153,12 +153,20 @@ export class UsuarioService {
   }
 
   // Siempre termina sin error, exista o no la cuenta: la respuesta no puede
-  // revelar qué emails están registrados. Si la cuenta superó su límite de
-  // pedidos, tampoco se envía nada.
+  // revelar qué emails están registrados. Tampoco puede revelarlo el tiempo: tras
+  // buscar la cuenta (una consulta, igual para ambos casos) se responde, y todo lo
+  // demás (límites, alta del token, correo) corre en segundo plano. Si la cuenta
+  // superó su límite de pedidos, tampoco se envía nada.
   async solicitarRecuperacion(email: string, ahora: Date = new Date()): Promise<void> {
     const usuario = await this.usuarioRepo.findByEmail(email);
     if (!usuario || usuario.estado !== "activo") return;
 
+    void this.enviarEnlaceDeRecuperacion(usuario, ahora).catch((error) =>
+      console.error(`[correo] no se pudo preparar la recuperación de ${usuario.email}:`, error),
+    );
+  }
+
+  private async enviarEnlaceDeRecuperacion(usuario: Usuario, ahora: Date): Promise<void> {
     const recientes = await this.usuarioRepo.findTokensRecuperacionDesde(usuario.id, new Date(ahora.getTime() - VIGENCIA_ENLACE_MS));
     if (recientes.length >= MAX_ENLACES_POR_HORA) return;
     if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return;
@@ -172,11 +180,10 @@ export class UsuarioService {
       );
     });
 
-    // Sin esperar al SMTP: la respuesta tarda lo mismo exista o no la cuenta.
     const enlace = `${config.APP_URL}/restablecer-contrasena?token=${token}`;
-    void this.mailer
-      .enviar(correoRecuperacion(usuario.nombre, usuario.email, enlace))
-      .catch((error) => console.error(`[correo] no se pudo enviar la recuperación a ${usuario.email}:`, error));
+    await this.mailer.enviar(correoRecuperacion(usuario.nombre, usuario.email, enlace)).catch((error) =>
+      console.error(`[correo] no se pudo enviar la recuperación a ${usuario.email}:`, error),
+    );
   }
 
   // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
