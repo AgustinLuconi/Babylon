@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { passwordNueva } from "@/core/lib/validacion";
 import { Pencil, Search, ToggleLeft, ToggleRight, UserPlus } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
@@ -132,11 +133,12 @@ export default function ProfesoresAdminPage() {
       });
       setToast("Cambios guardados correctamente");
     } else {
-      if (!datos.password || datos.password.length < 8) {
-        setError("password", { message: "La contraseña debe tener al menos 8 caracteres" });
+      const resultadoPassword = passwordNueva.safeParse(datos.password ?? "");
+      if (!resultadoPassword.success) {
+        setError("password", { message: resultadoPassword.error.issues[0].message });
         return;
       }
-      await crearProfesor.mutateAsync({ ...datos, password: datos.password });
+      await crearProfesor.mutateAsync({ ...datos, password: resultadoPassword.data });
       setToast(`Profesor ${datos.email} creado`);
     }
     setModal(null);

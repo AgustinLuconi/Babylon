@@ -2,15 +2,17 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
-import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
+import { AuthenticationError, ConflictError, ValidationError } from "../../core/errors";
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
 import type { UsuarioRepository } from "./usuario.repository";
-import { conEstado, type Usuario } from "./usuario.entity";
+import type { Usuario } from "./usuario.entity";
 import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
+// Hash de una contraseña que nadie conoce: para gastar el mismo tiempo cuando la cuenta no existe.
+const HASH_DE_RELLENO = bcrypt.hashSync(randomUUID(), RONDAS_BCRYPT);
 const VIGENCIA_ENLACE_MS = 60 * 60 * 1000;
 const MAX_ENLACES_POR_HORA = 3;
 const ESPERA_ENTRE_ENLACES_MS = 60 * 1000;
@@ -49,14 +51,11 @@ export class UsuarioService {
   async autenticar({ email, password, rolElegido, recordarme }: CredencialesInput): Promise<ResultadoAutenticacion> {
     const usuario = await this.usuarioRepo.findByEmail(email);
 
-    // Mismo mensaje genérico para usuario inexistente, inactivo o contraseña
-    // incorrecta: evita que la respuesta permita enumerar emails registrados.
-    if (!usuario || usuario.estado !== "activo") {
-      throw new AuthenticationError("Email o contraseña incorrectos");
-    }
-
-    const passwordValida = await bcrypt.compare(password, usuario.passwordHash);
-    if (!passwordValida) {
+    // Mismo mensaje genérico para usuario inexistente, inactivo o contraseña incorrecta, y también el
+    // mismo tiempo: sin cuenta se compara igual contra un hash de relleno (bcrypt tarda ~100 ms y un
+    // rechazo inmediato delataría qué emails existen).
+    const passwordValida = await bcrypt.compare(password, usuario?.passwordHash ?? HASH_DE_RELLENO);
+    if (!usuario || usuario.estado !== "activo" || !passwordValida) {
       throw new AuthenticationError("Email o contraseña incorrectos");
     }
 
@@ -71,7 +70,7 @@ export class UsuarioService {
       rolActivo = rolElegido;
     }
 
-    const token = jwt.sign({ sub: usuario.id, rol: rolActivo }, config.JWT_SECRET, {
+    const token = jwt.sign({ sub: usuario.id, rol: rolActivo, v: usuario.versionSesion }, config.JWT_SECRET, {
       expiresIn: (recordarme ? config.JWT_EXPIRES_IN_RECORDAR : config.JWT_EXPIRES_IN) as jwt.SignOptions["expiresIn"],
     });
 
@@ -112,6 +111,7 @@ export class UsuarioService {
       roles: [rol],
       estado: "activo",
       fechaCreacion: new Date(),
+      versionSesion: 0,
     };
     await this.usuarioRepo.create(usuario);
 
@@ -134,13 +134,10 @@ export class UsuarioService {
       throw new ValidationError("No podés desactivar tu propia cuenta");
     }
 
-    const usuario = await this.usuarioRepo.findById(id);
-    if (!usuario) {
-      throw new EntityNotFoundError("Usuario", id);
-    }
-
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
-      const resultado = await this.usuarioRepo.update(id, conEstado(usuario, estado), tx);
+      // Solo cambia el estado (no se reescribe la fila). Al desactivar se cortan las sesiones abiertas
+      // para siempre: reactivar la cuenta más tarde no revive los tokens que tenía emitidos.
+      const resultado = await this.usuarioRepo.actualizarParcial(id, { estado, invalidarSesiones: estado === "inactivo" }, tx);
       const profesor = await this.profesorRepo.findByUsuarioId(id, tx);
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
@@ -192,7 +189,7 @@ export class UsuarioService {
   }
 
   // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
-  // las sesiones abiertas (sesionesValidasDesde, ver authMiddleware).
+  // las sesiones abiertas (versionSesion, ver authMiddleware).
   async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
     const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
     await this.unitOfWork.runInTransaction(async (tx) => {
@@ -207,7 +204,7 @@ export class UsuarioService {
       const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
       if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
 
-      await this.usuarioRepo.update(usuario.id, { ...usuario, passwordHash, sesionesValidasDesde: ahora }, tx);
+      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, invalidarSesiones: true }, tx);
       await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
     });
   }

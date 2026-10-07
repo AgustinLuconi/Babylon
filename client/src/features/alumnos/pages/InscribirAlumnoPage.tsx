@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { passwordNueva } from "@/core/lib/validacion";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -50,7 +51,7 @@ const nuevoPadreSchema = z.object({
   dni: z.string().min(1, "El DNI es requerido").refine(dniValido, "DNI inválido (7-8 dígitos)"),
   telefono: z.string().optional(),
   email: z.email("Email inválido"),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  password: passwordNueva,
   vinculo: z.enum(["padre", "madre", "tutor"]),
 });
 

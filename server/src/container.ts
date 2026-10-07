@@ -67,7 +67,7 @@ import { ReporteController } from "./modules/reportes/reporte.controller";
 const usuarioRepository = new PrismaUsuarioRepository(prisma);
 configurarValidadorDeSesion(async (usuarioId) => {
   const usuario = await usuarioRepository.findById(usuarioId);
-  return usuario ? { activo: usuario.estado === "activo", sesionesValidasDesde: usuario.sesionesValidasDesde ?? null } : null;
+  return usuario ? { activo: usuario.estado === "activo", versionSesion: usuario.versionSesion } : null;
 });
 const cicloRepository = new PrismaCicloRepository(prisma);
 const padreRepository = new PrismaPadreRepository(prisma);

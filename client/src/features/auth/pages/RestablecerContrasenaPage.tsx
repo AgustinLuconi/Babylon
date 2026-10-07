@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import { ApiError } from "@/core/lib/apiClient";
+import { passwordNueva } from "@/core/lib/validacion";
 import { authService } from "../authService";
 import { AuthLayout } from "../components/AuthLayout";
 
@@ -12,10 +13,7 @@ const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo."
 
 const schema = z
   .object({
-    password: z
-      .string()
-      .min(8, "La contraseña debe tener al menos 8 caracteres")
-      .max(72, "La contraseña puede tener como máximo 72 caracteres"),
+    password: passwordNueva,
     repetir: z.string(),
   })
   .refine((d) => d.password === d.repetir, { path: ["repetir"], message: "Las contraseñas no coinciden" });

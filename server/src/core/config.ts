@@ -32,11 +32,11 @@ const envSchema = z
   SMTP_PASS: opcional,
   MAIL_FROM: z.string().default("Babylon English Institute <no-reply@babylon.local>"),
   // Base de los enlaces que van en los correos (la URL del client).
-  APP_URL: opcional,
+  APP_URL: opcional.pipe(z.url("APP_URL debe ser una URL completa (ej. https://babylon.ejemplo.com)").optional()),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {
-      for (const clave of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"] as const) {
+      for (const clave of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "APP_URL"] as const) {
         if (!env[clave]) ctx.addIssue({ code: "custom", path: [clave], message: `${clave} es requerida en producción` });
       }
     }

@@ -222,3 +222,15 @@ No hay test runner configurado; se verifica como en el resto del proyecto:
 - Cambiar la contraseña estando logueado (pantalla "Mi cuenta").
 - Verificación de email al crear cuentas.
 - Almacén compartido (Redis) para los límites por IP.
+
+## Actualización (2026-10-07): revisión independiente y arreglos menores
+
+- **Sesiones por versión, no por reloj**: `Usuario.versionSesion` (Int, default 0) reemplaza a `sesionesValidasDesde` (que dejaba pasar los tokens emitidos en el mismo segundo del cambio; donde este documento dice `sesionesValidasDesde` / `iat`, rige esto). El token lleva `v`; `authMiddleware` lo compara con la versión de la cuenta (ausente = 0). Se incrementa de forma atómica al cambiar la contraseña y al desactivar la cuenta.
+- Los cambios sobre una cuenta usan `UsuarioRepository.actualizarParcial` (solo los campos que cambian), para que dos cambios simultáneos no se pisen.
+- El login compara siempre contra un hash (de relleno si no hay cuenta), para que el tiempo no revele qué emails existen.
+- La contraseña nueva se valida en **bytes** (máx. 72), no en caracteres.
+- `APP_URL` es obligatoria y debe ser una URL válida en producción.
+- Una nota de cierre que vuelve a borrador limpia `publicadaEn`, así al republicarla se avisa de nuevo.
+- Emails de cuenta: guardados normalizados y buscados por igualdad exacta (nunca `ILIKE`).
+- `TRUST_PROXY="true"` se rechaza (hay que indicar la cantidad de proxies delante).
+- La caché de consultas del navegador se vacía al cerrar sesión y al iniciar otra.
