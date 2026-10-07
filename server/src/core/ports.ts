@@ -23,7 +23,7 @@ export interface UnitOfWork<TContext = unknown> {
 // implementación con configurarValidadorDeSesion().
 export interface EstadoDeSesion {
   activo: boolean;
-  contrasenaCambiadaEn: Date | null;
+  sesionesValidasDesde: Date | null;
 }
 
 export type ValidadorDeSesion = (usuarioId: string) => Promise<EstadoDeSesion | null>;

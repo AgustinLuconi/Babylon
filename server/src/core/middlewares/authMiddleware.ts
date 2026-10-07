@@ -44,14 +44,15 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (!validadorDeSesion) {
     throw new Error("authMiddleware: falta configurar el validador de sesión");
   }
-  // Una cuenta desactivada, o cuya contraseña cambió después de emitido el
-  // token, pierde la sesión en el próximo pedido aunque el token no haya vencido.
-  // `iat` está en segundos: se compara contra el segundo del cambio, así un
-  // login hecho en el mismo segundo que el cambio sigue siendo válido.
+  // Una cuenta desactivada, o a la que se le invalidaron las sesiones (cambio de
+  // contraseña, desactivación) después de emitido el token, pierde la sesión en el
+  // próximo pedido aunque el token no haya vencido. `iat` está en segundos: se
+  // compara contra el segundo del cambio, así un login hecho en el mismo segundo
+  // que el cambio sigue siendo válido.
   const estado = await validadorDeSesion(payload.sub);
-  const cambioEnSegundos = estado?.contrasenaCambiadaEn ? Math.floor(estado.contrasenaCambiadaEn.getTime() / 1000) : null;
-  const emitidoAntesDelCambio = cambioEnSegundos !== null && (payload.iat ?? 0) < cambioEnSegundos;
-  if (!estado || !estado.activo || emitidoAntesDelCambio) {
+  const desdeEnSegundos = estado?.sesionesValidasDesde ? Math.floor(estado.sesionesValidasDesde.getTime() / 1000) : null;
+  const emitidoAntes = desdeEnSegundos !== null && (payload.iat ?? 0) < desdeEnSegundos;
+  if (!estado || !estado.activo || emitidoAntes) {
     res.status(401).json({ error: "Tu sesión ya no es válida, ingresá de nuevo" });
     return;
   }

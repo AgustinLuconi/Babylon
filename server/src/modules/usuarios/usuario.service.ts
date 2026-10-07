@@ -140,7 +140,10 @@ export class UsuarioService {
     }
 
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
-      const resultado = await this.usuarioRepo.update(id, { ...usuario, estado }, tx);
+      // Al desactivar se cortan las sesiones abiertas para siempre: reactivar la cuenta
+      // más tarde no tiene que revivir los tokens que tenía emitidos.
+      const sesionesValidasDesde = estado === "inactivo" ? new Date() : usuario.sesionesValidasDesde;
+      const resultado = await this.usuarioRepo.update(id, { ...usuario, estado, sesionesValidasDesde }, tx);
       const profesor = await this.profesorRepo.findByUsuarioId(id, tx);
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
@@ -187,7 +190,7 @@ export class UsuarioService {
   }
 
   // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
-  // las sesiones abiertas (contrasenaCambiadaEn, ver authMiddleware).
+  // las sesiones abiertas (sesionesValidasDesde, ver authMiddleware).
   async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
     const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
     await this.unitOfWork.runInTransaction(async (tx) => {
@@ -202,7 +205,7 @@ export class UsuarioService {
       const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
       if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
 
-      await this.usuarioRepo.update(usuario.id, { ...usuario, passwordHash, contrasenaCambiadaEn: ahora }, tx);
+      await this.usuarioRepo.update(usuario.id, { ...usuario, passwordHash, sesionesValidasDesde: ahora }, tx);
       await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
     });
   }

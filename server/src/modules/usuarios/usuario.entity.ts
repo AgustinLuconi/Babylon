@@ -14,6 +14,6 @@ export interface Usuario {
   roles: Rol[];
   estado: EstadoUsuario;
   fechaCreacion: Date;
-  // Último cambio de contraseña; los tokens emitidos antes dejan de valer.
-  contrasenaCambiadaEn?: Date | null;
+  // Los tokens emitidos antes de este momento dejan de valer (cambio de contraseña o desactivación).
+  sesionesValidasDesde?: Date | null;
 }
