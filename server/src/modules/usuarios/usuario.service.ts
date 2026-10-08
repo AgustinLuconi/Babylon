@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
-import { AuthenticationError, ConflictError, ValidationError } from "../../core/errors";
+import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
@@ -27,6 +27,16 @@ export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
 export interface ContextoDeAcceso {
   dispositivo: string;
   ip: string | null;
+}
+
+// Lo que ve la persona de cada una de sus sesiones activas.
+export interface SesionActivaVista {
+  id: string;
+  dispositivo: string;
+  ip: string | null;
+  creadaEn: Date;
+  ultimoUsoEn: Date;
+  actual: boolean;
 }
 
 export interface SesionAutenticada {
@@ -172,6 +182,39 @@ export class UsuarioService {
 
     const { passwordHash: _passwordHash, ...usuarioSinPassword } = actualizado;
     return usuarioSinPassword;
+  }
+
+  // Cierra la sesión con la que se hizo el pedido (el token deja de valer en el servidor).
+  async cerrarSesion(sesionId: string, usuarioId: string): Promise<void> {
+    await this.sesionRepo.cerrar(sesionId, usuarioId, new Date());
+  }
+
+  // Abrir la lista cuenta como usar la sesión actual (queda con la hora de ahora).
+  async listarSesiones(usuarioId: string, sesionActualId: string): Promise<SesionActivaVista[]> {
+    const ahora = new Date();
+    await this.sesionRepo.tocar(sesionActualId, ahora);
+    const sesiones = await this.sesionRepo.findActivasByUsuario(usuarioId, ahora);
+    return sesiones.map((s) => ({
+      id: s.id,
+      dispositivo: s.dispositivo,
+      ip: s.ip,
+      creadaEn: s.creadaEn,
+      ultimoUsoEn: s.ultimoUsoEn,
+      actual: s.id === sesionActualId,
+    }));
+  }
+
+  // 404 si no existe, es de otra cuenta o ya estaba cerrada (no se distingue, para no revelar sesiones ajenas).
+  async cerrarSesionAjena(usuarioId: string, sesionActualId: string, sesionId: string): Promise<void> {
+    if (sesionId === sesionActualId) {
+      throw new ValidationError("Esta es tu sesión actual: usá Cerrar sesión");
+    }
+    const cerrada = await this.sesionRepo.cerrar(sesionId, usuarioId, new Date());
+    if (!cerrada) throw new EntityNotFoundError("Sesion", sesionId);
+  }
+
+  async cerrarOtrasSesiones(usuarioId: string, sesionActualId: string): Promise<number> {
+    return this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId);
   }
 
   // Siempre termina sin error, exista o no la cuenta: la respuesta no puede
