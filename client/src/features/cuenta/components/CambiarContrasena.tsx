@@ -50,8 +50,19 @@ export function CambiarContrasena() {
       <label className="label" htmlFor={id}>
         {etiqueta}
       </label>
-      <Input id={id} type="password" autoComplete={autoComplete} {...register(id)} />
-      {errors[id] && <p className="mt-1.5 text-[12px] text-destructive">{errors[id]?.message}</p>}
+      <Input
+        id={id}
+        type="password"
+        autoComplete={autoComplete}
+        aria-invalid={errors[id] ? true : undefined}
+        aria-describedby={errors[id] ? `${id}-error` : undefined}
+        {...register(id)}
+      />
+      {errors[id] && (
+        <p id={`${id}-error`} className="mt-1.5 text-[12px] text-destructive">
+          {errors[id]?.message}
+        </p>
+      )}
     </div>
   );
 
@@ -62,12 +73,12 @@ export function CambiarContrasena() {
         {campo("passwordNueva", "Contraseña nueva", "new-password")}
         {campo("repetir", "Repetir contraseña nueva", "new-password")}
         {cambiar.isError && (
-          <p className="text-[12.5px] text-destructive">
+          <p role="alert" className="text-[12.5px] text-destructive">
             {cambiar.error instanceof ApiError ? cambiar.error.message : "No se pudo cambiar la contraseña"}
           </p>
         )}
         {aviso && (
-          <p className="text-[12.5px]" style={{ color: "var(--success)" }}>
+          <p role="status" className="text-[12.5px]" style={{ color: "var(--success)" }}>
             {aviso}
           </p>
         )}

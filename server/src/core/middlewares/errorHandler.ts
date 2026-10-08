@@ -8,6 +8,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // El nombre de la clase queda disponible para los middlewares que miran la respuesta (ej. los límites de pedidos).
+  if (err instanceof DomainError) res.locals.errorDeDominio = err.name;
+
   if (err instanceof ValidationError) {
     res.status(err.statusCode).json({ error: err.message, details: err.details });
     return;

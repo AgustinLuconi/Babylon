@@ -35,7 +35,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // Se borra la sesión guardada sin tocar el estado en memoria: si se llamara a
     // cerrarSesion(), ProtectedRoute redirigiría a /login antes que esta línea y
     // se perdería el aviso. La recarga arranca ya sin sesión.
-    if (res.status === 401 && token && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/logout") && !redirigiendoAlLogin) {
+    // Tampoco si el pedido salió con una sesión que ya no es la actual (se cerró sesión o se entró con otra mientras
+    // el pedido estaba en vuelo): ese 401 no habla de la sesión de ahora.
+    const esLaSesionActual = useSessionStore.getState().token === token;
+    if (res.status === 401 && token && esLaSesionActual && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/logout") && !redirigiendoAlLogin) {
       redirigiendoAlLogin = true;
       useSessionStore.persist.clearStorage();
       window.location.replace("/login?motivo=sesion-vencida");

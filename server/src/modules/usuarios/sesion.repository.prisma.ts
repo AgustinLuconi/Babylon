@@ -38,22 +38,22 @@ export class PrismaSesionRepository implements SesionRepository {
     }
   }
 
-  async buscarValida(id: string, usuarioId: string, ahora: Date): Promise<Sesion | null> {
-    return this.prisma.sesion.findFirst({
+  async buscarValida(id: string, usuarioId: string, ahora: Date, tx?: unknown): Promise<Sesion | null> {
+    return this.client(tx).sesion.findFirst({
       where: { id, usuarioId, cerradaEn: null, expiraEn: { gt: ahora }, usuario: { estado: "activo" } },
     });
   }
 
-  async registrarUso(id: string, ahora: Date, antesDe: Date): Promise<boolean> {
-    const { count } = await this.prisma.sesion.updateMany({
+  async registrarUso(id: string, ahora: Date, antesDe: Date, tx?: unknown): Promise<boolean> {
+    const { count } = await this.client(tx).sesion.updateMany({
       where: { id, ultimoUsoEn: { lt: antesDe } },
       data: { ultimoUsoEn: ahora },
     });
     return count === 1;
   }
 
-  async tocar(id: string, ahora: Date): Promise<void> {
-    await this.prisma.sesion.updateMany({ where: { id }, data: { ultimoUsoEn: ahora } });
+  async tocar(id: string, ahora: Date, tx?: unknown): Promise<void> {
+    await this.client(tx).sesion.updateMany({ where: { id }, data: { ultimoUsoEn: ahora } });
   }
 
   async findActivasByUsuario(usuarioId: string, ahora: Date, tx?: unknown): Promise<Sesion[]> {
@@ -80,10 +80,10 @@ export class PrismaSesionRepository implements SesionRepository {
     return count;
   }
 
-  async depurarTerminadasAntesDe(limite: Date): Promise<number> {
+  async depurarTerminadasAntesDe(limite: Date, tx?: unknown): Promise<number> {
     // Una sesión con `cerradaEn` o `expiraEn` anterior al límite terminó antes del límite; una activa tiene
     // `cerradaEn` nulo y `expiraEn` en el futuro, así que nunca coincide.
-    const { count } = await this.prisma.sesion.deleteMany({
+    const { count } = await this.client(tx).sesion.deleteMany({
       where: { OR: [{ cerradaEn: { lt: limite } }, { expiraEn: { lt: limite } }] },
     });
     return count;

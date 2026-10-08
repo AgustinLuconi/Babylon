@@ -32,10 +32,12 @@ export const limiteOlvideContrasena = rateLimit({ ...base, limit: 5 });
 export const limiteRestablecerContrasena = rateLimit({ ...base, limit: 5 });
 
 // Cambiar la contraseña desde "Mi cuenta": quien tenga una sesión robada no puede adivinar la contraseña actual.
-// La clave es la cuenta (va después de authMiddleware) y los cambios exitosos no cuentan.
+// La clave es la cuenta (va después de authMiddleware). Solo cuentan los intentos con la contraseña actual equivocada
+// (PasswordActualIncorrectaError, de usuarios/): ni los cambios exitosos ni los errores de validación de la nueva.
 export const limiteCambioContrasena = rateLimit({
   ...base,
   limit: 5,
   skipSuccessfulRequests: true,
+  requestWasSuccessful: (_req, res) => res.locals.errorDeDominio !== "PasswordActualIncorrectaError",
   keyGenerator: (req) => req.auth?.sub ?? ipKeyGenerator(req.ip ?? ""),
 });

@@ -48,7 +48,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
   // Sin `sid` (token emitido antes de existir las sesiones), con una sesión cerrada, vencida o de otra cuenta, o con
   // la cuenta desactivada: 401. Es una sola consulta por pedido.
-  if (!payload.sid || !(await validadorDeSesion(payload.sid, payload.sub))) {
+  // `sub` tiene que ser un texto no vacío: un `undefined` en el filtro de la consulta se ignoraría y validaría la
+  // sesión de cualquier cuenta.
+  if (typeof payload.sub !== "string" || !payload.sub || !payload.sid || !(await validadorDeSesion(payload.sid, payload.sub))) {
     res.status(401).json({ error: "Tu sesión ya no es válida, ingresá de nuevo" });
     return;
   }

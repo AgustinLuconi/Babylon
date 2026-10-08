@@ -6,6 +6,8 @@ import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationErro
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
+import { PasswordActualIncorrectaError } from "./usuario.errors";
+import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
@@ -114,6 +116,13 @@ export class UsuarioService {
       if (!actual || actual.estado !== "activo" || actual.passwordHash !== usuario.passwordHash) {
         throw new AuthenticationError("Email o contraseña incorrectos");
       }
+      // En el tope de sesiones abiertas, la nueva desplaza a la menos usada.
+      const activas = await this.sesionRepo.findActivasByUsuario(usuario.id, ahora, tx);
+      const sobrantes = activas.length - MAX_SESIONES_ACTIVAS + 1;
+      if (sobrantes > 0) {
+        const menosUsadas = [...activas].sort((a, b) => a.ultimoUsoEn.getTime() - b.ultimoUsoEn.getTime()).slice(0, sobrantes);
+        for (const s of menosUsadas) await this.sesionRepo.cerrar(s.id, usuario.id, ahora, tx);
+      }
       await this.sesionRepo.create(
         {
           id: sesionId,
@@ -211,7 +220,7 @@ export class UsuarioService {
     const usuario = await this.usuarioRepo.findById(usuarioId);
     if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
     if (!(await bcrypt.compare(datos.passwordActual, usuario.passwordHash))) {
-      throw new ValidationError("La contraseña actual no es correcta");
+      throw new PasswordActualIncorrectaError("La contraseña actual no es correcta");
     }
     if (datos.passwordActual === datos.passwordNueva) {
       throw new ValidationError("La contraseña nueva debe ser distinta de la actual");
@@ -220,6 +229,12 @@ export class UsuarioService {
     const ahora = new Date();
     await this.unitOfWork.runInTransaction(async (tx) => {
       await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
+      // Con el bloqueo tomado se vuelve a comprobar que la sesión desde la que se pide siga abierta: si la cerraron
+      // desde otro dispositivo justo ahora, el cambio no se aplica (y no cerraría la sesión de su verdadero dueño).
+      const abiertas = await this.sesionRepo.findActivasByUsuario(usuarioId, ahora, tx);
+      if (!abiertas.some((s) => s.id === sesionActualId)) {
+        throw new AuthenticationError("Tu sesión ya no es válida, ingresá de nuevo");
+      }
       await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
       await this.sesionRepo.cerrarTodas(usuarioId, ahora, sesionActualId, tx);
       // Un enlace de recuperación pedido antes ya no debe poder cambiar la contraseña.

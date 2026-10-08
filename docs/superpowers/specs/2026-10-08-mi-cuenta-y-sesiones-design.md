@@ -170,3 +170,10 @@ commitean. Casos:
 - Mostrar el historial de accesos de los últimos 90 días (la tabla lo conserva, pero no hay pantalla).
 - Geolocalización por IP, alertas por inicio de sesión desde un dispositivo nuevo, límite de sesiones simultáneas.
 - Verificación de email, notificaciones y 2FA: subproyectos 2, 3 y 4.
+
+## Ajustes posteriores a la revisión (2026-10-08)
+
+- **Tope de sesiones**: 10 abiertas por cuenta; al iniciar otra se cierra la menos usada (antes estaba fuera de alcance).
+- **Carreras**: la sesión se crea bajo el bloqueo de la cuenta y los cambios que cierran sesiones toman el mismo bloqueo.
+- **Cambiar contraseña**: recomprueba que la sesión actual siga abierta, invalida los enlaces de recuperación pendientes y el límite de intentos cuenta solo contraseñas actuales equivocadas.
+- **Client**: el 401 de una sesión que ya no es la actual no redirige; la lista de sesiones no se vuelve a pedir al enfocar la ventana.

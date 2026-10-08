@@ -9,7 +9,7 @@ import { useCerrarSesion } from "../hooks/useCerrarSesion";
 import { useSesiones } from "../hooks/useSesiones";
 
 export function SesionesActivas() {
-  const { data: sesiones, isLoading } = useSesiones();
+  const { data: sesiones, isLoading, isError } = useSesiones();
   const cerrar = useCerrarSesion();
   const cerrarOtras = useCerrarOtrasSesiones();
   const hayOtras = (sesiones ?? []).some((s) => !s.actual);
@@ -32,8 +32,13 @@ export function SesionesActivas() {
           contraseña.
         </p>
         {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+        {isError && (
+          <p role="alert" className="text-[12.5px] text-destructive">
+            No se pudieron cargar las sesiones. Probá de nuevo en unos minutos.
+          </p>
+        )}
         {error && (
-          <p className="text-[12.5px] text-destructive">
+          <p role="alert" className="text-[12.5px] text-destructive">
             {error instanceof ApiError ? error.message : "No se pudo cerrar la sesión"}
           </p>
         )}
@@ -46,7 +51,9 @@ export function SesionesActivas() {
                   <TableHead>IP</TableHead>
                   <TableHead>Inicio</TableHead>
                   <TableHead>Último uso (± 5 min)</TableHead>
-                  <TableHead />
+                  <TableHead>
+                    <span className="sr-only">Acciones</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -66,6 +73,7 @@ export function SesionesActivas() {
                         <Button
                           variant="outline"
                           size="sm"
+                          aria-label={`Cerrar la sesión de ${s.dispositivo}`}
                           disabled={cerrar.isPending}
                           onClick={() => cerrar.mutate(s.id)}
                         >
