@@ -85,17 +85,20 @@ con el mismo mensaje que los demás límites.
 
 ## Último uso
 
-`ultimoUsoEn` **no** se actualiza en cada pedido. Se registra solo en dos momentos:
+`ultimoUsoEn` refleja la actividad real de cada sesión, pero **sin escribir en cada pedido**: se registra solo cuando
+la sesión se está usando y, como máximo, **una vez cada 5 minutos**.
 
-1. Al iniciar sesión (vale `creadaEn`).
-2. Cada vez que la persona abre la sección "Sesiones activas" de "Mi cuenta" (`GET /sesiones`), para la sesión desde
-   la que la abre.
+- La consulta que ya valida la sesión en cada pedido trae también `ultimoUsoEn`. Si pasaron más de 5 minutos desde el
+  último registro, se lanza una actualización condicional (`UPDATE ... WHERE id = :sid AND ultimoUsoEn < ahora - 5 min`)
+  **sin esperarla**: no suma tiempo al pedido y, si dos pedidos coinciden, solo uno escribe.
+- Una sesión que no se usa no genera ninguna escritura. Una sesión en uso continuo genera como máximo 12 por hora.
+- También se registra al iniciar sesión (vale `creadaEn`) y al abrir "Sesiones activas" (`GET /sesiones`), para que la
+  sesión desde la que se mira aparezca con la hora actual.
+- Por eso, el "último uso" que se muestra de cualquier dispositivo tiene una precisión de unos 5 minutos. La pantalla
+  lo indica en el encabezado de la columna ("Último uso (± 5 min)").
 
-Consecuencia que se acepta a propósito: el "último uso" de *otra* sesión muestra la última vez que ese dispositivo
-inició sesión o abrió esa pantalla, no su actividad real. Para no engañar a quien lo lee, la pantalla lo dice
-("El último uso se registra al iniciar sesión y cada vez que se abre esta pantalla en ese dispositivo"). La consulta
-del client no se vuelve a pedir al volver a enfocar la ventana (`refetchOnWindowFocus: false`), así solo se registra al
-entrar a la pantalla.
+Costo medido: una escritura tarda ~2,5 ms y la base sostiene ~850 por segundo; con 300 sesiones usándose sin parar serían
+1 escritura por segundo, y nunca están en el camino del pedido.
 
 ## Retención
 
@@ -125,8 +128,8 @@ mantenimiento de cuotas como la depuración de sesiones, cada una con su manejo 
   2. *Cambiar contraseña*: contraseña actual, nueva y repetir (validación por bytes, igual que el resto); al guardar,
      aviso "Contraseña actualizada. Se cerraron tus otras sesiones." Un error de contraseña actual incorrecta no cierra
      la sesión (es un 400, no un 401).
-  3. *Sesiones activas*: tabla con dispositivo, IP, inicio, último uso y la etiqueta "Esta sesión"; botón "Cerrar" en
-     cada una de las demás, y "Cerrar todas las demás" cuando hay más de una. Debajo, la nota sobre el último uso.
+  3. *Sesiones activas*: tabla con dispositivo, IP, inicio, último uso (± 5 min) y la etiqueta "Esta sesión"; botón
+     "Cerrar" en cada una de las demás, y "Cerrar todas las demás" cuando hay más de una.
 - **Logout**: `useAuth().logout` llama a `POST /api/auth/logout` (si falla, igual cierra localmente) y después vacía la
   caché y navega al login, como hoy.
 - **Una sesión cerrada desde otro dispositivo**: su próximo pedido responde 401 y el client ya la lleva al login con el
@@ -144,8 +147,10 @@ commitean. Casos:
 - **Operaciones**: `GET /sesiones` solo lista las activas y marca `actual`; `DELETE` de una sesión ajena (de otra
   cuenta) da 404 y de la actual da 400; `cerrar-otras` devuelve la cantidad correcta; contraseña actual incorrecta →
   400 y cuenta para el límite (el 6.º intento en 15 min da 429); nueva igual a la actual → 400; 72 bytes.
-- **Último uso**: queda igual tras varios pedidos comunes, cambia al pedir `GET /sesiones` y no cambia al volver a
-  enfocar la ventana.
+- **Último uso**: varios pedidos seguidos dentro de los 5 minutos no escriben (el valor no cambia); pasados 5 minutos
+  (se simula retrocediendo `ultimoUsoEn` en la base) el siguiente pedido lo actualiza; muchos pedidos simultáneos con el
+  valor vencido producen una sola escritura; una sesión sin uso no escribe; `GET /sesiones` deja la sesión actual con la
+  hora actual; el tiempo del pedido no aumenta de forma medible.
 - **Retención**: la tarea borra sesiones viejas (cerradas o vencidas hace más de 30 días) de una cuenta desactivada y
   **no** las de una cuenta activa; no toca sesiones activas.
 - **Rendimiento**: la verificación por pedido sigue en el orden de unos pocos ms (se mide igual que antes).
