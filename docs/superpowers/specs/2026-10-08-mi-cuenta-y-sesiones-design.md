@@ -102,10 +102,14 @@ Costo medido: una escritura tarda ~2,5 ms y la base sostiene ~850 por segundo; c
 
 ## Retención
 
-Las sesiones vencidas o cerradas **se conservan** como historial de accesos de cada cuenta activa; "Mi cuenta" solo
-muestra las activas. La tarea diaria de las 03:00 borra únicamente las sesiones, vencidas o cerradas hace más de 30
-días, de **cuentas desactivadas** (`estado = inactivo`). Las filas de cuentas activas crecen (orden de cientos por día
-a la escala del instituto, unas decenas de MB por año); si algún día molestara, se agrega una política de depuración.
+Las sesiones terminadas (vencidas o cerradas) se conservan **90 días** como historial reciente de accesos de cada
+cuenta (útil para investigar un acceso raro) y después se borran. "Mi cuenta" solo muestra las activas; las activas
+nunca se borran.
+
+- La tarea diaria de las 03:00 borra toda sesión cuyo `cerradaEn` o `expiraEn` (el que ocurra primero, si la sesión ya
+  terminó) tenga más de 90 días, **de cualquier cuenta**, activa o desactivada. Así la tabla no crece sin límite y no se
+  guardan direcciones IP indefinidamente.
+- Una sesión sigue "activa" mientras no esté cerrada y no haya vencido; esas no se tocan nunca.
 
 La tarea diaria deja de ser exclusiva de las cuotas: el temporizador de las 03:00 hora Argentina (`cuota.scheduler.ts`)
 se extrae a una utilidad genérica (`core/tareaDiaria.ts`, que conserva `msHastaProximaCorrida`) y la usan tanto el
@@ -151,8 +155,8 @@ commitean. Casos:
   (se simula retrocediendo `ultimoUsoEn` en la base) el siguiente pedido lo actualiza; muchos pedidos simultáneos con el
   valor vencido producen una sola escritura; una sesión sin uso no escribe; `GET /sesiones` deja la sesión actual con la
   hora actual; el tiempo del pedido no aumenta de forma medible.
-- **Retención**: la tarea borra sesiones viejas (cerradas o vencidas hace más de 30 días) de una cuenta desactivada y
-  **no** las de una cuenta activa; no toca sesiones activas.
+- **Retención**: la tarea borra las sesiones terminadas (cerradas o vencidas) hace más de 90 días, de cuentas activas y
+  de desactivadas, y **no** borra las terminadas hace menos de 90 días ni ninguna sesión activa.
 - **Rendimiento**: la verificación por pedido sigue en el orden de unos pocos ms (se mide igual que antes).
 - **Interfaz** (dos contextos de navegador = dos dispositivos): iniciar sesión en ambos, verlos en la lista, cerrar el
   segundo desde el primero y comprobar que el segundo termina en el login con el aviso; cambiar la contraseña desde uno
@@ -163,6 +167,6 @@ commitean. Casos:
 ## Fuera de alcance
 
 - Editar nombre o email; cambiar el email con verificación.
-- Mostrar el historial de accesos (la tabla lo conserva, pero no hay pantalla).
+- Mostrar el historial de accesos de los últimos 90 días (la tabla lo conserva, pero no hay pantalla).
 - Geolocalización por IP, alertas por inicio de sesión desde un dispositivo nuevo, límite de sesiones simultáneas.
 - Verificación de email, notificaciones y 2FA: subproyectos 2, 3 y 4.
