@@ -18,6 +18,7 @@ import type {
 } from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
+const DIAS_DE_HISTORIAL_DE_SESIONES = 90;
 // Hash de una contraseña que nadie conoce: para gastar el mismo tiempo cuando la cuenta no existe.
 const HASH_DE_RELLENO = bcrypt.hashSync(randomUUID(), RONDAS_BCRYPT);
 const VIGENCIA_ENLACE_MS = 60 * 60 * 1000;
@@ -206,6 +207,12 @@ export class UsuarioService {
       await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
       await this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId, tx);
     });
+  }
+
+  // Borra las sesiones terminadas (cerradas o vencidas) hace más de 90 días, de cualquier cuenta. Las activas no se tocan.
+  async depurarSesionesTerminadas(ahora: Date = new Date()): Promise<number> {
+    const limite = new Date(ahora.getTime() - DIAS_DE_HISTORIAL_DE_SESIONES * 24 * 60 * 60 * 1000);
+    return this.sesionRepo.depurarTerminadasAntesDe(limite);
   }
 
   // Cierra la sesión con la que se hizo el pedido (el token deja de valer en el servidor).
