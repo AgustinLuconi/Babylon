@@ -79,13 +79,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="px-3 py-3" style={{ borderTop: "1px solid var(--sidebar-border)" }}>
         <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <Avatar name={usuario.nombre} tone="brand" className="bg-white/10! text-white! border-white/20!" />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[12.5px] font-medium text-white">{usuario.nombre}</div>
-            <div className="truncate text-[11px]" style={{ color: "var(--sidebar-text-muted)" }}>
-              {ROL_LABELS[usuario.rol]}
+          <Link
+            to="/mi-cuenta"
+            onClick={onNavigate}
+            title="Mi cuenta"
+            className="-m-1 flex min-w-0 flex-1 items-center gap-2.5 rounded p-1 transition-colors hover:bg-white/5"
+          >
+            <Avatar name={usuario.nombre} tone="brand" className="bg-white/10! text-white! border-white/20!" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12.5px] font-medium text-white">{usuario.nombre}</div>
+              <div className="truncate text-[11px]" style={{ color: "var(--sidebar-text-muted)" }}>
+                {ROL_LABELS[usuario.rol]}
+              </div>
             </div>
-          </div>
+          </Link>
           <button
             onClick={alternarTema}
             className="rounded p-1.5 transition-colors"

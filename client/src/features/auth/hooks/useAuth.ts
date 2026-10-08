@@ -33,6 +33,8 @@ export function useAuth() {
   const queryClient = useQueryClient();
 
   const logout = () => {
+    // El pedido sale con el token actual (apiClient lo lee antes de que se borre la sesión local).
+    void authService.logout().catch(() => {});
     cerrarSesion();
     queryClient.clear();
     navigate("/login", { replace: true });

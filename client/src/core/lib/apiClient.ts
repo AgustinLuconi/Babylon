@@ -31,11 +31,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     // Sesión vencida o invalidada en el server: se cierra y se vuelve al login.
     // Solo si había token (las pantallas públicas no redirigen) y no es el
-    // propio login (credenciales incorrectas también responden 401).
+    // propio login (credenciales incorrectas también responden 401) ni el cierre de sesión (si ya estaba vencida, da igual).
     // Se borra la sesión guardada sin tocar el estado en memoria: si se llamara a
     // cerrarSesion(), ProtectedRoute redirigiría a /login antes que esta línea y
     // se perdería el aviso. La recarga arranca ya sin sesión.
-    if (res.status === 401 && token && !path.startsWith("/api/auth/login") && !redirigiendoAlLogin) {
+    if (res.status === 401 && token && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/logout") && !redirigiendoAlLogin) {
       redirigiendoAlLogin = true;
       useSessionStore.persist.clearStorage();
       window.location.replace("/login?motivo=sesion-vencida");

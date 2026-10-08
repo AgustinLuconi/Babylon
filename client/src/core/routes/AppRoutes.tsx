@@ -4,6 +4,7 @@ import LoginPage from "@/features/auth/pages/LoginPage";
 import OlvideContrasenaPage from "@/features/auth/pages/OlvideContrasenaPage";
 import RestablecerContrasenaPage from "@/features/auth/pages/RestablecerContrasenaPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
+import MiCuentaPage from "@/features/cuenta/pages/MiCuentaPage";
 import AlumnosListPage from "@/features/alumnos/pages/AlumnosListPage";
 import AlumnoDetailPage from "@/features/alumnos/pages/AlumnoDetailPage";
 import InscribirAlumnoPage from "@/features/alumnos/pages/InscribirAlumnoPage";
@@ -32,6 +33,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/mi-cuenta" element={<MiCuentaPage />} />
 
           <Route element={<ProtectedRoute rolesPermitidos={["admin", "secretario"]} />}>
             <Route path="/alumnos" element={<AlumnosListPage />} />
