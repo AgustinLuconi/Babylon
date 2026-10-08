@@ -144,6 +144,7 @@ model Usuario {
   profesor Profesor?
 
   tokensRecuperacion TokenRecuperacion[]
+  sesiones           Sesion[]
 }
 
 model Padre {
@@ -421,4 +422,21 @@ model TokenRecuperacion {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId, creadoEn])
+}
+
+// Una sesión por inicio de sesión (por dispositivo). El token lleva su id (`sid`) y solo vale mientras la
+// sesión esté abierta (sin `cerradaEn`), no haya vencido (`expiraEn`) y la cuenta esté activa.
+model Sesion {
+  id          String    @id
+  usuarioId   String
+  dispositivo String
+  ip          String?
+  creadaEn    DateTime
+  ultimoUsoEn DateTime
+  expiraEn    DateTime
+  cerradaEn   DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, cerradaEn, expiraEn])
 }
