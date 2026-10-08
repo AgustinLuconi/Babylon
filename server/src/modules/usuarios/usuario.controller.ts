@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
+import { describirDispositivo } from "../../core/dispositivo";
 import {
+  cambiarContrasenaSchema,
   cambiarEstadoUsuarioSchema,
   crearAdministradorSchema,
   crearSecretarioSchema,
@@ -14,8 +16,36 @@ export class UsuarioController {
 
   login = async (req: Request, res: Response) => {
     const credenciales = credencialesSchema.parse(req.body);
-    const sesion = await this.usuarioService.autenticar(credenciales);
+    const sesion = await this.usuarioService.autenticar(credenciales, {
+      dispositivo: describirDispositivo(req.headers["user-agent"]),
+      ip: req.ip ?? null,
+    });
     res.status(200).json(sesion);
+  };
+
+  cambiarContrasena = async (req: Request, res: Response) => {
+    const datos = cambiarContrasenaSchema.parse(req.body);
+    await this.usuarioService.cambiarContrasena(req.auth!.sub, req.auth!.sesionId, datos);
+    res.status(204).end();
+  };
+
+  logout = async (req: Request, res: Response) => {
+    await this.usuarioService.cerrarSesion(req.auth!.sesionId, req.auth!.sub);
+    res.status(204).end();
+  };
+
+  listarSesiones = async (req: Request, res: Response) => {
+    res.status(200).json(await this.usuarioService.listarSesiones(req.auth!.sub, req.auth!.sesionId));
+  };
+
+  cerrarSesionAjena = async (req: Request, res: Response) => {
+    await this.usuarioService.cerrarSesionAjena(req.auth!.sub, req.auth!.sesionId, String(req.params.id));
+    res.status(204).end();
+  };
+
+  cerrarOtrasSesiones = async (req: Request, res: Response) => {
+    const cerradas = await this.usuarioService.cerrarOtrasSesiones(req.auth!.sub, req.auth!.sesionId);
+    res.status(200).json({ cerradas });
   };
 
   crearSecretario = async (req: Request, res: Response) => {

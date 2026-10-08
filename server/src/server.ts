@@ -17,6 +17,7 @@ import { cursoRoutes } from "./modules/cursos/curso.routes";
 import { asistenciaRoutes } from "./modules/asistencia/asistencia.routes";
 import { cuotaRoutes } from "./modules/cuotas/cuota.routes";
 import { iniciarMantenimientoDeCuotas } from "./modules/cuotas/cuota.scheduler";
+import { iniciarDepuracionDeSesiones } from "./modules/usuarios/sesion.scheduler";
 import { configuracionRoutes } from "./modules/configuraciones/configuracion.routes";
 import { documentoRoutes } from "./modules/documentos/documento.routes";
 import { calificacionRoutes } from "./modules/calificaciones/calificacion.routes";
@@ -58,4 +59,5 @@ app.use(errorHandler);
 app.listen(config.PORT, "0.0.0.0", () => {
   console.log(`Babylon API escuchando en http://localhost:${config.PORT}`);
   iniciarMantenimientoDeCuotas(container.cuotaService);
+  iniciarDepuracionDeSesiones(container.usuarioService);
 });

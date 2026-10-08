@@ -6,6 +6,8 @@ import type { Rol, ValidadorDeSesion } from "../ports";
 export interface AuthPayload {
   sub: string;
   rol: Rol;
+  // Id de la Sesion con la que se inició (claim `sid` del token): identifica "esta sesión".
+  sesionId: string;
 }
 
 declare global {
@@ -33,9 +35,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  let payload: AuthPayload & { v?: number };
+  let payload: { sub: string; rol: Rol; sid?: string };
   try {
-    payload = jwt.verify(token, config.JWT_SECRET) as AuthPayload & { v?: number };
+    payload = jwt.verify(token, config.JWT_SECRET) as typeof payload;
   } catch {
     res.status(401).json({ error: "Token inválido o expirado" });
     return;
@@ -44,17 +46,16 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (!validadorDeSesion) {
     throw new Error("authMiddleware: falta configurar el validador de sesión");
   }
-  // Una cuenta desactivada, o cuyas sesiones se invalidaron (cambio de contraseña, desactivación) después
-  // de emitido el token, pierde la sesión en el próximo pedido aunque el token no haya vencido. El token lleva la
-  // versión de sesión con la que se emitió (`v`; los emitidos antes de existir este campo cuentan como 0) y solo
-  // vale mientras coincida con la de la cuenta: no depende del reloj, así que no hay ventana de un segundo.
-  const estado = await validadorDeSesion(payload.sub);
-  if (!estado || !estado.activo || (payload.v ?? 0) !== estado.versionSesion) {
+  // Sin `sid` (token emitido antes de existir las sesiones), con una sesión cerrada, vencida o de otra cuenta, o con
+  // la cuenta desactivada: 401. Es una sola consulta por pedido.
+  // `sub` tiene que ser un texto no vacío: un `undefined` en el filtro de la consulta se ignoraría y validaría la
+  // sesión de cualquier cuenta.
+  if (typeof payload.sub !== "string" || !payload.sub || !payload.sid || !(await validadorDeSesion(payload.sid, payload.sub))) {
     res.status(401).json({ error: "Tu sesión ya no es válida, ingresá de nuevo" });
     return;
   }
 
-  req.auth = { sub: payload.sub, rol: payload.rol };
+  req.auth = { sub: payload.sub, rol: payload.rol, sesionId: payload.sid };
   next();
 }
 

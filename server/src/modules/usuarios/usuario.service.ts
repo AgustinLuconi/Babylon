@@ -2,15 +2,25 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
-import { AuthenticationError, ConflictError, ValidationError } from "../../core/errors";
+import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
+import { PasswordActualIncorrectaError } from "./usuario.errors";
+import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
+import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
-import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
+import type {
+  CambiarContrasenaInput,
+  CambiarEstadoUsuarioInput,
+  CredencialesInput,
+  CrearAdministradorInput,
+  CrearSecretarioInput,
+} from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
+const DIAS_DE_HISTORIAL_DE_SESIONES = 90;
 // Hash de una contraseña que nadie conoce: para gastar el mismo tiempo cuando la cuenta no existe.
 const HASH_DE_RELLENO = bcrypt.hashSync(randomUUID(), RONDAS_BCRYPT);
 const VIGENCIA_ENLACE_MS = 60 * 60 * 1000;
@@ -21,6 +31,22 @@ const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo."
 const hashDeToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
+
+// Datos del pedido de login que se guardan en la sesión (los arma el controller a partir de la request).
+export interface ContextoDeAcceso {
+  dispositivo: string;
+  ip: string | null;
+}
+
+// Lo que ve la persona de cada una de sus sesiones activas.
+export interface SesionActivaVista {
+  id: string;
+  dispositivo: string;
+  ip: string | null;
+  creadaEn: Date;
+  ultimoUsoEn: Date;
+  actual: boolean;
+}
 
 export interface SesionAutenticada {
   requiereSeleccionRol: false;
@@ -43,12 +69,16 @@ export type ResultadoAutenticacion = SesionAutenticada | SeleccionRolRequerida;
 export class UsuarioService {
   constructor(
     private readonly usuarioRepo: UsuarioRepository,
+    private readonly sesionRepo: SesionRepository,
     private readonly profesorRepo: ProfesorRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
   ) {}
 
-  async autenticar({ email, password, rolElegido, recordarme }: CredencialesInput): Promise<ResultadoAutenticacion> {
+  async autenticar(
+    { email, password, rolElegido, recordarme }: CredencialesInput,
+    contexto: ContextoDeAcceso,
+  ): Promise<ResultadoAutenticacion> {
     const usuario = await this.usuarioRepo.findByEmail(email);
 
     // Mismo mensaje genérico para usuario inexistente, inactivo o contraseña incorrecta, y también el
@@ -70,8 +100,42 @@ export class UsuarioService {
       rolActivo = rolElegido;
     }
 
-    const token = jwt.sign({ sub: usuario.id, rol: rolActivo, v: usuario.versionSesion }, config.JWT_SECRET, {
+    const sesionId = randomUUID();
+    const token = jwt.sign({ sub: usuario.id, rol: rolActivo, sid: sesionId }, config.JWT_SECRET, {
       expiresIn: (recordarme ? config.JWT_EXPIRES_IN_RECORDAR : config.JWT_EXPIRES_IN) as jwt.SignOptions["expiresIn"],
+    });
+    // La sesión vence cuando vence el token.
+    const { exp } = jwt.decode(token) as { exp: number };
+    const ahora = new Date();
+    // La sesión se crea con el bloqueo de la cuenta y releyéndola: si mientras corría la verificación de la contraseña
+    // (~100 ms) otro pedido cambió la contraseña o desactivó la cuenta, ese cambio ya cerró las sesiones y esta
+    // no puede nacer después, abierta (los cambios toman el mismo bloqueo, ver bloquearCuenta).
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
+      const actual = await this.usuarioRepo.findById(usuario.id, tx);
+      if (!actual || actual.estado !== "activo" || actual.passwordHash !== usuario.passwordHash) {
+        throw new AuthenticationError("Email o contraseña incorrectos");
+      }
+      // En el tope de sesiones abiertas, la nueva desplaza a la menos usada.
+      const activas = await this.sesionRepo.findActivasByUsuario(usuario.id, ahora, tx);
+      const sobrantes = activas.length - MAX_SESIONES_ACTIVAS + 1;
+      if (sobrantes > 0) {
+        const menosUsadas = [...activas].sort((a, b) => a.ultimoUsoEn.getTime() - b.ultimoUsoEn.getTime()).slice(0, sobrantes);
+        for (const s of menosUsadas) await this.sesionRepo.cerrar(s.id, usuario.id, ahora, tx);
+      }
+      await this.sesionRepo.create(
+        {
+          id: sesionId,
+          usuarioId: usuario.id,
+          dispositivo: contexto.dispositivo,
+          ip: contexto.ip,
+          creadaEn: ahora,
+          ultimoUsoEn: ahora,
+          expiraEn: new Date(exp * 1000),
+          cerradaEn: null,
+        },
+        tx,
+      );
     });
 
     return {
@@ -111,7 +175,6 @@ export class UsuarioService {
       roles: [rol],
       estado: "activo",
       fechaCreacion: new Date(),
-      versionSesion: 0,
     };
     await this.usuarioRepo.create(usuario);
 
@@ -135,9 +198,11 @@ export class UsuarioService {
     }
 
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
-      // Solo cambia el estado (no se reescribe la fila). Al desactivar se cortan las sesiones abiertas
-      // para siempre: reactivar la cuenta más tarde no revive los tokens que tenía emitidos.
-      const resultado = await this.usuarioRepo.actualizarParcial(id, { estado, invalidarSesiones: estado === "inactivo" }, tx);
+      await this.usuarioRepo.bloquearCuenta(id, tx);
+      // Solo cambia el estado (no se reescribe la fila).
+      const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
+      // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.
+      if (estado === "inactivo") await this.sesionRepo.cerrarTodas(id, new Date(), undefined, tx);
       const profesor = await this.profesorRepo.findByUsuarioId(id, tx);
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
@@ -147,6 +212,73 @@ export class UsuarioService {
 
     const { passwordHash: _passwordHash, ...usuarioSinPassword } = actualizado;
     return usuarioSinPassword;
+  }
+
+  // Con la sesión abierta: exige la contraseña actual (400 si no coincide, no 401: la sesión sigue válida), la nueva
+  // tiene que ser distinta, y se cierran las demás sesiones; la actual sigue abierta.
+  async cambiarContrasena(usuarioId: string, sesionActualId: string, datos: CambiarContrasenaInput): Promise<void> {
+    const usuario = await this.usuarioRepo.findById(usuarioId);
+    if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
+    if (!(await bcrypt.compare(datos.passwordActual, usuario.passwordHash))) {
+      throw new PasswordActualIncorrectaError("La contraseña actual no es correcta");
+    }
+    if (datos.passwordActual === datos.passwordNueva) {
+      throw new ValidationError("La contraseña nueva debe ser distinta de la actual");
+    }
+    const passwordHash = await bcrypt.hash(datos.passwordNueva, RONDAS_BCRYPT);
+    const ahora = new Date();
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
+      // Con el bloqueo tomado se vuelve a comprobar que la sesión desde la que se pide siga abierta: si la cerraron
+      // desde otro dispositivo justo ahora, el cambio no se aplica (y no cerraría la sesión de su verdadero dueño).
+      const abiertas = await this.sesionRepo.findActivasByUsuario(usuarioId, ahora, tx);
+      if (!abiertas.some((s) => s.id === sesionActualId)) {
+        throw new AuthenticationError("Tu sesión ya no es válida, ingresá de nuevo");
+      }
+      await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
+      await this.sesionRepo.cerrarTodas(usuarioId, ahora, sesionActualId, tx);
+      // Un enlace de recuperación pedido antes ya no debe poder cambiar la contraseña.
+      await this.usuarioRepo.invalidarTokensRecuperacion(usuarioId, ahora, tx);
+    });
+  }
+
+  // Borra las sesiones terminadas (cerradas o vencidas) hace más de 90 días, de cualquier cuenta. Las activas no se tocan.
+  async depurarSesionesTerminadas(ahora: Date = new Date()): Promise<number> {
+    const limite = new Date(ahora.getTime() - DIAS_DE_HISTORIAL_DE_SESIONES * 24 * 60 * 60 * 1000);
+    return this.sesionRepo.depurarTerminadasAntesDe(limite);
+  }
+
+  // Cierra la sesión con la que se hizo el pedido (el token deja de valer en el servidor).
+  async cerrarSesion(sesionId: string, usuarioId: string): Promise<void> {
+    await this.sesionRepo.cerrar(sesionId, usuarioId, new Date());
+  }
+
+  // Abrir la lista cuenta como usar la sesión actual (queda con la hora de ahora).
+  async listarSesiones(usuarioId: string, sesionActualId: string): Promise<SesionActivaVista[]> {
+    const ahora = new Date();
+    await this.sesionRepo.tocar(sesionActualId, ahora);
+    const sesiones = await this.sesionRepo.findActivasByUsuario(usuarioId, ahora);
+    return sesiones.map((s) => ({
+      id: s.id,
+      dispositivo: s.dispositivo,
+      ip: s.ip,
+      creadaEn: s.creadaEn,
+      ultimoUsoEn: s.ultimoUsoEn,
+      actual: s.id === sesionActualId,
+    }));
+  }
+
+  // 404 si no existe, es de otra cuenta o ya estaba cerrada (no se distingue, para no revelar sesiones ajenas).
+  async cerrarSesionAjena(usuarioId: string, sesionActualId: string, sesionId: string): Promise<void> {
+    if (sesionId === sesionActualId) {
+      throw new ValidationError("Esta es tu sesión actual: usá Cerrar sesión");
+    }
+    const cerrada = await this.sesionRepo.cerrar(sesionId, usuarioId, new Date());
+    if (!cerrada) throw new EntityNotFoundError("Sesion", sesionId);
+  }
+
+  async cerrarOtrasSesiones(usuarioId: string, sesionActualId: string): Promise<number> {
+    return this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId);
   }
 
   // Siempre termina sin error, exista o no la cuenta: la respuesta no puede
@@ -189,7 +321,7 @@ export class UsuarioService {
   }
 
   // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
-  // las sesiones abiertas (versionSesion, ver authMiddleware).
+  // todas las sesiones de la cuenta.
   async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
     const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
     await this.unitOfWork.runInTransaction(async (tx) => {
@@ -197,6 +329,7 @@ export class UsuarioService {
       if (!registro || registro.usadoEn || registro.expiraEn.getTime() <= ahora.getTime()) {
         throw new ValidationError(ENLACE_INVALIDO);
       }
+      await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
       // Marcado atómico: si dos pedidos usan el mismo enlace a la vez, solo uno gana.
       if (!(await this.usuarioRepo.marcarTokenRecuperacionUsado(registro.id, ahora, tx))) {
         throw new ValidationError(ENLACE_INVALIDO);
@@ -204,7 +337,8 @@ export class UsuarioService {
       const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
       if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
 
-      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, invalidarSesiones: true }, tx);
+      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash }, tx);
+      await this.sesionRepo.cerrarTodas(usuario.id, ahora, undefined, tx);
       await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
     });
   }

@@ -6,6 +6,8 @@ import { SmtpMailer } from "./core/adapters/SmtpMailer";
 import { config } from "./core/config";
 import type { Mailer } from "./core/ports";
 
+import { PrismaSesionRepository } from "./modules/usuarios/sesion.repository.prisma";
+import { crearValidadorDeSesion } from "./modules/usuarios/sesion.validador";
 import { PrismaUsuarioRepository } from "./modules/usuarios/usuario.repository.prisma";
 import { UsuarioService } from "./modules/usuarios/usuario.service";
 import { UsuarioController } from "./modules/usuarios/usuario.controller";
@@ -65,10 +67,8 @@ import { ReporteController } from "./modules/reportes/reporte.controller";
 // --- Repositorios: Prisma real, conectado a PostgreSQL. Los datos de
 // desarrollo ya no se siembran acá — correr `npm run prisma:seed`. ---
 const usuarioRepository = new PrismaUsuarioRepository(prisma);
-configurarValidadorDeSesion(async (usuarioId) => {
-  const usuario = await usuarioRepository.findById(usuarioId);
-  return usuario ? { activo: usuario.estado === "activo", versionSesion: usuario.versionSesion } : null;
-});
+const sesionRepository = new PrismaSesionRepository(prisma);
+configurarValidadorDeSesion(crearValidadorDeSesion(sesionRepository));
 const cicloRepository = new PrismaCicloRepository(prisma);
 const padreRepository = new PrismaPadreRepository(prisma);
 const profesorRepository = new PrismaProfesorRepository(prisma);
@@ -96,10 +96,10 @@ const mailer: Mailer = config.SMTP_HOST
   : new ConsoleMailer();
 
 // --- Servicios ---
-const usuarioService = new UsuarioService(usuarioRepository, profesorRepository, unitOfWork, mailer);
+const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, mailer);
 const cicloService = new CicloService(cicloRepository, unitOfWork);
 const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork);
-const profesorService = new ProfesorService(profesorRepository, usuarioRepository, unitOfWork);
+const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork);
 const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, cicloRepository, configuracionRepository, unitOfWork);
 const configuracionService = new ConfiguracionService(configuracionRepository);
 const alumnoService = new AlumnoService(
@@ -130,6 +130,8 @@ export const container = {
   cuotaService,
   // Expuesto para verificar los avisos con fechas fijas.
   notificacionService,
+  // Expuesto para la depuración diaria de sesiones y para verificar los flujos.
+  usuarioService,
   // Expuesto para verificar el adaptador de correo elegido.
   mailer,
   configuracionController: new ConfiguracionController(configuracionService),

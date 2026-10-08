@@ -61,15 +61,11 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
     }
   }
 
-  async actualizarParcial(id: string, { invalidarSesiones, ...campos }: CambiosUsuario, tx?: unknown): Promise<Usuario> {
+  async actualizarParcial(id: string, cambios: CambiosUsuario, tx?: unknown): Promise<Usuario> {
     try {
       const fila = await this.client(tx).usuario.update({
         where: { id },
-        data: {
-          ...campos,
-          ...(campos.email !== undefined ? { email: normalizarEmail(campos.email) } : {}),
-          ...(invalidarSesiones ? { versionSesion: { increment: 1 } } : {}),
-        },
+        data: { ...cambios, ...(cambios.email !== undefined ? { email: normalizarEmail(cambios.email) } : {}) },
       });
       return aEntidad(fila);
     } catch {

@@ -16,6 +16,7 @@ const TITULOS: { prefijo: string; titulo: string; subtitulo: string }[] = [
   { prefijo: "/asistencia", titulo: "Asistencia", subtitulo: "Registro de presentes, tardanzas y ausencias" },
   { prefijo: "/calificaciones", titulo: "Calificaciones", subtitulo: "Carga y publicación de evaluaciones" },
   { prefijo: "/observaciones", titulo: "Observaciones", subtitulo: "Comunicaciones al tutor del alumno" },
+  { prefijo: "/mi-cuenta", titulo: "Mi cuenta", subtitulo: "Datos, contraseña y sesiones" },
   { prefijo: "/mis-hijos/calificaciones", titulo: "Calificaciones", subtitulo: "" },
   { prefijo: "/mis-hijos/asistencia", titulo: "Asistencia", subtitulo: "" },
   { prefijo: "/mis-hijos/cuotas", titulo: "Cuotas", subtitulo: "" },

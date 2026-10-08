@@ -23,6 +23,20 @@ export function formatFecha(fechaIso: string): string {
   return `${dia}/${mes}/${anio}`;
 }
 
+// "08/10/2026 14:35" en la hora local del navegador (para instantes reales, como el inicio de una sesión).
+export function formatFechaHora(iso: string): string {
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(new Date(iso))
+    .replace(",", "");
+}
+
 // "Viernes · 9 de mayo de 2026" — formato del eyebrow de fecha de los dashboards.
 export function formatFechaLarga(fecha: Date = new Date()): string {
   const diaSemana = new Intl.DateTimeFormat("es-AR", { weekday: "long" }).format(fecha);

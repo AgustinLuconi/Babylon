@@ -31,11 +31,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     // Sesión vencida o invalidada en el server: se cierra y se vuelve al login.
     // Solo si había token (las pantallas públicas no redirigen) y no es el
-    // propio login (credenciales incorrectas también responden 401).
+    // propio login (credenciales incorrectas también responden 401) ni el cierre de sesión (si ya estaba vencida, da igual).
     // Se borra la sesión guardada sin tocar el estado en memoria: si se llamara a
     // cerrarSesion(), ProtectedRoute redirigiría a /login antes que esta línea y
     // se perdería el aviso. La recarga arranca ya sin sesión.
-    if (res.status === 401 && token && !path.startsWith("/api/auth/login") && !redirigiendoAlLogin) {
+    // Tampoco si el pedido salió con una sesión que ya no es la actual (se cerró sesión o se entró con otra mientras
+    // el pedido estaba en vuelo): ese 401 no habla de la sesión de ahora.
+    const esLaSesionActual = useSessionStore.getState().token === token;
+    if (res.status === 401 && token && esLaSesionActual && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/logout") && !redirigiendoAlLogin) {
       redirigiendoAlLogin = true;
       useSessionStore.persist.clearStorage();
       window.location.replace("/login?motivo=sesion-vencida");
@@ -55,6 +58,7 @@ export const apiClient = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined }),
 };
