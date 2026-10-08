@@ -18,15 +18,10 @@ export interface UnitOfWork<TContext = unknown> {
   runInTransaction<T>(work: (context: TContext) => Promise<T>): Promise<T>;
 }
 
-// Lo que authMiddleware necesita saber de una cuenta para aceptar su token.
-// core/ no puede importar modules/, así que container.ts le inyecta la
-// implementación con configurarValidadorDeSesion().
-export interface EstadoDeSesion {
-  activo: boolean;
-  versionSesion: number;
-}
-
-export type ValidadorDeSesion = (usuarioId: string) => Promise<EstadoDeSesion | null>;
+// Lo que authMiddleware necesita para aceptar un token: que la sesión (`sid`) exista, sea de esa cuenta, esté
+// abierta y sin vencer, y que la cuenta siga activa. core/ no puede importar modules/, así que container.ts le
+// inyecta la implementación con configurarValidadorDeSesion().
+export type ValidadorDeSesion = (sesionId: string, usuarioId: string) => Promise<boolean>;
 
 export interface MensajeCorreo {
   para: string;

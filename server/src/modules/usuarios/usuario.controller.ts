@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { describirDispositivo } from "../../core/dispositivo";
 import {
   cambiarEstadoUsuarioSchema,
   crearAdministradorSchema,
@@ -14,7 +15,10 @@ export class UsuarioController {
 
   login = async (req: Request, res: Response) => {
     const credenciales = credencialesSchema.parse(req.body);
-    const sesion = await this.usuarioService.autenticar(credenciales);
+    const sesion = await this.usuarioService.autenticar(credenciales, {
+      dispositivo: describirDispositivo(req.headers["user-agent"]),
+      ip: req.ip ?? null,
+    });
     res.status(200).json(sesion);
   };
 

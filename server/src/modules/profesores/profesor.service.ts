@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { UnitOfWork } from "../../core/ports";
+import type { SesionRepository } from "../usuarios/sesion.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { Usuario } from "../usuarios/usuario.entity";
 import type { ProfesorRepository } from "./profesor.repository";
@@ -12,6 +13,7 @@ export class ProfesorService {
   constructor(
     private readonly profesorRepo: ProfesorRepository,
     private readonly usuarioRepo: UsuarioRepository,
+    private readonly sesionRepo: SesionRepository,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -46,7 +48,6 @@ export class ProfesorService {
         roles: ["profesor"],
         estado: "activo",
         fechaCreacion: new Date(),
-        versionSesion: 0,
       };
       await this.usuarioRepo.create(usuario, tx);
 
@@ -113,17 +114,18 @@ export class ProfesorService {
               throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
             }
           }
-          // Solo los campos que cambian (no se reescribe la fila). Desactivar al profesor corta sus sesiones para siempre.
+          // Solo los campos que cambian (no se reescribe la fila).
           await this.usuarioRepo.actualizarParcial(
             usuario.id,
             {
               nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
               ...(datos.email ? { email: datos.email } : {}),
               estado: actualizado.estado,
-              invalidarSesiones: actualizado.estado === "inactivo",
             },
             tx,
           );
+          // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
+          if (actualizado.estado === "inactivo") await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
         }
       }
       return this.profesorRepo.update(id, actualizado, tx);

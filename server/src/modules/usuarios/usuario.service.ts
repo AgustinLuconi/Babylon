@@ -6,6 +6,7 @@ import { AuthenticationError, ConflictError, ValidationError } from "../../core/
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
+import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
 import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
@@ -21,6 +22,12 @@ const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo."
 const hashDeToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
+
+// Datos del pedido de login que se guardan en la sesión (los arma el controller a partir de la request).
+export interface ContextoDeAcceso {
+  dispositivo: string;
+  ip: string | null;
+}
 
 export interface SesionAutenticada {
   requiereSeleccionRol: false;
@@ -43,12 +50,16 @@ export type ResultadoAutenticacion = SesionAutenticada | SeleccionRolRequerida;
 export class UsuarioService {
   constructor(
     private readonly usuarioRepo: UsuarioRepository,
+    private readonly sesionRepo: SesionRepository,
     private readonly profesorRepo: ProfesorRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
   ) {}
 
-  async autenticar({ email, password, rolElegido, recordarme }: CredencialesInput): Promise<ResultadoAutenticacion> {
+  async autenticar(
+    { email, password, rolElegido, recordarme }: CredencialesInput,
+    contexto: ContextoDeAcceso,
+  ): Promise<ResultadoAutenticacion> {
     const usuario = await this.usuarioRepo.findByEmail(email);
 
     // Mismo mensaje genérico para usuario inexistente, inactivo o contraseña incorrecta, y también el
@@ -70,8 +81,22 @@ export class UsuarioService {
       rolActivo = rolElegido;
     }
 
-    const token = jwt.sign({ sub: usuario.id, rol: rolActivo, v: usuario.versionSesion }, config.JWT_SECRET, {
+    const sesionId = randomUUID();
+    const token = jwt.sign({ sub: usuario.id, rol: rolActivo, sid: sesionId }, config.JWT_SECRET, {
       expiresIn: (recordarme ? config.JWT_EXPIRES_IN_RECORDAR : config.JWT_EXPIRES_IN) as jwt.SignOptions["expiresIn"],
+    });
+    // La sesión vence cuando vence el token.
+    const { exp } = jwt.decode(token) as { exp: number };
+    const ahora = new Date();
+    await this.sesionRepo.create({
+      id: sesionId,
+      usuarioId: usuario.id,
+      dispositivo: contexto.dispositivo,
+      ip: contexto.ip,
+      creadaEn: ahora,
+      ultimoUsoEn: ahora,
+      expiraEn: new Date(exp * 1000),
+      cerradaEn: null,
     });
 
     return {
@@ -111,7 +136,6 @@ export class UsuarioService {
       roles: [rol],
       estado: "activo",
       fechaCreacion: new Date(),
-      versionSesion: 0,
     };
     await this.usuarioRepo.create(usuario);
 
@@ -135,9 +159,10 @@ export class UsuarioService {
     }
 
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
-      // Solo cambia el estado (no se reescribe la fila). Al desactivar se cortan las sesiones abiertas
-      // para siempre: reactivar la cuenta más tarde no revive los tokens que tenía emitidos.
-      const resultado = await this.usuarioRepo.actualizarParcial(id, { estado, invalidarSesiones: estado === "inactivo" }, tx);
+      // Solo cambia el estado (no se reescribe la fila).
+      const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
+      // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.
+      if (estado === "inactivo") await this.sesionRepo.cerrarTodas(id, new Date(), undefined, tx);
       const profesor = await this.profesorRepo.findByUsuarioId(id, tx);
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
@@ -189,7 +214,7 @@ export class UsuarioService {
   }
 
   // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
-  // las sesiones abiertas (versionSesion, ver authMiddleware).
+  // todas las sesiones de la cuenta.
   async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
     const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
     await this.unitOfWork.runInTransaction(async (tx) => {
@@ -204,7 +229,8 @@ export class UsuarioService {
       const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
       if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
 
-      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, invalidarSesiones: true }, tx);
+      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash }, tx);
+      await this.sesionRepo.cerrarTodas(usuario.id, ahora, undefined, tx);
       await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
     });
   }

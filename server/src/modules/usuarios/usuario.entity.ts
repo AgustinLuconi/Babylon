@@ -14,6 +14,4 @@ export interface Usuario {
   roles: Rol[];
   estado: EstadoUsuario;
   fechaCreacion: Date;
-  // Versión de las sesiones: un token solo vale si lleva esta misma versión (cambio de contraseña o desactivación la incrementan).
-  versionSesion: number;
 }
