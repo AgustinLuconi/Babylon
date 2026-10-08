@@ -2,6 +2,7 @@ import { Panel } from "@/core/components/ui/panel";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ROL_LABELS } from "@/features/auth/types";
 import { CambiarContrasena } from "../components/CambiarContrasena";
+import { SesionesActivas } from "../components/SesionesActivas";
 
 export default function MiCuentaPage() {
   const { usuario } = useAuth();
@@ -26,6 +27,7 @@ export default function MiCuentaPage() {
         </dl>
       </Panel>
       <CambiarContrasena />
+      <SesionesActivas />
     </div>
   );
 }
