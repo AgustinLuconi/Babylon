@@ -234,3 +234,7 @@ No hay test runner configurado; se verifica como en el resto del proyecto:
 - Emails de cuenta: guardados normalizados y buscados por igualdad exacta (nunca `ILIKE`).
 - `TRUST_PROXY="true"` se rechaza (hay que indicar la cantidad de proxies delante).
 - La caché de consultas del navegador se vacía al cerrar sesión y al iniciar otra.
+
+## Actualización (2026-10-08): sesiones por dispositivo
+
+Reemplaza a "Sesiones por versión" de la actualización anterior: `Usuario.versionSesion` se eliminó y el acceso pasó a la tabla `Sesion` (una por dispositivo; el token lleva `sid`). Ver `2026-10-08-mi-cuenta-y-sesiones-design.md`.
