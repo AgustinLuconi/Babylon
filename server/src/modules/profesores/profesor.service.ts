@@ -114,6 +114,7 @@ export class ProfesorService {
               throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
             }
           }
+          await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
           // Solo los campos que cambian (no se reescribe la fila).
           await this.usuarioRepo.actualizarParcial(
             usuario.id,

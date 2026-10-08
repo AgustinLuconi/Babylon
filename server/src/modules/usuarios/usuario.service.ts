@@ -105,15 +105,28 @@ export class UsuarioService {
     // La sesión vence cuando vence el token.
     const { exp } = jwt.decode(token) as { exp: number };
     const ahora = new Date();
-    await this.sesionRepo.create({
-      id: sesionId,
-      usuarioId: usuario.id,
-      dispositivo: contexto.dispositivo,
-      ip: contexto.ip,
-      creadaEn: ahora,
-      ultimoUsoEn: ahora,
-      expiraEn: new Date(exp * 1000),
-      cerradaEn: null,
+    // La sesión se crea con el bloqueo de la cuenta y releyéndola: si mientras corría la verificación de la contraseña
+    // (~100 ms) otro pedido cambió la contraseña o desactivó la cuenta, ese cambio ya cerró las sesiones y esta
+    // no puede nacer después, abierta (los cambios toman el mismo bloqueo, ver bloquearCuenta).
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
+      const actual = await this.usuarioRepo.findById(usuario.id, tx);
+      if (!actual || actual.estado !== "activo" || actual.passwordHash !== usuario.passwordHash) {
+        throw new AuthenticationError("Email o contraseña incorrectos");
+      }
+      await this.sesionRepo.create(
+        {
+          id: sesionId,
+          usuarioId: usuario.id,
+          dispositivo: contexto.dispositivo,
+          ip: contexto.ip,
+          creadaEn: ahora,
+          ultimoUsoEn: ahora,
+          expiraEn: new Date(exp * 1000),
+          cerradaEn: null,
+        },
+        tx,
+      );
     });
 
     return {
@@ -176,6 +189,7 @@ export class UsuarioService {
     }
 
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(id, tx);
       // Solo cambia el estado (no se reescribe la fila).
       const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
       // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.
@@ -203,9 +217,13 @@ export class UsuarioService {
       throw new ValidationError("La contraseña nueva debe ser distinta de la actual");
     }
     const passwordHash = await bcrypt.hash(datos.passwordNueva, RONDAS_BCRYPT);
+    const ahora = new Date();
     await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
       await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
-      await this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId, tx);
+      await this.sesionRepo.cerrarTodas(usuarioId, ahora, sesionActualId, tx);
+      // Un enlace de recuperación pedido antes ya no debe poder cambiar la contraseña.
+      await this.usuarioRepo.invalidarTokensRecuperacion(usuarioId, ahora, tx);
     });
   }
 
@@ -296,6 +314,7 @@ export class UsuarioService {
       if (!registro || registro.usadoEn || registro.expiraEn.getTime() <= ahora.getTime()) {
         throw new ValidationError(ENLACE_INVALIDO);
       }
+      await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
       // Marcado atómico: si dos pedidos usan el mismo enlace a la vez, solo uno gana.
       if (!(await this.usuarioRepo.marcarTokenRecuperacionUsado(registro.id, ahora, tx))) {
         throw new ValidationError(ENLACE_INVALIDO);
