@@ -9,7 +9,13 @@ import { correoRecuperacion } from "./correoRecuperacion";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
-import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
+import type {
+  CambiarContrasenaInput,
+  CambiarEstadoUsuarioInput,
+  CredencialesInput,
+  CrearAdministradorInput,
+  CrearSecretarioInput,
+} from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
 // Hash de una contraseña que nadie conoce: para gastar el mismo tiempo cuando la cuenta no existe.
@@ -182,6 +188,24 @@ export class UsuarioService {
 
     const { passwordHash: _passwordHash, ...usuarioSinPassword } = actualizado;
     return usuarioSinPassword;
+  }
+
+  // Con la sesión abierta: exige la contraseña actual (400 si no coincide, no 401: la sesión sigue válida), la nueva
+  // tiene que ser distinta, y se cierran las demás sesiones; la actual sigue abierta.
+  async cambiarContrasena(usuarioId: string, sesionActualId: string, datos: CambiarContrasenaInput): Promise<void> {
+    const usuario = await this.usuarioRepo.findById(usuarioId);
+    if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
+    if (!(await bcrypt.compare(datos.passwordActual, usuario.passwordHash))) {
+      throw new ValidationError("La contraseña actual no es correcta");
+    }
+    if (datos.passwordActual === datos.passwordNueva) {
+      throw new ValidationError("La contraseña nueva debe ser distinta de la actual");
+    }
+    const passwordHash = await bcrypt.hash(datos.passwordNueva, RONDAS_BCRYPT);
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
+      await this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId, tx);
+    });
   }
 
   // Cierra la sesión con la que se hizo el pedido (el token deja de valer en el servidor).

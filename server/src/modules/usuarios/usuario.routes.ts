@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware, requireRole } from "../../core/middlewares/authMiddleware";
 import {
+  limiteCambioContrasena,
   limiteLoginPorCuenta,
   limiteLoginPorIp,
   limiteOlvideContrasena,
@@ -15,6 +16,7 @@ export function usuarioRoutes(controller: UsuarioController): Router {
   router.post("/olvide-contrasena", limiteOlvideContrasena, controller.olvideContrasena);
   router.post("/restablecer-contrasena", limiteRestablecerContrasena, controller.restablecerContrasena);
   // Cualquier rol autenticado: cada persona ve y cierra solo sus propias sesiones.
+  router.post("/cambiar-contrasena", authMiddleware, limiteCambioContrasena, controller.cambiarContrasena);
   router.post("/logout", authMiddleware, controller.logout);
   router.get("/sesiones", authMiddleware, controller.listarSesiones);
   router.post("/sesiones/cerrar-otras", authMiddleware, controller.cerrarOtrasSesiones);

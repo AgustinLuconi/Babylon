@@ -30,3 +30,12 @@ export const limiteLoginPorIp = rateLimit({ ...base, limit: 20, skipSuccessfulRe
 
 export const limiteOlvideContrasena = rateLimit({ ...base, limit: 5 });
 export const limiteRestablecerContrasena = rateLimit({ ...base, limit: 5 });
+
+// Cambiar la contraseña desde "Mi cuenta": quien tenga una sesión robada no puede adivinar la contraseña actual.
+// La clave es la cuenta (va después de authMiddleware) y los cambios exitosos no cuentan.
+export const limiteCambioContrasena = rateLimit({
+  ...base,
+  limit: 5,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => req.auth?.sub ?? ipKeyGenerator(req.ip ?? ""),
+});

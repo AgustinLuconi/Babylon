@@ -45,3 +45,9 @@ export const restablecerContrasenaSchema = z.object({
   token: z.string().min(1, "Falta el enlace"),
   password: passwordNueva,
 });
+
+export const cambiarContrasenaSchema = z.object({
+  passwordActual: z.string().min(1, "Ingresá tu contraseña actual"),
+  passwordNueva,
+});
+export type CambiarContrasenaInput = z.infer<typeof cambiarContrasenaSchema>;
