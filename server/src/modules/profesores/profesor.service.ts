@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
-import { ConflictError, EntityNotFoundError } from "../../core/errors";
+import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { UnitOfWork } from "../../core/ports";
 import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
 import type { SesionRepository } from "../usuarios/sesion.repository";
@@ -134,18 +134,38 @@ export class ProfesorService {
             }
           }
           await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
-          // Solo los campos que cambian (no se reescribe la fila).
-          await this.usuarioRepo.actualizarParcial(
-            usuario.id,
-            {
-              nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
-              ...(datos.email ? { email: datos.email } : {}),
-              estado: actualizado.estado,
-            },
-            tx,
-          );
-          // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
-          if (actualizado.estado === "inactivo") await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
+          // Se relee con el bloqueo tomado: la cuenta pudo haberse activado o cancelado mientras tanto.
+          const actual = await this.usuarioRepo.findById(usuario.id, tx);
+          if (actual?.estado === "pendiente") {
+            // Invitación sin aceptar: el estado de la cuenta no se toca desde la ficha (pasa a activa solo cuando la
+            // persona la activa) y el estado del profesor tampoco puede cambiar hasta entonces.
+            if (actualizado.estado !== profesor.estado) throw new ValidationError("La cuenta todavía no fue activada");
+            const ahora = new Date();
+            await this.usuarioRepo.actualizarParcial(
+              usuario.id,
+              {
+                nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
+                ...(datos.email ? { email: datos.email } : {}),
+              },
+              tx,
+            );
+            // Si cambia el email, la invitación que se mandó al anterior ya no puede activar la cuenta: quedará
+            // "vencida" hasta que el admin la reenvíe al email nuevo.
+            if (datos.email && datos.email !== usuario.email) await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", ahora, tx);
+          } else {
+            // Solo los campos que cambian (no se reescribe la fila).
+            await this.usuarioRepo.actualizarParcial(
+              usuario.id,
+              {
+                nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
+                ...(datos.email ? { email: datos.email } : {}),
+                estado: actualizado.estado,
+              },
+              tx,
+            );
+            // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
+            if (actualizado.estado === "inactivo") await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
+          }
         }
       }
       return this.profesorRepo.update(id, actualizado, tx);
