@@ -8,7 +8,7 @@ import type { PadreRepository } from "../padres/padre.repository";
 import type { Profesor } from "../profesores/profesor.entity";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoInvitacion } from "./correoInvitacion";
-import { enlaceVigente, nuevoEnlace } from "./enlaces";
+import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
 import type { Usuario } from "./usuario.entity";
 import type { UsuarioRepository } from "./usuario.repository";
 
@@ -198,6 +198,38 @@ export class InvitacionService {
       }),
     ];
     return filas.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
+
+  // Para la pantalla de activación: a quién pertenece el enlace (saludo y email). Mismo mensaje para cualquier problema.
+  async consultarInvitacion(token: string, ahora: Date = new Date()): Promise<{ nombre: string; email: string }> {
+    const registro = await this.usuarioRepo.findTokenPorHash(hashDeToken(token));
+    if (!registro || registro.tipo !== "invitacion" || !enlaceVigente(registro, ahora)) throw new ValidationError(ENLACE_NO_VALIDO);
+    const usuario = await this.usuarioRepo.findById(registro.usuarioId);
+    if (!usuario || usuario.estado !== "pendiente") throw new ValidationError(ENLACE_NO_VALIDO);
+    return { nombre: usuario.nombre, email: usuario.email };
+  }
+
+  // La persona elige su contraseña: la cuenta queda activa y con el email verificado (el correo le llegó).
+  async activarCuenta(token: string, password: string, ahora: Date = new Date()): Promise<void> {
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      const registro = await this.usuarioRepo.findTokenPorHash(hashDeToken(token), tx);
+      if (!registro || registro.tipo !== "invitacion" || !enlaceVigente(registro, ahora)) throw new ValidationError(ENLACE_NO_VALIDO);
+      await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
+      // Marcado atómico: si dos pedidos usan el mismo enlace a la vez, solo uno gana.
+      if (!(await this.usuarioRepo.marcarTokenUsado(registro.id, ahora, tx))) throw new ValidationError(ENLACE_NO_VALIDO);
+      const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
+      if (!usuario || usuario.estado !== "pendiente") throw new ValidationError(ENLACE_NO_VALIDO);
+      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, estado: "activo", emailVerificadoEn: ahora }, tx);
+      await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", ahora, tx);
+    });
+  }
+
+  // "¿Olvidaste tu contraseña?" con la invitación todavía pendiente: se manda una nueva, con los límites de la
+  // recuperación (1 minuto entre envíos y 3 por hora). No informa nada: la respuesta al pedido es siempre la misma.
+  async reenviarPorOlvido(usuarioId: string, ahora: Date): Promise<void> {
+    const preparacion = await this.renovarInvitacion(usuarioId, ahora, true);
+    if ("cuenta" in preparacion) await this.enviarInvitacion(preparacion.cuenta);
   }
 
   private async informar(id: string, preparacion: Preparacion): Promise<ResultadoEnvio> {

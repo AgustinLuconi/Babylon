@@ -9,6 +9,7 @@ import type { Mailer } from "./core/ports";
 import { PrismaSesionRepository } from "./modules/usuarios/sesion.repository.prisma";
 import { crearValidadorDeSesion } from "./modules/usuarios/sesion.validador";
 import { PrismaUsuarioRepository } from "./modules/usuarios/usuario.repository.prisma";
+import { InvitacionService } from "./modules/usuarios/invitacion.service";
 import { UsuarioService } from "./modules/usuarios/usuario.service";
 import { UsuarioController } from "./modules/usuarios/usuario.controller";
 
@@ -96,7 +97,8 @@ const mailer: Mailer = config.SMTP_HOST
   : new ConsoleMailer();
 
 // --- Servicios ---
-const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, mailer);
+const invitacionService = new InvitacionService(usuarioRepository, padreRepository, profesorRepository, unitOfWork, mailer);
+const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, mailer, invitacionService);
 const cicloService = new CicloService(cicloRepository, unitOfWork);
 const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork);

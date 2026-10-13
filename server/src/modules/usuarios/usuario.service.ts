@@ -7,6 +7,7 @@ import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
 import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
+import type { InvitacionService } from "./invitacion.service";
 import { PasswordActualIncorrectaError } from "./usuario.errors";
 import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
@@ -72,6 +73,7 @@ export class UsuarioService {
     private readonly profesorRepo: ProfesorRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
+    private readonly invitaciones: InvitacionService,
   ) {}
 
   async autenticar(
@@ -288,7 +290,15 @@ export class UsuarioService {
   // superó su límite de pedidos, tampoco se envía nada.
   async solicitarRecuperacion(email: string, ahora: Date = new Date()): Promise<void> {
     const usuario = await this.usuarioRepo.findByEmail(email);
-    if (!usuario || usuario.estado !== "activo") return;
+    if (!usuario) return;
+    // Invitación todavía sin aceptar: en vez de un enlace de recuperación se manda una invitación nueva.
+    if (usuario.estado === "pendiente") {
+      void this.invitaciones.reenviarPorOlvido(usuario.id, ahora).catch((error) =>
+        console.error(`[correo] no se pudo preparar la invitación de ${usuario.email}:`, error),
+      );
+      return;
+    }
+    if (usuario.estado !== "activo") return;
 
     void this.enviarEnlaceDeRecuperacion(usuario, ahora).catch((error) =>
       console.error(`[correo] no se pudo preparar la recuperación de ${usuario.email}:`, error),
