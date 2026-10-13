@@ -17,12 +17,14 @@ import { useCrearPadre } from "@/features/padres/hooks/useCrearPadre";
 import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
 import { useCrearProfesor } from "@/features/profesores/hooks/useCrearProfesor";
 import { useCrearSecretario } from "@/features/secretarios/hooks/useCrearSecretario";
+import { mensajeDeAlta } from "../alta";
 import { EtiquetaRol } from "../components/EtiquetaRol";
+import { ModoDeAcceso } from "../components/ModoDeAcceso";
 import { PendientesTab } from "../components/PendientesTab";
 import { useCambiarEstadoUsuario } from "../hooks/useCambiarEstadoUsuario";
 import { useCrearAdministrador } from "../hooks/useCrearAdministrador";
 import { useUsuarios } from "../hooks/useUsuarios";
-import type { CuentaUsuario } from "../types";
+import type { CuentaUsuario, EstadoInvitacion } from "../types";
 
 const DESCRIPCION_ROL: Record<Rol, string> = {
   admin: "Acceso total al sistema, incluyendo configuración y datos sensibles.",
@@ -50,7 +52,8 @@ const cuentaSchema = z
     // requerido" del superRefine de abajo.
     vinculo: z.union([z.enum(["padre", "madre", "tutor"]), z.literal("")]).optional(),
     email: z.email("Email inválido"),
-    password: passwordNueva,
+    password: z.string().optional(),
+    modo: z.enum(["invitacion", "contrasena"]),
   })
   .superRefine((datos, ctx) => {
     if (datos.rol === "profesor" || datos.rol === "padre") {
@@ -59,6 +62,10 @@ const cuentaSchema = z
     }
     if (datos.rol === "padre" && !datos.vinculo) {
       ctx.addIssue({ code: "custom", path: ["vinculo"], message: "El vínculo es requerido" });
+    }
+    if (datos.modo === "contrasena") {
+      const resultado = passwordNueva.safeParse(datos.password ?? "");
+      if (!resultado.success) ctx.addIssue({ code: "custom", path: ["password"], message: resultado.error.issues[0].message });
     }
   });
 type CuentaForm = z.infer<typeof cuentaSchema>;
@@ -72,6 +79,7 @@ const VALORES_INICIALES: CuentaForm = {
   vinculo: undefined,
   email: "",
   password: "",
+  modo: "invitacion",
 };
 
 function generarPassword(): string {
@@ -154,6 +162,7 @@ export default function UsuariosPage() {
 
   const rol = watch("rol");
   const password = watch("password");
+  const modo = watch("modo");
 
   const activas = useMemo(() => (cuentas ?? []).filter((c) => c.estado === "activo").length, [cuentas]);
 
@@ -175,26 +184,29 @@ export default function UsuariosPage() {
     const apellido = d.apellido?.trim() ?? "";
     const dni = d.dni?.trim() ?? "";
     const telefono = d.telefono?.trim() || undefined;
+    // Sin contraseña, el server crea la cuenta pendiente y manda la invitación.
+    const password = d.modo === "contrasena" ? d.password : undefined;
 
+    let creado: { invitacion: EstadoInvitacion | null };
     if (d.rol === "admin") {
-      await crearAdministrador.mutateAsync({ nombre: d.nombre, email: d.email, password: d.password });
+      creado = await crearAdministrador.mutateAsync({ nombre: d.nombre, email: d.email, password });
     } else if (d.rol === "secretario") {
-      await crearSecretario.mutateAsync({ nombre: d.nombre, email: d.email, password: d.password });
+      creado = await crearSecretario.mutateAsync({ nombre: d.nombre, email: d.email, password });
     } else if (d.rol === "profesor") {
-      await crearProfesor.mutateAsync({ nombre: d.nombre, apellido, dni, telefono, email: d.email, password: d.password });
+      creado = await crearProfesor.mutateAsync({ nombre: d.nombre, apellido, dni, telefono, email: d.email, password });
     } else {
-      await crearPadre.mutateAsync({
+      creado = await crearPadre.mutateAsync({
         nombre: d.nombre,
         apellido,
         dni,
         telefono,
         email: d.email,
-        password: d.password,
+        password,
         vinculo: d.vinculo as VinculoPadre,
       });
     }
     setMostrarModal(false);
-    setToast(`Usuario ${d.email} creado`);
+    setToast(mensajeDeAlta(d.email, creado.invitacion));
   });
 
   const alternarEstado = (cuenta: CuentaUsuario) => {
@@ -464,32 +476,43 @@ export default function UsuariosPage() {
                 <Input type="email" {...register("email")} className="font-mono" />
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
-              <div className="col-span-2 space-y-1.5">
-                <label className="label">Contraseña de acceso</label>
-                <div className="flex gap-2">
-                  <Input
-                    {...register("password")}
-                    type="text"
-                    autoComplete="off"
-                    placeholder="Ingresá o generá"
-                    className="font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => setValue("password", generarPassword(), { shouldValidate: true })}
-                  >
-                    Generar
-                  </Button>
-                </div>
-                {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-                {password && (
-                  <p className="text-[11.5px] text-muted-foreground">
-                    Anotala ahora: después no se puede volver a ver.
-                  </p>
-                )}
+              <div className="col-span-2">
+                <ModoDeAcceso
+                  valor={modo}
+                  onCambiar={(m) => {
+                    setValue("modo", m);
+                    clearErrors("password");
+                  }}
+                />
               </div>
+              {modo === "contrasena" && (
+                <div className="col-span-2 space-y-1.5">
+                  <label className="label">Contraseña de acceso</label>
+                  <div className="flex gap-2">
+                    <Input
+                      {...register("password")}
+                      type="text"
+                      autoComplete="off"
+                      placeholder="Ingresá o generá"
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setValue("password", generarPassword(), { shouldValidate: true })}
+                    >
+                      Generar
+                    </Button>
+                  </div>
+                  {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+                  {password && (
+                    <p className="text-[11.5px] text-muted-foreground">
+                      Anotala ahora: después no se puede volver a ver.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {errorGuardado && (

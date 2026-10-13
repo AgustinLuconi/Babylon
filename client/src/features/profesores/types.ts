@@ -1,3 +1,5 @@
+import type { EstadoInvitacion } from "@/features/usuarios/types";
+
 export type EstadoProfesor = "activo" | "inactivo";
 
 export interface Profesor {
@@ -19,7 +21,8 @@ export interface CrearProfesorInput {
   dni: string;
   telefono?: string;
   email: string;
-  password: string;
+  // Sin contraseña, la cuenta queda pendiente y se manda una invitación por email.
+  password?: string;
 }
 
 export interface ActualizarProfesorInput {
@@ -30,3 +33,5 @@ export interface ActualizarProfesorInput {
   email?: string;
   estado?: EstadoProfesor;
 }
+
+export type ProfesorCreado = Profesor & { invitacion: EstadoInvitacion | null };

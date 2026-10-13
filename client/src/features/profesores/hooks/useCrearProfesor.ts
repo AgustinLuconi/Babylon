@@ -9,6 +9,7 @@ export function useCrearProfesor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profesores"] });
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
     },
   });
 }

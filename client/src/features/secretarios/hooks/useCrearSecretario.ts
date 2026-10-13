@@ -8,6 +8,7 @@ export function useCrearSecretario() {
     mutationFn: secretarioService.crear,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
     },
   });
 }
