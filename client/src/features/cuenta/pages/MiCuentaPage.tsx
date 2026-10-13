@@ -2,6 +2,7 @@ import { Panel } from "@/core/components/ui/panel";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ROL_LABELS } from "@/features/auth/types";
 import { CambiarContrasena } from "../components/CambiarContrasena";
+import { EmailSinVerificar } from "../components/EmailSinVerificar";
 import { SesionesActivas } from "../components/SesionesActivas";
 
 export default function MiCuentaPage() {
@@ -16,6 +17,7 @@ export default function MiCuentaPage() {
 
   return (
     <div className="space-y-4">
+      <EmailSinVerificar />
       <Panel title="Datos">
         <dl className="grid gap-4 p-5 sm:grid-cols-3">
           {datos.map(([etiqueta, valor]) => (
