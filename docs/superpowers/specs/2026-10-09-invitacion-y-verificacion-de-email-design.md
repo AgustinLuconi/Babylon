@@ -29,7 +29,7 @@ La etiqueta que ve el admin se **calcula**, no se guarda:
 
 | Etiqueta | Condición |
 |---|---|
-| Sin cuenta | Padre o Profesor con `usuarioId` nulo |
+| Sin cuenta | Padre o Profesor con `usuarioId` nulo (los profesores inactivos no se listan ni se pueden invitar) |
 | Pendiente de aceptación | Cuenta `pendiente` cuyo último enlace de invitación sin usar todavía no venció |
 | Invitación vencida | Cuenta `pendiente` sin ningún enlace de invitación vigente |
 | Activa / Inactiva | Como hoy |
@@ -66,13 +66,12 @@ En los tres lugares de alta, el campo de contraseña se reemplaza por **"¿Cómo
 |---|---|
 | Usuarios → "Crear usuario" (admin, cualquier rol) | Enviar invitación por email (por defecto) · Asignar contraseña ahora |
 | Inscribir alumno → padre nuevo (admin y secretario) | Enviar invitación por email (por defecto) · Asignar contraseña ahora |
-| Profesores → nuevo profesor (admin) | Enviar invitación por email (por defecto) · Asignar contraseña ahora · Sin acceso por ahora (lo que hoy pasa al dejar la contraseña vacía) |
+| Profesores → nuevo profesor (admin) | Enviar invitación por email (por defecto) · Asignar contraseña ahora |
 
 - **Invitación:** email obligatorio, sin contraseña. Se crea la cuenta `pendiente` y se envía el correo **después** de guardar. Si el envío falla, el alta igual queda hecha y se muestra *"La cuenta quedó creada pero no se pudo enviar el correo; reenviala desde Usuarios → Pendientes."*
 - **Asignar contraseña ahora:** como hoy; la cuenta nace `activa` con `emailVerificadoEn` nulo.
-- **Sin acceso por ahora** (solo Profesores): el profesor queda sin cuenta, como hoy, y aparece en Pendientes como "Sin cuenta".
 
-En el server, las altas existentes (`POST /api/padres`, `POST /api/profesores`, `POST /api/auth/secretarios`, `POST /api/auth/administradores`) dejan de exigir `password`: **si viene, es "asignar ahora"; si no viene, es invitación.** El alta sin cuenta de profesores sigue igual que hoy.
+En el server, las altas existentes (`POST /api/padres`, `POST /api/profesores`, `POST /api/auth/secretarios`, `POST /api/auth/administradores`) dejan de exigir `password`: **si viene, es "asignar ahora"; si no viene, es invitación.** (Corrección al revisar el código: la pantalla Profesores hoy **no** permite crear un profesor sin cuenta —exige contraseña—; los profesores sin cuenta vienen solo del importador. Por eso no hay opción "Sin acceso por ahora".)
 
 ## Activación (la persona invitada)
 
@@ -151,7 +150,7 @@ Las migraciones se escriben a mano (renombres con `ALTER TABLE … RENAME`, enum
 - Verificación: enviar (y sus límites: 1 minuto, 3 por hora), verificar, ya verificado (400), enlace inválido.
 - Invitación en lote con fallas parciales: sin email, email repetido, ya tiene cuenta; las demás se envían.
 - Dos invitaciones simultáneas a la misma persona: una sola cuenta.
-- Altas con y sin contraseña en los tres lugares, y "Sin acceso por ahora" en Profesores.
+- Altas con y sin contraseña en los tres lugares.
 - La migración conserva los enlaces de recuperación existentes (siguen sirviendo).
 - E2E: pestaña Pendientes (filtros, selección, confirmación, resumen), pantalla de activación completa, verificación desde Mi cuenta, y la elección "¿Cómo accede?".
 
