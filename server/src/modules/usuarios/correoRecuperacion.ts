@@ -1,6 +1,6 @@
 import type { MensajeCorreo } from "../../core/ports";
+import { escapar } from "./correoHtml";
 
-const escapar = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 export function correoRecuperacion(nombre: string, para: string, enlace: string): MensajeCorreo {
   const asunto = "Restablecé tu contraseña — Babylon English Institute";
