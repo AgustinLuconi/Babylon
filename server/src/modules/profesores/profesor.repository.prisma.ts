@@ -13,6 +13,9 @@ function aEntidad(fila: FilaProfesor): Profesor {
     telefono: fila.telefono ?? undefined,
     email: fila.email ?? undefined,
     usuarioId: fila.usuarioId ?? undefined,
+    // La columna comparte el enum de la cuenta (que también tiene "pendiente"), pero un profesor solo está activo o
+    // inactivo: cualquier otro valor se lee como inactivo, que es la lectura segura.
+    estado: fila.estado === "activo" ? "activo" : "inactivo",
   };
 }
 

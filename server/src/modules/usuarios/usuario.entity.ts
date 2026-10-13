@@ -1,6 +1,6 @@
 import type { Rol } from "../../core/ports";
 
-export type EstadoUsuario = "activo" | "inactivo";
+export type EstadoUsuario = "activo" | "inactivo" | "pendiente";
 
 export interface Usuario {
   id: string;
@@ -14,4 +14,7 @@ export interface Usuario {
   roles: Rol[];
   estado: EstadoUsuario;
   fechaCreacion: Date;
+  // Cuándo se comprobó que el email es de la persona (activó una invitación, abrió el enlace de verificación o
+  // recuperó la contraseña). Nulo: sin verificar.
+  emailVerificadoEn: Date | null;
 }

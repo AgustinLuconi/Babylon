@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
@@ -6,6 +6,7 @@ import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationErro
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
+import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
 import { PasswordActualIncorrectaError } from "./usuario.errors";
 import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
@@ -23,12 +24,10 @@ const RONDAS_BCRYPT = 10;
 const DIAS_DE_HISTORIAL_DE_SESIONES = 90;
 // Hash de una contraseña que nadie conoce: para gastar el mismo tiempo cuando la cuenta no existe.
 const HASH_DE_RELLENO = bcrypt.hashSync(randomUUID(), RONDAS_BCRYPT);
-const VIGENCIA_ENLACE_MS = 60 * 60 * 1000;
+const UNA_HORA_MS = 60 * 60 * 1000;
 const MAX_ENLACES_POR_HORA = 3;
 const ESPERA_ENTRE_ENLACES_MS = 60 * 1000;
 const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo.";
-
-const hashDeToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
 
@@ -175,6 +174,7 @@ export class UsuarioService {
       roles: [rol],
       estado: "activo",
       fechaCreacion: new Date(),
+      emailVerificadoEn: null,
     };
     await this.usuarioRepo.create(usuario);
 
@@ -238,7 +238,7 @@ export class UsuarioService {
       await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
       await this.sesionRepo.cerrarTodas(usuarioId, ahora, sesionActualId, tx);
       // Un enlace de recuperación pedido antes ya no debe poder cambiar la contraseña.
-      await this.usuarioRepo.invalidarTokensRecuperacion(usuarioId, ahora, tx);
+      await this.usuarioRepo.invalidarTokens(usuarioId, "recuperacion", ahora, tx);
     });
   }
 
@@ -296,23 +296,20 @@ export class UsuarioService {
   }
 
   private async enviarEnlaceDeRecuperacion(usuario: Usuario, ahora: Date): Promise<void> {
-    const token = randomBytes(32).toString("base64url");
-    // Las comprobaciones y el alta del token van juntas bajo un bloqueo de la cuenta: si no,
+    // Las comprobaciones y el alta del enlace van juntas bajo un bloqueo de la cuenta: si no,
     // varios pedidos simultáneos leerían "ningún enlace reciente" a la vez y pasarían todos.
-    const creado = await this.unitOfWork.runInTransaction(async (tx) => {
+    const token = await this.unitOfWork.runInTransaction(async (tx) => {
       await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
-      const recientes = await this.usuarioRepo.findTokensRecuperacionDesde(usuario.id, new Date(ahora.getTime() - VIGENCIA_ENLACE_MS), tx);
-      if (recientes.length >= MAX_ENLACES_POR_HORA) return false;
-      if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return false;
+      const recientes = await this.usuarioRepo.findTokensDesde(usuario.id, "recuperacion", new Date(ahora.getTime() - UNA_HORA_MS), tx);
+      if (recientes.length >= MAX_ENLACES_POR_HORA) return null;
+      if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return null;
 
-      await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
-      await this.usuarioRepo.crearTokenRecuperacion(
-        { id: randomUUID(), usuarioId: usuario.id, hash: hashDeToken(token), creadoEn: ahora, expiraEn: new Date(ahora.getTime() + VIGENCIA_ENLACE_MS), usadoEn: null },
-        tx,
-      );
-      return true;
+      await this.usuarioRepo.invalidarTokens(usuario.id, "recuperacion", ahora, tx);
+      const enlace = nuevoEnlace(usuario.id, "recuperacion", ahora);
+      await this.usuarioRepo.crearToken(enlace.registro, tx);
+      return enlace.token;
     });
-    if (!creado) return;
+    if (!token) return;
 
     const enlace = `${config.APP_URL}/restablecer-contrasena?token=${token}`;
     await this.mailer.enviar(correoRecuperacion(usuario.nombre, usuario.email, enlace)).catch((error) =>
@@ -325,13 +322,14 @@ export class UsuarioService {
   async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
     const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
     await this.unitOfWork.runInTransaction(async (tx) => {
-      const registro = await this.usuarioRepo.findTokenRecuperacionPorHash(hashDeToken(token), tx);
-      if (!registro || registro.usadoEn || registro.expiraEn.getTime() <= ahora.getTime()) {
+      const registro = await this.usuarioRepo.findTokenPorHash(hashDeToken(token), tx);
+      // Solo enlaces de recuperación: uno de invitación o de verificación no sirve acá.
+      if (!registro || registro.tipo !== "recuperacion" || !enlaceVigente(registro, ahora)) {
         throw new ValidationError(ENLACE_INVALIDO);
       }
       await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
       // Marcado atómico: si dos pedidos usan el mismo enlace a la vez, solo uno gana.
-      if (!(await this.usuarioRepo.marcarTokenRecuperacionUsado(registro.id, ahora, tx))) {
+      if (!(await this.usuarioRepo.marcarTokenUsado(registro.id, ahora, tx))) {
         throw new ValidationError(ENLACE_INVALIDO);
       }
       const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
@@ -339,7 +337,7 @@ export class UsuarioService {
 
       await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash }, tx);
       await this.sesionRepo.cerrarTodas(usuario.id, ahora, undefined, tx);
-      await this.usuarioRepo.invalidarTokensRecuperacion(usuario.id, ahora, tx);
+      await this.usuarioRepo.invalidarTokens(usuario.id, "recuperacion", ahora, tx);
     });
   }
 }

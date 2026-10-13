@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
 import type { Rol } from "../../core/ports";
 import type { CambiosUsuario, UsuarioRepository } from "./usuario.repository";
-import type { TokenRecuperacion } from "./tokenRecuperacion.entity";
+import type { TipoTokenCuenta, TokenCuenta } from "./tokenCuenta.entity";
 import type { Usuario } from "./usuario.entity";
 
 type FilaUsuario = Awaited<ReturnType<PrismaClient["usuario"]["findUniqueOrThrow"]>>;
@@ -73,28 +73,33 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
     }
   }
 
-  async bloquearCuenta(usuarioId: string, tx: unknown): Promise<void> {
-    await this.client(tx).$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${usuarioId}, 0))`;
+  async bloquearCuenta(clave: string, tx: unknown): Promise<void> {
+    await this.client(tx).$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clave}, 0))`;
   }
 
-  async crearTokenRecuperacion(token: TokenRecuperacion, tx?: unknown): Promise<TokenRecuperacion> {
-    return this.client(tx).tokenRecuperacion.create({ data: token });
+  async crearToken(token: TokenCuenta, tx?: unknown): Promise<TokenCuenta> {
+    return this.client(tx).tokenCuenta.create({ data: token });
   }
 
-  async findTokenRecuperacionPorHash(hash: string, tx?: unknown): Promise<TokenRecuperacion | null> {
-    return this.client(tx).tokenRecuperacion.findUnique({ where: { hash } });
+  async findTokenPorHash(hash: string, tx?: unknown): Promise<TokenCuenta | null> {
+    return this.client(tx).tokenCuenta.findUnique({ where: { hash } });
   }
 
-  async findTokensRecuperacionDesde(usuarioId: string, desde: Date, tx?: unknown): Promise<TokenRecuperacion[]> {
-    return this.client(tx).tokenRecuperacion.findMany({ where: { usuarioId, creadoEn: { gte: desde } } });
+  async findTokensDesde(usuarioId: string, tipo: TipoTokenCuenta, desde: Date, tx?: unknown): Promise<TokenCuenta[]> {
+    return this.client(tx).tokenCuenta.findMany({ where: { usuarioId, tipo, creadoEn: { gte: desde } } });
   }
 
-  async invalidarTokensRecuperacion(usuarioId: string, ahora: Date, tx?: unknown): Promise<void> {
-    await this.client(tx).tokenRecuperacion.updateMany({ where: { usuarioId, usadoEn: null }, data: { usadoEn: ahora } });
+  async findTokensDeUsuarios(usuarioIds: string[], tipo: TipoTokenCuenta, tx?: unknown): Promise<TokenCuenta[]> {
+    if (usuarioIds.length === 0) return [];
+    return this.client(tx).tokenCuenta.findMany({ where: { usuarioId: { in: usuarioIds }, tipo } });
   }
 
-  async marcarTokenRecuperacionUsado(id: string, ahora: Date, tx?: unknown): Promise<boolean> {
-    const { count } = await this.client(tx).tokenRecuperacion.updateMany({ where: { id, usadoEn: null }, data: { usadoEn: ahora } });
+  async invalidarTokens(usuarioId: string, tipo: TipoTokenCuenta, ahora: Date, tx?: unknown): Promise<void> {
+    await this.client(tx).tokenCuenta.updateMany({ where: { usuarioId, tipo, usadoEn: null }, data: { usadoEn: ahora } });
+  }
+
+  async marcarTokenUsado(id: string, ahora: Date, tx?: unknown): Promise<boolean> {
+    const { count } = await this.client(tx).tokenCuenta.updateMany({ where: { id, usadoEn: null }, data: { usadoEn: ahora } });
     return count === 1;
   }
 }

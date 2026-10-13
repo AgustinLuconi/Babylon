@@ -48,6 +48,7 @@ export class ProfesorService {
         roles: ["profesor"],
         estado: "activo",
         fechaCreacion: new Date(),
+        emailVerificadoEn: null,
       };
       await this.usuarioRepo.create(usuario, tx);
 

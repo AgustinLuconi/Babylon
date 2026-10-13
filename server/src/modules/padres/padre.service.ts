@@ -46,6 +46,7 @@ export class PadreService {
         roles: ["padre"],
         estado: "activo",
         fechaCreacion: new Date(),
+        emailVerificadoEn: null,
       };
       await this.usuarioRepo.create(usuario, tx);
 
