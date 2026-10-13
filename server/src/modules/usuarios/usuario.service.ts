@@ -7,7 +7,7 @@ import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
 import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
-import type { InvitacionService } from "./invitacion.service";
+import type { EstadoInvitacion, InvitacionService } from "./invitacion.service";
 import { PasswordActualIncorrectaError } from "./usuario.errors";
 import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
@@ -31,6 +31,7 @@ const ESPERA_ENTRE_ENLACES_MS = 60 * 1000;
 const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo.";
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
+export type UsuarioCreado = UsuarioSinPassword & { invitacion: EstadoInvitacion | null };
 
 // Datos del pedido de login que se guardan en la sesión (los arma el controller a partir de la request).
 export interface ContextoDeAcceso {
@@ -153,19 +154,30 @@ export class UsuarioService {
 
   // Secretario no tiene entidad propia (a diferencia de Padre/Profesor): no
   // guarda ningún dato que Usuario no tenga ya, así que el alta es directa acá.
-  async crearSecretario(datos: CrearSecretarioInput): Promise<UsuarioSinPassword> {
+  async crearSecretario(datos: CrearSecretarioInput): Promise<UsuarioCreado> {
     return this.crearUsuarioSimple(datos, "secretario");
   }
 
   // Mismo criterio que Secretario: sin entidad propia, es solo un Usuario.
-  async crearAdministrador(datos: CrearAdministradorInput): Promise<UsuarioSinPassword> {
+  async crearAdministrador(datos: CrearAdministradorInput): Promise<UsuarioCreado> {
     return this.crearUsuarioSimple(datos, "admin");
   }
 
-  private async crearUsuarioSimple(datos: CrearSecretarioInput, rol: Rol): Promise<UsuarioSinPassword> {
+  private async crearUsuarioSimple(datos: CrearSecretarioInput, rol: Rol): Promise<UsuarioCreado> {
     const emailExistente = await this.usuarioRepo.findByEmail(datos.email);
     if (emailExistente) {
       throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+    }
+    const ahora = new Date();
+
+    if (!datos.password) {
+      // Sin contraseña: cuenta pendiente e invitación por email (enviada después de confirmar la transacción).
+      const cuenta = await this.unitOfWork.runInTransaction((tx) =>
+        this.invitaciones.prepararCuentaPendiente({ nombre: datos.nombre, email: datos.email, roles: [rol] }, ahora, tx),
+      );
+      const enviada = await this.invitaciones.enviarInvitacion(cuenta);
+      const { passwordHash: _passwordHash, ...sinPassword } = cuenta.usuario;
+      return { ...sinPassword, invitacion: enviada ? "enviada" : "no-enviada" };
     }
 
     const usuario: Usuario = {
@@ -175,18 +187,20 @@ export class UsuarioService {
       passwordHash: await bcrypt.hash(datos.password, RONDAS_BCRYPT),
       roles: [rol],
       estado: "activo",
-      fechaCreacion: new Date(),
+      fechaCreacion: ahora,
       emailVerificadoEn: null,
     };
     await this.usuarioRepo.create(usuario);
 
-    const { passwordHash: _passwordHash, ...usuarioSinPassword } = usuario;
-    return usuarioSinPassword;
+    const { passwordHash: _passwordHash, ...sinPassword } = usuario;
+    return { ...sinPassword, invitacion: null };
   }
 
   async listarUsuarios(): Promise<UsuarioSinPassword[]> {
     const usuarios = await this.usuarioRepo.findAll();
     return usuarios
+      // Las pendientes (invitación sin aceptar) se ven en la pestaña Pendientes, no acá.
+      .filter((u) => u.estado !== "pendiente")
       .map(({ passwordHash: _passwordHash, ...usuarioSinPassword }) => usuarioSinPassword)
       .sort((a, b) => a.fechaCreacion.getTime() - b.fechaCreacion.getTime());
   }
@@ -201,6 +215,10 @@ export class UsuarioService {
 
     const actualizado = await this.unitOfWork.runInTransaction(async (tx) => {
       await this.usuarioRepo.bloquearCuenta(id, tx);
+      const actual = await this.usuarioRepo.findById(id, tx);
+      if (!actual) throw new EntityNotFoundError("Usuario", id);
+      // Una invitación sin aceptar se gestiona desde Pendientes (reenviar o cancelar), no con el interruptor de estado.
+      if (actual.estado === "pendiente") throw new ValidationError("La cuenta todavía no fue activada");
       // Solo cambia el estado (no se reescribe la fila).
       const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
       // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.

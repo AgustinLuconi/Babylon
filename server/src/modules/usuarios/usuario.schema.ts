@@ -22,7 +22,8 @@ export type CredencialesInput = z.infer<typeof credencialesSchema>;
 export const crearSecretarioSchema = z.object({
   nombre: z.string().min(1, "El nombre es requerido"),
   email: z.email("Email inválido"),
-  password: passwordNueva,
+  // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
+  password: passwordNueva.optional(),
 });
 
 export type CrearSecretarioInput = z.infer<typeof crearSecretarioSchema>;
