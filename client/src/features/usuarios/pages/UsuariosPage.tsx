@@ -17,18 +17,12 @@ import { useCrearPadre } from "@/features/padres/hooks/useCrearPadre";
 import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
 import { useCrearProfesor } from "@/features/profesores/hooks/useCrearProfesor";
 import { useCrearSecretario } from "@/features/secretarios/hooks/useCrearSecretario";
+import { EtiquetaRol } from "../components/EtiquetaRol";
+import { PendientesTab } from "../components/PendientesTab";
 import { useCambiarEstadoUsuario } from "../hooks/useCambiarEstadoUsuario";
 import { useCrearAdministrador } from "../hooks/useCrearAdministrador";
 import { useUsuarios } from "../hooks/useUsuarios";
 import type { CuentaUsuario } from "../types";
-
-// Colores de la etiqueta de rol, calcados de ROLE_LABELS del prototipo.
-const ESTILO_ROL: Record<Rol, { color: string; bg: string; dot: string }> = {
-  admin: { color: "#09090B", bg: "#F4F4F5", dot: "#0F3D2E" },
-  secretario: { color: "#09090B", bg: "#F4F4F5", dot: "#71717A" },
-  profesor: { color: "#0F3D2E", bg: "#F0F4F2", dot: "#1B7A4F" },
-  padre: { color: "#52525B", bg: "#FAFAFA", dot: "#A1A1AA" },
-};
 
 const DESCRIPCION_ROL: Record<Rol, string> = {
   admin: "Acceso total al sistema, incluyendo configuración y datos sensibles.",
@@ -86,21 +80,6 @@ function generarPassword(): string {
   return Array.from(azar, (n) => caracteres[n % caracteres.length]).join("");
 }
 
-function EtiquetaRol({ rol, compacta = false }: { rol: Rol; compacta?: boolean }) {
-  const estilo = ESTILO_ROL[rol];
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center font-medium ${
-        compacta ? "gap-1 px-2 py-0.5 text-[11px]" : "gap-1.5 px-2 py-0.5 text-[11.5px]"
-      }`}
-      style={{ background: estilo.bg, color: estilo.color, borderRadius: 2 }}
-    >
-      <span className={`rounded-full ${compacta ? "h-1 w-1" : "h-1.5 w-1.5"}`} style={{ background: estilo.dot }} />
-      {ROL_LABELS[rol]}
-    </span>
-  );
-}
-
 function Interruptor({
   activo,
   onClick,
@@ -155,6 +134,7 @@ export default function UsuariosPage() {
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [toast, setToast] = useState("");
+  const [pestana, setPestana] = useState<"cuentas" | "pendientes">("cuentas");
 
   useEffect(() => {
     if (!toast) return;
@@ -225,18 +205,46 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-          <span className="font-medium" style={{ color: "var(--text)" }}>
-            {activas}
-          </span>{" "}
-          usuarios activos
-          <span style={{ color: "var(--text-faint)" }}> · {cuentas?.length ?? 0} en total</span>
-        </p>
-        <Button onClick={abrirModal}>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b" style={{ borderColor: "var(--border-hex)" }}>
+        <div role="tablist" aria-label="Usuarios" className="flex gap-1">
+          {(
+            [
+              ["cuentas", "Cuentas"],
+              ["pendientes", "Pendientes"],
+            ] as const
+          ).map(([id, etiqueta]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={pestana === id}
+              onClick={() => setPestana(id)}
+              className="-mb-px px-3.5 py-2 text-[13px] font-medium transition-colors"
+              style={{
+                borderBottom: `2px solid ${pestana === id ? "var(--brand)" : "transparent"}`,
+                color: pestana === id ? "var(--brand)" : "var(--text-muted)",
+              }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
+        <Button className="mb-2" onClick={abrirModal}>
           <UserPlus size={14} /> Crear usuario
         </Button>
       </div>
+
+      {pestana === "pendientes" ? (
+        <PendientesTab />
+      ) : (
+        <>
+          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+            <span className="font-medium" style={{ color: "var(--text)" }}>
+              {activas}
+            </span>{" "}
+            usuarios activos
+            <span style={{ color: "var(--text-faint)" }}> · {cuentas?.length ?? 0} en total</span>
+          </p>
 
       {cambiarEstado.isError && (
         <p className="text-sm text-destructive">
@@ -326,6 +334,9 @@ export default function UsuariosPage() {
           </div>
         ))}
       </div>
+
+        </>
+      )}
 
       {mostrarModal && (
         <Modal
