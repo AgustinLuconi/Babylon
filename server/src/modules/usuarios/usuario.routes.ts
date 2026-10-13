@@ -6,6 +6,7 @@ import {
   limiteLoginPorIp,
   limiteOlvideContrasena,
   limiteRestablecerContrasena,
+  limiteVerificarEmail,
 } from "../../core/middlewares/limitesDePedidos";
 import type { UsuarioController } from "./usuario.controller";
 
@@ -15,6 +16,9 @@ export function usuarioRoutes(controller: UsuarioController): Router {
   router.post("/login", limiteLoginPorIp, limiteLoginPorCuenta, controller.login);
   router.post("/olvide-contrasena", limiteOlvideContrasena, controller.olvideContrasena);
   router.post("/restablecer-contrasena", limiteRestablecerContrasena, controller.restablecerContrasena);
+  router.post("/verificar-email", limiteVerificarEmail, controller.verificarEmail);
+  router.get("/yo", authMiddleware, controller.yo);
+  router.post("/enviar-verificacion", authMiddleware, controller.enviarVerificacion);
   // Cualquier rol autenticado: cada persona ve y cierra solo sus propias sesiones.
   router.post("/cambiar-contrasena", authMiddleware, limiteCambioContrasena, controller.cambiarContrasena);
   router.post("/logout", authMiddleware, controller.logout);

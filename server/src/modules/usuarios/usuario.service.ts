@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
-import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
+import { AuthenticationError, ConflictError, DemasiadosPedidosError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
+import { correoVerificacion } from "./correoVerificacion";
 import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
-import type { EstadoInvitacion, InvitacionService } from "./invitacion.service";
+import { ENLACE_NO_VALIDO, type EstadoInvitacion, type InvitacionService } from "./invitacion.service";
 import { PasswordActualIncorrectaError } from "./usuario.errors";
 import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
@@ -32,6 +33,15 @@ const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo."
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
 export type UsuarioCreado = UsuarioSinPassword & { invitacion: EstadoInvitacion | null };
+
+// Lo que la persona ve de su propia cuenta (Mi cuenta).
+export interface DatosPropios {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: Rol;
+  emailVerificado: boolean;
+}
 
 // Datos del pedido de login que se guardan en la sesión (los arma el controller a partir de la request).
 export interface ContextoDeAcceso {
@@ -301,6 +311,44 @@ export class UsuarioService {
     return this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId);
   }
 
+  async yo(usuarioId: string, rol: Rol): Promise<DatosPropios> {
+    const usuario = await this.usuarioRepo.findById(usuarioId);
+    if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
+    return { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol, emailVerificado: usuario.emailVerificadoEn !== null };
+  }
+
+  // Manda el enlace de verificación (24 h). Límites por cuenta: 1 minuto entre envíos y 3 por hora.
+  async enviarVerificacion(usuarioId: string, ahora: Date = new Date()): Promise<void> {
+    const { usuario, token } = await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
+      const usuario = await this.usuarioRepo.findById(usuarioId, tx);
+      if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
+      if (usuario.emailVerificadoEn) throw new ValidationError("Tu email ya está verificado");
+      const recientes = await this.usuarioRepo.findTokensDesde(usuarioId, "verificacion_email", new Date(ahora.getTime() - UNA_HORA_MS), tx);
+      if (recientes.length >= MAX_ENLACES_POR_HORA || recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) {
+        throw new DemasiadosPedidosError("Ya te enviamos un enlace hace poco, probá de nuevo en unos minutos");
+      }
+      await this.usuarioRepo.invalidarTokens(usuarioId, "verificacion_email", ahora, tx);
+      const enlace = nuevoEnlace(usuarioId, "verificacion_email", ahora);
+      await this.usuarioRepo.crearToken(enlace.registro, tx);
+      return { usuario, token: enlace.token };
+    });
+    await this.mailer.enviar(correoVerificacion(usuario.nombre, usuario.email, `${config.APP_URL}/verificar-email?token=${token}`));
+  }
+
+  async verificarEmail(token: string, ahora: Date = new Date()): Promise<void> {
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      const registro = await this.usuarioRepo.findTokenPorHash(hashDeToken(token), tx);
+      if (!registro || registro.tipo !== "verificacion_email" || !enlaceVigente(registro, ahora)) throw new ValidationError(ENLACE_NO_VALIDO);
+      await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
+      if (!(await this.usuarioRepo.marcarTokenUsado(registro.id, ahora, tx))) throw new ValidationError(ENLACE_NO_VALIDO);
+      const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
+      if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_NO_VALIDO);
+      if (!usuario.emailVerificadoEn) await this.usuarioRepo.actualizarParcial(usuario.id, { emailVerificadoEn: ahora }, tx);
+      await this.usuarioRepo.invalidarTokens(usuario.id, "verificacion_email", ahora, tx);
+    });
+  }
+
   // Siempre termina sin error, exista o no la cuenta: la respuesta no puede
   // revelar qué emails están registrados. Tampoco puede revelarlo el tiempo: tras
   // buscar la cuenta (una consulta, igual para ambos casos) se responde, y todo lo
@@ -363,7 +411,8 @@ export class UsuarioService {
       const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
       if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
 
-      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash }, tx);
+      // El enlace llegó a su correo: si el email no estaba verificado, ahora lo está.
+      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, ...(usuario.emailVerificadoEn ? {} : { emailVerificadoEn: ahora }) }, tx);
       await this.sesionRepo.cerrarTodas(usuario.id, ahora, undefined, tx);
       await this.usuarioRepo.invalidarTokens(usuario.id, "recuperacion", ahora, tx);
     });

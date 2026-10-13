@@ -37,3 +37,8 @@ export class ValidationError extends DomainError {
     super(message);
   }
 }
+
+// Demasiados pedidos seguidos de la misma cuenta (ej. reenviar el enlace de verificación).
+export class DemasiadosPedidosError extends DomainError {
+  readonly statusCode = 429;
+}

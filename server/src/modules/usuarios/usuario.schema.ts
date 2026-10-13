@@ -52,3 +52,5 @@ export const cambiarContrasenaSchema = z.object({
   passwordNueva,
 });
 export type CambiarContrasenaInput = z.infer<typeof cambiarContrasenaSchema>;
+
+export const verificarEmailSchema = z.object({ token: z.string().min(1, "Falta el enlace") });
