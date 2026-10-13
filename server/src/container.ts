@@ -9,6 +9,7 @@ import type { Mailer } from "./core/ports";
 import { PrismaSesionRepository } from "./modules/usuarios/sesion.repository.prisma";
 import { crearValidadorDeSesion } from "./modules/usuarios/sesion.validador";
 import { PrismaUsuarioRepository } from "./modules/usuarios/usuario.repository.prisma";
+import { InvitacionController } from "./modules/usuarios/invitacion.controller";
 import { InvitacionService } from "./modules/usuarios/invitacion.service";
 import { UsuarioService } from "./modules/usuarios/usuario.service";
 import { UsuarioController } from "./modules/usuarios/usuario.controller";
@@ -138,6 +139,7 @@ export const container = {
   mailer,
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
+  invitacionController: new InvitacionController(invitacionService),
   cicloController: new CicloController(cicloService),
   padreController: new PadreController(padreService),
   profesorController: new ProfesorController(profesorService),

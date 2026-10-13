@@ -41,3 +41,7 @@ export const limiteCambioContrasena = rateLimit({
   requestWasSuccessful: (_req, res) => res.locals.errorDeDominio !== "PasswordActualIncorrectaError",
   keyGenerator: (req) => req.auth?.sub ?? ipKeyGenerator(req.ip ?? ""),
 });
+
+// Enlaces públicos de invitación: quien prueba enlaces al azar choca con el límite.
+export const limiteConsultarInvitacion = rateLimit({ ...base, limit: 5 });
+export const limiteActivarCuenta = rateLimit({ ...base, limit: 5 });
