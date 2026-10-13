@@ -3,6 +3,7 @@ import { AppLayout } from "@/core/components/layout/AppLayout";
 import LoginPage from "@/features/auth/pages/LoginPage";
 import OlvideContrasenaPage from "@/features/auth/pages/OlvideContrasenaPage";
 import RestablecerContrasenaPage from "@/features/auth/pages/RestablecerContrasenaPage";
+import ActivarCuentaPage from "@/features/auth/pages/ActivarCuentaPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import MiCuentaPage from "@/features/cuenta/pages/MiCuentaPage";
 import AlumnosListPage from "@/features/alumnos/pages/AlumnosListPage";
@@ -29,6 +30,7 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/olvide-contrasena" element={<OlvideContrasenaPage />} />
       <Route path="/restablecer-contrasena" element={<RestablecerContrasenaPage />} />
+      <Route path="/activar-cuenta" element={<ActivarCuentaPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>

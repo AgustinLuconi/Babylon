@@ -21,6 +21,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 const MENSAJES_MOTIVO: Record<string, { texto: string; tono: "warning" | "success" }> = {
   "sesion-vencida": { texto: "Tu sesión venció, ingresá de nuevo.", tono: "warning" },
   "contrasena-actualizada": { texto: "Contraseña actualizada, ya podés ingresar.", tono: "success" },
+  "cuenta-activada": { texto: "Cuenta activada. Ingresá con tu email y contraseña.", tono: "success" },
 };
 
 export default function LoginPage() {
