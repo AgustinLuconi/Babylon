@@ -37,3 +37,13 @@ export class ValidationError extends DomainError {
     super(message);
   }
 }
+
+// Demasiados pedidos seguidos de la misma cuenta (ej. reenviar el enlace de verificación).
+export class DemasiadosPedidosError extends DomainError {
+  readonly statusCode = 429;
+}
+
+// Un servicio externo del que depende el pedido (ej. el servidor de correo) no respondió: la persona puede reintentar.
+export class ServicioNoDisponibleError extends DomainError {
+  readonly statusCode = 503;
+}

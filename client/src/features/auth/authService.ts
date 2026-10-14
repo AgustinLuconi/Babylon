@@ -8,6 +8,10 @@ export const authService = {
     apiClient.post<ResultadoAutenticacion>("/api/auth/login", credenciales),
   solicitarRecuperacion: (email: string) =>
     apiClient.post<{ mensaje: string }>("/api/auth/olvide-contrasena", { email }),
+  consultarInvitacion: (token: string) =>
+    apiClient.post<{ nombre: string; email: string }>("/api/auth/activar-cuenta/consultar", { token }),
+  activarCuenta: (token: string, password: string) => apiClient.post<void>("/api/auth/activar-cuenta", { token, password }),
+  verificarEmail: (token: string) => apiClient.post<void>("/api/auth/verificar-email", { token }),
   restablecerContrasena: (token: string, password: string) =>
     apiClient.post<void>("/api/auth/restablecer-contrasena", { token, password }),
 };

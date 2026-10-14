@@ -7,7 +7,8 @@ export const crearPadreSchema = z.object({
   dni: z.string().min(1, "El DNI es requerido"),
   telefono: z.string().optional(),
   email: z.email("Email inválido"),
-  password: passwordNueva,
+  // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
+  password: passwordNueva.optional(),
   vinculo: z.enum(["padre", "madre", "tutor"]),
 });
 

@@ -1,3 +1,5 @@
+import type { EstadoInvitacion } from "@/features/usuarios/types";
+
 export type VinculoPadre = "padre" | "madre" | "tutor";
 
 export const VINCULO_LABELS: Record<VinculoPadre, string> = {
@@ -23,7 +25,8 @@ export interface CrearPadreInput {
   dni: string;
   telefono?: string;
   email: string;
-  password: string;
+  // Sin contraseña, la cuenta queda pendiente y se manda una invitación por email.
+  password?: string;
   vinculo: VinculoPadre;
 }
 
@@ -35,3 +38,5 @@ export interface ActualizarPadreInput {
   email?: string;
   vinculo?: VinculoPadre;
 }
+
+export type PadreCreado = Padre & { invitacion: EstadoInvitacion | null };

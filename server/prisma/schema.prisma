@@ -21,6 +21,21 @@ enum Rol {
 enum EstadoUsuario {
   activo
   inactivo
+  // Creada por una invitación y todavía no activada: no puede iniciar sesión.
+  pendiente
+}
+
+// Un profesor solo está activo o inactivo (la cuenta de acceso, además, puede estar pendiente de activar).
+enum EstadoProfesor {
+  activo
+  inactivo
+}
+
+// Tipo de enlace de un solo uso que se manda por correo (ver TokenCuenta).
+enum TipoTokenCuenta {
+  recuperacion
+  invitacion
+  verificacion_email
 }
 
 enum VinculoPadre {
@@ -134,11 +149,12 @@ model Usuario {
   roles         Rol[]
   estado        EstadoUsuario
   fechaCreacion DateTime
+  emailVerificadoEn DateTime?
 
   padre    Padre?
   profesor Profesor?
 
-  tokensRecuperacion TokenRecuperacion[]
+  tokens             TokenCuenta[]
   sesiones           Sesion[]
 }
 
@@ -165,7 +181,7 @@ model Profesor {
   dni       String?       @unique
   telefono  String?
   email     String?
-  estado    EstadoUsuario @default(activo)
+  estado    EstadoProfesor @default(activo)
   usuarioId String?       @unique
 
   usuario                  Usuario?                 @relation(fields: [usuarioId], references: [id])
@@ -404,19 +420,20 @@ model Configuracion {
   valorCuota Float?
 }
 
-// Enlace de recuperación de contraseña. Se guarda solo el SHA-256 del token
-// (el token viaja únicamente en el correo). Vence a la hora y es de un solo uso.
-model TokenRecuperacion {
-  id        String    @id
+// Enlace de un solo uso que se manda por correo: recuperar la contraseña (1 h), activar una invitación (7 días) o
+// verificar el email (24 h). Se guarda solo el SHA-256 del token (el token viaja únicamente en el correo).
+model TokenCuenta {
+  id        String          @id
   usuarioId String
-  hash      String    @unique
+  tipo      TipoTokenCuenta
+  hash      String          @unique
   creadoEn  DateTime
   expiraEn  DateTime
   usadoEn   DateTime?
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
-  @@index([usuarioId, creadoEn])
+  @@index([usuarioId, tipo, creadoEn])
 }
 
 // Una sesión por inicio de sesión (por dispositivo). El token lleva su id (`sid`) y solo vale mientras la

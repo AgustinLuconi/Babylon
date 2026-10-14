@@ -67,6 +67,10 @@ export class PrismaProfesorRepository implements ProfesorRepository {
     }
   }
 
+  async vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void> {
+    await this.client(tx).profesor.updateMany({ where: { id }, data: { usuarioId } });
+  }
+
   async delete(id: string, tx?: unknown): Promise<void> {
     try {
       await this.client(tx).profesor.delete({ where: { id } });

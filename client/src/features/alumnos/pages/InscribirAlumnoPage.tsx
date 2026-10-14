@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { passwordNueva } from "@/core/lib/validacion";
+import { ModoDeAcceso, type ModoAcceso } from "@/features/usuarios/components/ModoDeAcceso";
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -51,11 +52,14 @@ const nuevoPadreSchema = z.object({
   dni: z.string().min(1, "El DNI es requerido").refine(dniValido, "DNI inválido (7-8 dígitos)"),
   telefono: z.string().optional(),
   email: z.email("Email inválido"),
-  password: passwordNueva,
+  password: z.string().optional(),
   vinculo: z.enum(["padre", "madre", "tutor"]),
 });
 
 type NuevoPadreForm = z.infer<typeof nuevoPadreSchema>;
+
+const AVISO_INVITACION_NO_ENVIADA =
+  "La inscripción quedó hecha, pero no se pudo enviar el correo de invitación al padre/madre/tutor. Se puede reenviar desde Usuarios → Pendientes.";
 
 function Opcional() {
   return (
@@ -74,6 +78,7 @@ export default function InscribirAlumnoPage() {
 
   const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
   const [modoPadre, setModoPadre] = useState<"buscar" | "crear">("buscar");
+  const [modoAcceso, setModoAcceso] = useState<ModoAcceso>("invitacion");
   const [busquedaPadre, setBusquedaPadre] = useState("");
   const [padreSeleccionado, setPadreSeleccionado] = useState<Padre | null>(null);
   const [errorPaso, setErrorPaso] = useState<string | null>(null);
@@ -119,6 +124,13 @@ export default function InscribirAlumnoPage() {
       if (modoPadre === "crear") {
         const valido = await padreForm.trigger();
         if (!valido) return;
+        if (modoAcceso === "contrasena") {
+          const resultado = passwordNueva.safeParse(padreForm.getValues("password") ?? "");
+          if (!resultado.success) {
+            padreForm.setError("password", { message: resultado.error.issues[0].message });
+            return;
+          }
+        }
       }
     }
     if (paso === 3 && !cursoId) {
@@ -134,9 +146,12 @@ export default function InscribirAlumnoPage() {
     setErrorPaso(null);
     let padreId = padreSeleccionado?.id;
 
+    let aviso: string | undefined;
     if (modoPadre === "crear") {
-      const nuevoPadre = await crearPadre.mutateAsync(padreForm.getValues());
+      const valores = padreForm.getValues();
+      const nuevoPadre = await crearPadre.mutateAsync({ ...valores, password: modoAcceso === "contrasena" ? valores.password : undefined });
       padreId = nuevoPadre.id;
+      if (nuevoPadre.invitacion === "no-enviada") aviso = AVISO_INVITACION_NO_ENVIADA;
     }
     if (!padreId) {
       setErrorPaso("Elegí un padre/madre/tutor existente o cargá uno nuevo");
@@ -154,7 +169,7 @@ export default function InscribirAlumnoPage() {
       padreId,
       cursoId,
     });
-    navigate("/alumnos");
+    navigate("/alumnos", aviso ? { state: { aviso } } : undefined);
   };
 
   const guardando = inscribirAlumno.isPending || crearPadre.isPending;
@@ -432,13 +447,22 @@ export default function InscribirAlumnoPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="padrePassword">Contraseña de acceso</Label>
-                  <Input id="padrePassword" type="password" {...padreForm.register("password")} />
-                  {padreForm.formState.errors.password && (
-                    <p className="text-sm text-destructive">{padreForm.formState.errors.password.message}</p>
-                  )}
-                </div>
+                <ModoDeAcceso
+                  valor={modoAcceso}
+                  onCambiar={(m) => {
+                    setModoAcceso(m);
+                    padreForm.clearErrors("password");
+                  }}
+                />
+                {modoAcceso === "contrasena" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="padrePassword">Contraseña de acceso</Label>
+                    <Input id="padrePassword" type="password" {...padreForm.register("password")} />
+                    {padreForm.formState.errors.password && (
+                      <p className="text-sm text-destructive">{padreForm.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -517,6 +541,11 @@ export default function InscribirAlumnoPage() {
                 <p className="text-xs text-muted-foreground">
                   {modoPadre === "buscar" && padreSeleccionado ? padreSeleccionado.email : padreForm.getValues("email")}
                 </p>
+                {modoPadre === "crear" && (
+                  <p className="text-xs text-muted-foreground">
+                    Acceso: {modoAcceso === "invitacion" ? "invitación por email" : "contraseña asignada"}
+                  </p>
+                )}
               </div>
               <div className="col-span-2 rounded-md border p-3" style={{ background: "var(--bg-subtle)" }}>
                 <p className="eyebrow mb-1.5">Curso</p>

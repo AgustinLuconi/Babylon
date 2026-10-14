@@ -21,6 +21,8 @@ export class SmtpMailer implements Mailer {
       port: opciones.port,
       secure: opciones.secure,
       auth: { user: opciones.user, pass: opciones.pass },
+      // Reutiliza la conexión entre correos: un lote de invitaciones no abre (TCP + TLS + login) una por cada uno.
+      pool: true,
     });
   }
 

@@ -17,18 +17,14 @@ import { useCrearPadre } from "@/features/padres/hooks/useCrearPadre";
 import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
 import { useCrearProfesor } from "@/features/profesores/hooks/useCrearProfesor";
 import { useCrearSecretario } from "@/features/secretarios/hooks/useCrearSecretario";
+import { mensajeDeAlta } from "../alta";
+import { EtiquetaRol } from "../components/EtiquetaRol";
+import { ModoDeAcceso } from "../components/ModoDeAcceso";
+import { PendientesTab } from "../components/PendientesTab";
 import { useCambiarEstadoUsuario } from "../hooks/useCambiarEstadoUsuario";
 import { useCrearAdministrador } from "../hooks/useCrearAdministrador";
 import { useUsuarios } from "../hooks/useUsuarios";
-import type { CuentaUsuario } from "../types";
-
-// Colores de la etiqueta de rol, calcados de ROLE_LABELS del prototipo.
-const ESTILO_ROL: Record<Rol, { color: string; bg: string; dot: string }> = {
-  admin: { color: "#09090B", bg: "#F4F4F5", dot: "#0F3D2E" },
-  secretario: { color: "#09090B", bg: "#F4F4F5", dot: "#71717A" },
-  profesor: { color: "#0F3D2E", bg: "#F0F4F2", dot: "#1B7A4F" },
-  padre: { color: "#52525B", bg: "#FAFAFA", dot: "#A1A1AA" },
-};
+import type { CuentaUsuario, EstadoInvitacion } from "../types";
 
 const DESCRIPCION_ROL: Record<Rol, string> = {
   admin: "Acceso total al sistema, incluyendo configuración y datos sensibles.",
@@ -56,7 +52,8 @@ const cuentaSchema = z
     // requerido" del superRefine de abajo.
     vinculo: z.union([z.enum(["padre", "madre", "tutor"]), z.literal("")]).optional(),
     email: z.email("Email inválido"),
-    password: passwordNueva,
+    password: z.string().optional(),
+    modo: z.enum(["invitacion", "contrasena"]),
   })
   .superRefine((datos, ctx) => {
     if (datos.rol === "profesor" || datos.rol === "padre") {
@@ -65,6 +62,10 @@ const cuentaSchema = z
     }
     if (datos.rol === "padre" && !datos.vinculo) {
       ctx.addIssue({ code: "custom", path: ["vinculo"], message: "El vínculo es requerido" });
+    }
+    if (datos.modo === "contrasena") {
+      const resultado = passwordNueva.safeParse(datos.password ?? "");
+      if (!resultado.success) ctx.addIssue({ code: "custom", path: ["password"], message: resultado.error.issues[0].message });
     }
   });
 type CuentaForm = z.infer<typeof cuentaSchema>;
@@ -78,27 +79,13 @@ const VALORES_INICIALES: CuentaForm = {
   vinculo: undefined,
   email: "",
   password: "",
+  modo: "invitacion",
 };
 
 function generarPassword(): string {
   const caracteres = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const azar = crypto.getRandomValues(new Uint32Array(12));
   return Array.from(azar, (n) => caracteres[n % caracteres.length]).join("");
-}
-
-function EtiquetaRol({ rol, compacta = false }: { rol: Rol; compacta?: boolean }) {
-  const estilo = ESTILO_ROL[rol];
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center font-medium ${
-        compacta ? "gap-1 px-2 py-0.5 text-[11px]" : "gap-1.5 px-2 py-0.5 text-[11.5px]"
-      }`}
-      style={{ background: estilo.bg, color: estilo.color, borderRadius: 2 }}
-    >
-      <span className={`rounded-full ${compacta ? "h-1 w-1" : "h-1.5 w-1.5"}`} style={{ background: estilo.dot }} />
-      {ROL_LABELS[rol]}
-    </span>
-  );
 }
 
 function Interruptor({
@@ -144,6 +131,12 @@ function Interruptor({
   );
 }
 
+const PESTANAS = [
+  ["cuentas", "Cuentas"],
+  ["pendientes", "Pendientes"],
+] as const;
+type IdPestana = (typeof PESTANAS)[number][0];
+
 export default function UsuariosPage() {
   const { usuario: sesion } = useAuth();
   const { data: cuentas, isLoading } = useUsuarios();
@@ -155,6 +148,23 @@ export default function UsuariosPage() {
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [toast, setToast] = useState("");
+  const [pestana, setPestana] = useState<IdPestana>("cuentas");
+
+  // Navegación de las pestañas con el teclado (patrón ARIA de "tabs"): flechas, Inicio y Fin; mueve el foco y la selección.
+  const moverPestana = (e: React.KeyboardEvent) => {
+    const actual = PESTANAS.findIndex(([id]) => id === pestana);
+    const destino =
+      e.key === "ArrowRight" ? (actual + 1) % PESTANAS.length
+      : e.key === "ArrowLeft" ? (actual - 1 + PESTANAS.length) % PESTANAS.length
+      : e.key === "Home" ? 0
+      : e.key === "End" ? PESTANAS.length - 1
+      : null;
+    if (destino === null) return;
+    e.preventDefault();
+    const id = PESTANAS[destino][0];
+    setPestana(id);
+    document.getElementById(`pestana-${id}`)?.focus();
+  };
 
   useEffect(() => {
     if (!toast) return;
@@ -174,6 +184,7 @@ export default function UsuariosPage() {
 
   const rol = watch("rol");
   const password = watch("password");
+  const modo = watch("modo");
 
   const activas = useMemo(() => (cuentas ?? []).filter((c) => c.estado === "activo").length, [cuentas]);
 
@@ -195,26 +206,29 @@ export default function UsuariosPage() {
     const apellido = d.apellido?.trim() ?? "";
     const dni = d.dni?.trim() ?? "";
     const telefono = d.telefono?.trim() || undefined;
+    // Sin contraseña, el server crea la cuenta pendiente y manda la invitación.
+    const password = d.modo === "contrasena" ? d.password : undefined;
 
+    let creado: { invitacion: EstadoInvitacion | null };
     if (d.rol === "admin") {
-      await crearAdministrador.mutateAsync({ nombre: d.nombre, email: d.email, password: d.password });
+      creado = await crearAdministrador.mutateAsync({ nombre: d.nombre, email: d.email, password });
     } else if (d.rol === "secretario") {
-      await crearSecretario.mutateAsync({ nombre: d.nombre, email: d.email, password: d.password });
+      creado = await crearSecretario.mutateAsync({ nombre: d.nombre, email: d.email, password });
     } else if (d.rol === "profesor") {
-      await crearProfesor.mutateAsync({ nombre: d.nombre, apellido, dni, telefono, email: d.email, password: d.password });
+      creado = await crearProfesor.mutateAsync({ nombre: d.nombre, apellido, dni, telefono, email: d.email, password });
     } else {
-      await crearPadre.mutateAsync({
+      creado = await crearPadre.mutateAsync({
         nombre: d.nombre,
         apellido,
         dni,
         telefono,
         email: d.email,
-        password: d.password,
+        password,
         vinculo: d.vinculo as VinculoPadre,
       });
     }
     setMostrarModal(false);
-    setToast(`Usuario ${d.email} creado`);
+    setToast(mensajeDeAlta(d.email, creado.invitacion));
   });
 
   const alternarEstado = (cuenta: CuentaUsuario) => {
@@ -225,18 +239,46 @@ export default function UsuariosPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-          <span className="font-medium" style={{ color: "var(--text)" }}>
-            {activas}
-          </span>{" "}
-          usuarios activos
-          <span style={{ color: "var(--text-faint)" }}> · {cuentas?.length ?? 0} en total</span>
-        </p>
-        <Button onClick={abrirModal}>
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b" style={{ borderColor: "var(--border-hex)" }}>
+        <div role="tablist" aria-label="Usuarios" className="flex gap-1" onKeyDown={moverPestana}>
+          {PESTANAS.map(([id, etiqueta]) => (
+            <button
+              key={id}
+              id={`pestana-${id}`}
+              type="button"
+              role="tab"
+              aria-selected={pestana === id}
+              aria-controls="panel-usuarios"
+              // Solo la pestaña activa entra en el orden del teclado; entre pestañas se mueve con las flechas.
+              tabIndex={pestana === id ? 0 : -1}
+              onClick={() => setPestana(id)}
+              className="-mb-px px-3.5 py-2 text-[13px] font-medium transition-colors"
+              style={{
+                borderBottom: `2px solid ${pestana === id ? "var(--brand)" : "transparent"}`,
+                color: pestana === id ? "var(--brand)" : "var(--text-muted)",
+              }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
+        <Button className="mb-2" onClick={abrirModal}>
           <UserPlus size={14} /> Crear usuario
         </Button>
       </div>
+
+      <div role="tabpanel" id="panel-usuarios" aria-labelledby={`pestana-${pestana}`} className="space-y-4">
+      {pestana === "pendientes" ? (
+        <PendientesTab />
+      ) : (
+        <>
+          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
+            <span className="font-medium" style={{ color: "var(--text)" }}>
+              {activas}
+            </span>{" "}
+            usuarios activos
+            <span style={{ color: "var(--text-faint)" }}> · {cuentas?.length ?? 0} en total</span>
+          </p>
 
       {cambiarEstado.isError && (
         <p className="text-sm text-destructive">
@@ -325,6 +367,10 @@ export default function UsuariosPage() {
             </div>
           </div>
         ))}
+      </div>
+
+        </>
+      )}
       </div>
 
       {mostrarModal && (
@@ -453,32 +499,43 @@ export default function UsuariosPage() {
                 <Input type="email" {...register("email")} className="font-mono" />
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
-              <div className="col-span-2 space-y-1.5">
-                <label className="label">Contraseña de acceso</label>
-                <div className="flex gap-2">
-                  <Input
-                    {...register("password")}
-                    type="text"
-                    autoComplete="off"
-                    placeholder="Ingresá o generá"
-                    className="font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="shrink-0"
-                    onClick={() => setValue("password", generarPassword(), { shouldValidate: true })}
-                  >
-                    Generar
-                  </Button>
-                </div>
-                {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-                {password && (
-                  <p className="text-[11.5px] text-muted-foreground">
-                    Anotala ahora: después no se puede volver a ver.
-                  </p>
-                )}
+              <div className="col-span-2">
+                <ModoDeAcceso
+                  valor={modo}
+                  onCambiar={(m) => {
+                    setValue("modo", m);
+                    clearErrors("password");
+                  }}
+                />
               </div>
+              {modo === "contrasena" && (
+                <div className="col-span-2 space-y-1.5">
+                  <label className="label">Contraseña de acceso</label>
+                  <div className="flex gap-2">
+                    <Input
+                      {...register("password")}
+                      type="text"
+                      autoComplete="off"
+                      placeholder="Ingresá o generá"
+                      className="font-mono"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setValue("password", generarPassword(), { shouldValidate: true })}
+                    >
+                      Generar
+                    </Button>
+                  </div>
+                  {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+                  {password && (
+                    <p className="text-[11.5px] text-muted-foreground">
+                      Anotala ahora: después no se puede volver a ver.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {errorGuardado && (

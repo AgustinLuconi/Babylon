@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { passwordNueva } from "@/core/lib/validacion";
+import { mensajeDeAlta } from "@/features/usuarios/alta";
+import { ModoDeAcceso, type ModoAcceso } from "@/features/usuarios/components/ModoDeAcceso";
 import { Pencil, Search, ToggleLeft, ToggleRight, UserPlus } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
@@ -49,6 +51,7 @@ export default function ProfesoresAdminPage() {
   const [modal, setModal] = useState<ModalEstado>(null);
   const [estadoForm, setEstadoForm] = useState<EstadoProfesor>("activo");
   const [toast, setToast] = useState("");
+  const [modoAcceso, setModoAcceso] = useState<ModoAcceso>("invitacion");
 
   useEffect(() => {
     if (!toast) return;
@@ -101,6 +104,7 @@ export default function ProfesoresAdminPage() {
   const abrirNuevo = () => {
     reset({ nombre: "", apellido: "", dni: "", telefono: "", email: "", password: "" });
     crearProfesor.reset();
+    setModoAcceso("invitacion");
     setModal({ mode: "new" });
   };
 
@@ -133,13 +137,17 @@ export default function ProfesoresAdminPage() {
       });
       setToast("Cambios guardados correctamente");
     } else {
-      const resultadoPassword = passwordNueva.safeParse(datos.password ?? "");
-      if (!resultadoPassword.success) {
-        setError("password", { message: resultadoPassword.error.issues[0].message });
-        return;
+      let password: string | undefined;
+      if (modoAcceso === "contrasena") {
+        const resultadoPassword = passwordNueva.safeParse(datos.password ?? "");
+        if (!resultadoPassword.success) {
+          setError("password", { message: resultadoPassword.error.issues[0].message });
+          return;
+        }
+        password = resultadoPassword.data;
       }
-      await crearProfesor.mutateAsync({ ...datos, password: resultadoPassword.data });
-      setToast(`Profesor ${datos.email} creado`);
+      const creado = await crearProfesor.mutateAsync({ ...datos, password });
+      setToast(mensajeDeAlta(datos.email, creado.invitacion));
     }
     setModal(null);
   });
@@ -342,6 +350,11 @@ export default function ProfesoresAdminPage() {
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
               {modal.mode === "new" && (
+                <div className="col-span-2">
+                  <ModoDeAcceso valor={modoAcceso} onCambiar={setModoAcceso} />
+                </div>
+              )}
+              {modal.mode === "new" && modoAcceso === "contrasena" && (
                 <div className="col-span-2 space-y-1.5">
                   <label className="label">Contraseña de acceso</label>
                   <Input type="password" {...register("password")} />

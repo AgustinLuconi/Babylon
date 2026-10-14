@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, Pencil, UserPlus } from "lucide-react";
 import { Input } from "@/core/components/ui/input";
 import { Button } from "@/core/components/ui/button";
@@ -31,6 +31,14 @@ const CUOTA_LABELS: Record<EstadoCuota, string> = {
 const POR_PAGINA = 8;
 
 export default function AlumnosListPage() {
+  // Aviso que deja la inscripción (ej. no se pudo mandar el correo de invitación al padre). Se guarda en el estado del
+  // componente y se borra del historial del navegador, así no reaparece al recargar la página.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [aviso] = useState(() => (location.state as { aviso?: string } | null)?.aviso);
+  useEffect(() => {
+    if (aviso) navigate(location.pathname, { replace: true, state: null });
+  }, [aviso, location.pathname, navigate]);
   const { data: ciclos } = useCiclos();
   const cicloActivo = ciclos?.find((c) => c.activo);
   // "activo" es un centinela (no un id real): sigue al ciclo marcado como
@@ -116,6 +124,15 @@ export default function AlumnosListPage() {
 
   return (
     <div className="space-y-4">
+      {aviso && (
+        <p
+          role="status"
+          className="px-3.5 py-3 text-[12.5px]"
+          style={{ background: "var(--warning-soft)", border: "1px solid var(--warning)", borderRadius: 4 }}
+        >
+          {aviso}
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-1 flex-wrap items-center gap-2">
           <Input

@@ -8,6 +8,7 @@ import {
   credencialesSchema,
   olvideContrasenaSchema,
   restablecerContrasenaSchema,
+  verificarEmailSchema,
 } from "./usuario.schema";
 import type { UsuarioService } from "./usuario.service";
 
@@ -26,6 +27,21 @@ export class UsuarioController {
   cambiarContrasena = async (req: Request, res: Response) => {
     const datos = cambiarContrasenaSchema.parse(req.body);
     await this.usuarioService.cambiarContrasena(req.auth!.sub, req.auth!.sesionId, datos);
+    res.status(204).end();
+  };
+
+  yo = async (req: Request, res: Response) => {
+    res.status(200).json(await this.usuarioService.yo(req.auth!.sub, req.auth!.rol));
+  };
+
+  enviarVerificacion = async (req: Request, res: Response) => {
+    await this.usuarioService.enviarVerificacion(req.auth!.sub);
+    res.status(204).end();
+  };
+
+  verificarEmail = async (req: Request, res: Response) => {
+    const { token } = verificarEmailSchema.parse(req.body);
+    await this.usuarioService.verificarEmail(token);
     res.status(204).end();
   };
 

@@ -8,6 +8,7 @@ export function useCrearAdministrador() {
     mutationFn: usuarioService.crearAdministrador,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
     },
   });
 }
