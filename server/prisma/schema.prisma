@@ -25,6 +25,12 @@ enum EstadoUsuario {
   pendiente
 }
 
+// Un profesor solo está activo o inactivo (la cuenta de acceso, además, puede estar pendiente de activar).
+enum EstadoProfesor {
+  activo
+  inactivo
+}
+
 // Tipo de enlace de un solo uso que se manda por correo (ver TokenCuenta).
 enum TipoTokenCuenta {
   recuperacion
@@ -175,7 +181,7 @@ model Profesor {
   dni       String?       @unique
   telefono  String?
   email     String?
-  estado    EstadoUsuario @default(activo)
+  estado    EstadoProfesor @default(activo)
   usuarioId String?       @unique
 
   usuario                  Usuario?                 @relation(fields: [usuarioId], references: [id])

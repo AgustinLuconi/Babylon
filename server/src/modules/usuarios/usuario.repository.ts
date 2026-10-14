@@ -16,6 +16,8 @@ export interface UsuarioRepository extends Repository<Usuario> {
   bloquearCuenta(clave: string, tx: unknown): Promise<void>;
 
   crearToken(token: TokenCuenta, tx?: unknown): Promise<TokenCuenta>;
+  // Borra un enlace (ej. el que nunca llegó a enviarse porque el correo falló). No falla si ya no existe.
+  eliminarToken(id: string, tx?: unknown): Promise<void>;
   findTokenPorHash(hash: string, tx?: unknown): Promise<TokenCuenta | null>;
   findTokensDesde(usuarioId: string, tipo: TipoTokenCuenta, desde: Date, tx?: unknown): Promise<TokenCuenta[]>;
   findTokensDeUsuarios(usuarioIds: string[], tipo: TipoTokenCuenta, tx?: unknown): Promise<TokenCuenta[]>;

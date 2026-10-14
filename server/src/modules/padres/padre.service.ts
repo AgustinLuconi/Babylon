@@ -117,6 +117,24 @@ export class PadreService {
       email: datos.email ?? actual.email,
       vinculo: datos.vinculo ?? actual.vinculo,
     };
-    return this.padreRepo.update(id, actualizado);
+    const cambiaEmail = datos.email !== undefined && datos.email !== actual.email;
+    if (!cambiaEmail || !actual.usuarioId) return this.padreRepo.update(id, actualizado);
+
+    // Con una invitación todavía sin aceptar, corregir el email de la ficha corrige el de la cuenta y anula la invitación
+    // que se mandó a la dirección anterior (queda "vencida" hasta reenviarla a la nueva). Una cuenta ya activa conserva su
+    // email de acceso: cambiarlo es otra operación (fuera de alcance).
+    const usuarioId = actual.usuarioId;
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
+      const usuario = await this.usuarioRepo.findById(usuarioId, tx);
+      if (usuario?.estado === "pendiente") {
+        const emailNuevo = datos.email!;
+        const otra = await this.usuarioRepo.findByEmail(emailNuevo, tx);
+        if (otra && otra.id !== usuario.id) throw new ConflictError(`Ya existe un usuario con el email ${emailNuevo}`);
+        await this.usuarioRepo.actualizarParcial(usuario.id, { email: emailNuevo }, tx);
+        await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", new Date(), tx);
+      }
+      return this.padreRepo.update(id, actualizado, tx);
+    });
   }
 }

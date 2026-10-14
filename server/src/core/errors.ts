@@ -42,3 +42,8 @@ export class ValidationError extends DomainError {
 export class DemasiadosPedidosError extends DomainError {
   readonly statusCode = 429;
 }
+
+// Un servicio externo del que depende el pedido (ej. el servidor de correo) no respondió: la persona puede reintentar.
+export class ServicioNoDisponibleError extends DomainError {
+  readonly statusCode = 503;
+}

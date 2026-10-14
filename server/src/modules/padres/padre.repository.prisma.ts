@@ -65,6 +65,10 @@ export class PrismaPadreRepository implements PadreRepository {
     }
   }
 
+  async vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void> {
+    await this.client(tx).padre.updateMany({ where: { id }, data: { usuarioId } });
+  }
+
   async delete(id: string, tx?: unknown): Promise<void> {
     try {
       await this.client(tx).padre.delete({ where: { id } });

@@ -71,6 +71,8 @@ export interface DatosCuentaInvitada {
 export interface CuentaPreparada {
   usuario: Usuario;
   token: string;
+  // Id de la fila del enlace: si el correo no sale, se borra para que no quede un enlace que nadie recibió.
+  tokenId: string;
   venceEn: Date;
 }
 
@@ -101,17 +103,20 @@ export class InvitacionService {
     await this.usuarioRepo.create(usuario, tx);
     const { token, registro } = nuevoEnlace(usuario.id, "invitacion", ahora);
     await this.usuarioRepo.crearToken(registro, tx);
-    return { usuario, token, venceEn: registro.expiraEn };
+    return { usuario, token, tokenId: registro.id, venceEn: registro.expiraEn };
   }
 
   // Nunca lanza: devuelve si el correo salió (una falla queda en el log y se informa en el resultado).
-  async enviarInvitacion({ usuario, token, venceEn }: CuentaPreparada): Promise<boolean> {
+  async enviarInvitacion({ usuario, token, tokenId, venceEn }: CuentaPreparada): Promise<boolean> {
     const enlace = `${config.APP_URL}/activar-cuenta?token=${token}`;
     try {
       await this.mailer.enviar(correoInvitacion(usuario.nombre, usuario.email, enlace, venceEn));
       return true;
     } catch (error) {
       console.error(`[correo] no se pudo enviar la invitación a ${usuario.email}:`, error);
+      // El enlace nunca llegó a la persona: se borra. Así la cuenta figura como "vencida" (para reenviar) y el minuto de
+      // espera entre reenvíos no cuenta un envío que no salió.
+      await this.usuarioRepo.eliminarToken(tokenId).catch((e) => console.error("[invitaciones] no se pudo borrar el enlace sin enviar:", e));
       return false;
     }
   }
@@ -240,26 +245,35 @@ export class InvitacionService {
       : { id, nombre: preparacion.nombre, resultado: "no-enviada", motivo: "no se pudo enviar el correo" };
   }
 
-  private prepararInvitacion(rol: "padre" | "profesor", id: string, ahora: Date): Promise<Preparacion> {
-    return this.unitOfWork.runInTransaction(async (tx): Promise<Preparacion> => {
-      // Bloqueo por persona: dos pedidos simultáneos para la misma persona no crean dos cuentas.
-      await this.usuarioRepo.bloquearCuenta(`${rol}:${id}`, tx);
-      const persona: Padre | Profesor | null = rol === "padre" ? await this.padreRepo.findById(id, tx) : await this.profesorRepo.findById(id, tx);
-      if (!persona) return { motivo: "no existe", nombre: "" };
-      const nombre = nombreCompleto(persona);
-      if (persona.usuarioId) return { motivo: "ya tiene cuenta", nombre };
-      if (rol === "profesor" && (persona as Profesor).estado === "inactivo") return { motivo: "profesor inactivo", nombre };
-      if (!persona.email?.trim()) return { motivo: "sin email", nombre };
-      const email = normalizarEmail(persona.email);
-      // Bloqueo por email: dos personas distintas con el mismo email tampoco pasan las dos.
-      await this.usuarioRepo.bloquearCuenta(`email:${email}`, tx);
-      if (await this.usuarioRepo.findByEmail(email, tx)) return { motivo: "email repetido", nombre };
+  private async prepararInvitacion(rol: "padre" | "profesor", id: string, ahora: Date): Promise<Preparacion> {
+    let nombre = "";
+    try {
+      return await this.unitOfWork.runInTransaction(async (tx): Promise<Preparacion> => {
+        // Bloqueo por persona: dos pedidos simultáneos para la misma persona no crean dos cuentas.
+        await this.usuarioRepo.bloquearCuenta(`${rol}:${id}`, tx);
+        const persona: Padre | Profesor | null = rol === "padre" ? await this.padreRepo.findById(id, tx) : await this.profesorRepo.findById(id, tx);
+        if (!persona) return { motivo: "no existe", nombre: "" };
+        nombre = nombreCompleto(persona);
+        if (persona.usuarioId) return { motivo: "ya tiene cuenta", nombre };
+        if (rol === "profesor" && (persona as Profesor).estado === "inactivo") return { motivo: "profesor inactivo", nombre };
+        if (!persona.email?.trim()) return { motivo: "sin email", nombre };
+        const email = normalizarEmail(persona.email);
+        // Bloqueo por email: dos personas distintas con el mismo email tampoco pasan las dos.
+        await this.usuarioRepo.bloquearCuenta(`email:${email}`, tx);
+        if (await this.usuarioRepo.findByEmail(email, tx)) return { motivo: "email repetido", nombre };
 
-      const cuenta = await this.prepararCuentaPendiente({ nombre, email, roles: [rol] }, ahora, tx);
-      if (rol === "padre") await this.padreRepo.update(id, { ...(persona as Padre), usuarioId: cuenta.usuario.id }, tx);
-      else await this.profesorRepo.update(id, { ...(persona as Profesor), usuarioId: cuenta.usuario.id }, tx);
-      return { cuenta, nombre };
-    });
+        const cuenta = await this.prepararCuentaPendiente({ nombre, email, roles: [rol] }, ahora, tx);
+        // Solo se asigna la cuenta: no se reescribe el resto de la ficha, que alguien pudo haber editado mientras tanto.
+        if (rol === "padre") await this.padreRepo.vincularUsuario(id, cuenta.usuario.id, tx);
+        else await this.profesorRepo.vincularUsuario(id, cuenta.usuario.id, tx);
+        return { cuenta, nombre };
+      });
+    } catch (error) {
+      // Un alta con ese mismo email, simultánea a esta invitación, ganó la carrera (restricción única de la base): esta
+      // persona queda como "email repetido" y el resto del lote sigue.
+      if (error instanceof ConflictError) return { motivo: "email repetido", nombre };
+      throw error;
+    }
   }
 
   // Un enlace de invitación nuevo para una cuenta todavía pendiente (anula los anteriores). `limitarPorHora` aplica el
@@ -278,7 +292,7 @@ export class InvitacionService {
       await this.usuarioRepo.invalidarTokens(usuarioId, "invitacion", ahora, tx);
       const { token, registro } = nuevoEnlace(usuarioId, "invitacion", ahora);
       await this.usuarioRepo.crearToken(registro, tx);
-      return { cuenta: { usuario, token, venceEn: registro.expiraEn }, nombre: usuario.nombre };
+      return { cuenta: { usuario, token, tokenId: registro.id, venceEn: registro.expiraEn }, nombre: usuario.nombre };
     });
   }
 }

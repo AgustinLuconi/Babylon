@@ -13,9 +13,6 @@ function aEntidad(fila: FilaProfesor): Profesor {
     telefono: fila.telefono ?? undefined,
     email: fila.email ?? undefined,
     usuarioId: fila.usuarioId ?? undefined,
-    // La columna comparte el enum de la cuenta (que también tiene "pendiente"), pero un profesor solo está activo o
-    // inactivo: cualquier otro valor se lee como inactivo, que es la lectura segura.
-    estado: fila.estado === "activo" ? "activo" : "inactivo",
   };
 }
 
@@ -68,6 +65,10 @@ export class PrismaProfesorRepository implements ProfesorRepository {
     } catch {
       throw new EntityNotFoundError("Profesor", id);
     }
+  }
+
+  async vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void> {
+    await this.client(tx).profesor.updateMany({ where: { id }, data: { usuarioId } });
   }
 
   async delete(id: string, tx?: unknown): Promise<void> {

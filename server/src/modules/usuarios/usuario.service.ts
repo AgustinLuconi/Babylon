@@ -2,7 +2,14 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
-import { AuthenticationError, ConflictError, DemasiadosPedidosError, EntityNotFoundError, ValidationError } from "../../core/errors";
+import {
+  AuthenticationError,
+  ConflictError,
+  DemasiadosPedidosError,
+  EntityNotFoundError,
+  ServicioNoDisponibleError,
+  ValidationError,
+} from "../../core/errors";
 import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
@@ -319,7 +326,7 @@ export class UsuarioService {
 
   // Manda el enlace de verificación (24 h). Límites por cuenta: 1 minuto entre envíos y 3 por hora.
   async enviarVerificacion(usuarioId: string, ahora: Date = new Date()): Promise<void> {
-    const { usuario, token } = await this.unitOfWork.runInTransaction(async (tx) => {
+    const { usuario, token, tokenId } = await this.unitOfWork.runInTransaction(async (tx) => {
       await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
       const usuario = await this.usuarioRepo.findById(usuarioId, tx);
       if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
@@ -331,9 +338,16 @@ export class UsuarioService {
       await this.usuarioRepo.invalidarTokens(usuarioId, "verificacion_email", ahora, tx);
       const enlace = nuevoEnlace(usuarioId, "verificacion_email", ahora);
       await this.usuarioRepo.crearToken(enlace.registro, tx);
-      return { usuario, token: enlace.token };
+      return { usuario, token: enlace.token, tokenId: enlace.registro.id };
     });
-    await this.mailer.enviar(correoVerificacion(usuario.nombre, usuario.email, `${config.APP_URL}/verificar-email?token=${token}`));
+    try {
+      await this.mailer.enviar(correoVerificacion(usuario.nombre, usuario.email, `${config.APP_URL}/verificar-email?token=${token}`));
+    } catch (error) {
+      console.error(`[correo] no se pudo enviar la verificación a ${usuario.email}:`, error);
+      // El enlace nunca llegó: se borra para que reintentar no choque con el límite de envíos.
+      await this.usuarioRepo.eliminarToken(tokenId).catch((e) => console.error("[correo] no se pudo borrar el enlace sin enviar:", e));
+      throw new ServicioNoDisponibleError("No pudimos enviar el correo, probá de nuevo en unos minutos");
+    }
   }
 
   async verificarEmail(token: string, ahora: Date = new Date()): Promise<void> {

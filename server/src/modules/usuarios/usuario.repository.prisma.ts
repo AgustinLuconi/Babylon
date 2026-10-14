@@ -1,5 +1,5 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { EntityNotFoundError } from "../../core/errors";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { Rol } from "../../core/ports";
 import type { CambiosUsuario, UsuarioRepository } from "./usuario.repository";
 import type { TipoTokenCuenta, TokenCuenta } from "./tokenCuenta.entity";
@@ -9,6 +9,12 @@ type FilaUsuario = Awaited<ReturnType<PrismaClient["usuario"]["findUniqueOrThrow
 
 // Sin espacios y en minúsculas: " Admin@Babylon.test " es la misma cuenta que "admin@babylon.test".
 const normalizarEmail = (email: string) => email.trim().toLowerCase();
+
+// El email es único: si dos pedidos lo usan a la vez, el segundo choca con la restricción de la base. Se traduce a un
+// error de dominio (409) en vez de dejar escapar el error de Prisma (500).
+function esEmailRepetido(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
 
 function aEntidad(fila: FilaUsuario): Usuario {
   return { ...fila, roles: fila.roles as Rol[] };
@@ -40,15 +46,21 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
   }
 
   async create(entidad: Usuario, tx?: unknown): Promise<Usuario> {
-    const fila = await this.client(tx).usuario.create({ data: { ...entidad, email: normalizarEmail(entidad.email) } });
-    return aEntidad(fila);
+    try {
+      const fila = await this.client(tx).usuario.create({ data: { ...entidad, email: normalizarEmail(entidad.email) } });
+      return aEntidad(fila);
+    } catch (error) {
+      if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${entidad.email}`);
+      throw error;
+    }
   }
 
   async update(id: string, entidad: Usuario, tx?: unknown): Promise<Usuario> {
     try {
       const fila = await this.client(tx).usuario.update({ where: { id }, data: { ...entidad, email: normalizarEmail(entidad.email) } });
       return aEntidad(fila);
-    } catch {
+    } catch (error) {
+      if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${entidad.email}`);
       throw new EntityNotFoundError("Usuario", id);
     }
   }
@@ -68,7 +80,8 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
         data: { ...cambios, ...(cambios.email !== undefined ? { email: normalizarEmail(cambios.email) } : {}) },
       });
       return aEntidad(fila);
-    } catch {
+    } catch (error) {
+      if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${cambios.email}`);
       throw new EntityNotFoundError("Usuario", id);
     }
   }
@@ -79,6 +92,10 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
 
   async crearToken(token: TokenCuenta, tx?: unknown): Promise<TokenCuenta> {
     return this.client(tx).tokenCuenta.create({ data: token });
+  }
+
+  async eliminarToken(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).tokenCuenta.deleteMany({ where: { id } });
   }
 
   async findTokenPorHash(hash: string, tx?: unknown): Promise<TokenCuenta | null> {
