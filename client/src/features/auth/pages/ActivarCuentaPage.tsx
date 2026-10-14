@@ -41,6 +41,8 @@ export default function ActivarCuentaPage() {
     formState: { errors, isSubmitting },
   } = useForm<Formulario>({ resolver: zodResolver(schema) });
   const [error, setError] = useState<string | null>(null);
+  // El server rechazó el enlace al activar (venció, se reenvió otra invitación, ya se usó).
+  const [rechazadoAlActivar, setRechazadoAlActivar] = useState(false);
 
   const onSubmit = async ({ password }: Formulario) => {
     setError(null);
@@ -48,11 +50,16 @@ export default function ActivarCuentaPage() {
       await authService.activarCuenta(token, password);
       navigate("/login?motivo=cuenta-activada", { replace: true });
     } catch (e) {
+      if (e instanceof ApiError && e.status === 400 && e.message === ENLACE_NO_VALIDO) setRechazadoAlActivar(true);
       setError(e instanceof ApiError ? e.message : "No se pudo activar la cuenta. Probá de nuevo.");
     }
   };
 
-  const invalido = !token || invitacion.isError;
+  // Enlace realmente inválido: sin enlace, o el server dijo 400. Un 429 o un error de red no dicen nada del enlace.
+  const falloLaConsulta = invitacion.isError;
+  const enlaceRechazado = invitacion.error instanceof ApiError && invitacion.error.status === 400;
+  const invalido = !token || (falloLaConsulta && enlaceRechazado) || rechazadoAlActivar;
+  const noSePudoComprobar = !!token && falloLaConsulta && !enlaceRechazado;
 
   return (
     <AuthLayout>
@@ -73,7 +80,7 @@ export default function ActivarCuentaPage() {
         </p>
       )}
 
-      {invitacion.data && (
+      {invitacion.data && !rechazadoAlActivar && (
         <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4" noValidate>
           <CampoContrasena id="password" etiqueta="Contraseña" autoComplete="new-password" error={errors.password?.message} {...register("password")} />
           <CampoContrasena id="repetir" etiqueta="Repetir contraseña" autoComplete="new-password" error={errors.repetir?.message} {...register("repetir")} />
@@ -89,6 +96,12 @@ export default function ActivarCuentaPage() {
             )}
           </button>
         </form>
+      )}
+
+      {noSePudoComprobar && (
+        <div className="mt-8">
+          <AvisoError>No se pudo comprobar el enlace. Probá de nuevo en unos minutos.</AvisoError>
+        </div>
       )}
 
       {invalido && (

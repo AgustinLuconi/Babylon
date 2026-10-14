@@ -41,7 +41,10 @@ function detalle(f: FilaPendiente): string | null {
   if (f.etiqueta === "pendiente" && f.invitacionEnviadaEn && f.invitacionVenceEn) {
     return `enviada el ${formatFechaCorta(f.invitacionEnviadaEn)} · vence el ${formatFechaCorta(f.invitacionVenceEn)}`;
   }
-  if (f.etiqueta === "vencida" && f.invitacionVenceEn) return `venció el ${formatFechaCorta(f.invitacionVenceEn)}`;
+  if (f.etiqueta === "vencida") {
+    // Sin enlace guardado: el correo no llegó a enviarse (el enlace se borra cuando el envío falla).
+    return f.invitacionVenceEn ? `venció el ${formatFechaCorta(f.invitacionVenceEn)}` : "El correo no llegó a enviarse: reenviá la invitación";
+  }
   return motivoParaNoInvitar(f);
 }
 
@@ -115,15 +118,22 @@ export function PendientesTab() {
     const { accion, filas: objetivo } = confirmacion;
     setError(null);
     try {
+      // Los resultados traen el id de la persona (padre, profesor o cuenta): se completa el nombre de quienes no lo traen.
+      const conNombres = (resultadosDelEnvio: ResultadoEnvio[]) => {
+        const nombres = new Map(objetivo.map((f) => [accion === "invitar" ? (f.padreId ?? f.profesorId)! : f.usuarioId!, f.nombre]));
+        return resultadosDelEnvio.map((r) => ({ ...r, nombre: r.nombre || nombres.get(r.id) || "" }));
+      };
       if (accion === "invitar") {
         setResultados(
-          await invitar.mutateAsync({
-            padreIds: objetivo.filter((f) => f.origen === "padre").map((f) => f.padreId!),
-            profesorIds: objetivo.filter((f) => f.origen === "profesor").map((f) => f.profesorId!),
-          }),
+          conNombres(
+            await invitar.mutateAsync({
+              padreIds: objetivo.filter((f) => f.origen === "padre").map((f) => f.padreId!),
+              profesorIds: objetivo.filter((f) => f.origen === "profesor").map((f) => f.profesorId!),
+            }),
+          ),
         );
       } else if (accion === "reenviar") {
-        setResultados(await reenviar.mutateAsync(objetivo.map((f) => f.usuarioId!)));
+        setResultados(conNombres(await reenviar.mutateAsync(objetivo.map((f) => f.usuarioId!))));
       } else {
         await cancelar.mutateAsync(objetivo[0].usuarioId!);
         setResultados(null);

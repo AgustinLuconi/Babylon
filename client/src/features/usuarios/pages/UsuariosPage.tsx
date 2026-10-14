@@ -131,6 +131,12 @@ function Interruptor({
   );
 }
 
+const PESTANAS = [
+  ["cuentas", "Cuentas"],
+  ["pendientes", "Pendientes"],
+] as const;
+type IdPestana = (typeof PESTANAS)[number][0];
+
 export default function UsuariosPage() {
   const { usuario: sesion } = useAuth();
   const { data: cuentas, isLoading } = useUsuarios();
@@ -142,7 +148,23 @@ export default function UsuariosPage() {
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [toast, setToast] = useState("");
-  const [pestana, setPestana] = useState<"cuentas" | "pendientes">("cuentas");
+  const [pestana, setPestana] = useState<IdPestana>("cuentas");
+
+  // Navegación de las pestañas con el teclado (patrón ARIA de "tabs"): flechas, Inicio y Fin; mueve el foco y la selección.
+  const moverPestana = (e: React.KeyboardEvent) => {
+    const actual = PESTANAS.findIndex(([id]) => id === pestana);
+    const destino =
+      e.key === "ArrowRight" ? (actual + 1) % PESTANAS.length
+      : e.key === "ArrowLeft" ? (actual - 1 + PESTANAS.length) % PESTANAS.length
+      : e.key === "Home" ? 0
+      : e.key === "End" ? PESTANAS.length - 1
+      : null;
+    if (destino === null) return;
+    e.preventDefault();
+    const id = PESTANAS[destino][0];
+    setPestana(id);
+    document.getElementById(`pestana-${id}`)?.focus();
+  };
 
   useEffect(() => {
     if (!toast) return;
@@ -218,18 +240,17 @@ export default function UsuariosPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b" style={{ borderColor: "var(--border-hex)" }}>
-        <div role="tablist" aria-label="Usuarios" className="flex gap-1">
-          {(
-            [
-              ["cuentas", "Cuentas"],
-              ["pendientes", "Pendientes"],
-            ] as const
-          ).map(([id, etiqueta]) => (
+        <div role="tablist" aria-label="Usuarios" className="flex gap-1" onKeyDown={moverPestana}>
+          {PESTANAS.map(([id, etiqueta]) => (
             <button
               key={id}
+              id={`pestana-${id}`}
               type="button"
               role="tab"
               aria-selected={pestana === id}
+              aria-controls="panel-usuarios"
+              // Solo la pestaña activa entra en el orden del teclado; entre pestañas se mueve con las flechas.
+              tabIndex={pestana === id ? 0 : -1}
               onClick={() => setPestana(id)}
               className="-mb-px px-3.5 py-2 text-[13px] font-medium transition-colors"
               style={{
@@ -246,6 +267,7 @@ export default function UsuariosPage() {
         </Button>
       </div>
 
+      <div role="tabpanel" id="panel-usuarios" aria-labelledby={`pestana-${pestana}`} className="space-y-4">
       {pestana === "pendientes" ? (
         <PendientesTab />
       ) : (
@@ -349,6 +371,7 @@ export default function UsuariosPage() {
 
         </>
       )}
+      </div>
 
       {mostrarModal && (
         <Modal
