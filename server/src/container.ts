@@ -146,6 +146,8 @@ const notificacionService = new NotificacionService(
 );
 
 suscribirAvisos(tablero, notificacionService);
+// Sesiones cerradas por cualquier camino: después de confirmar, el canal corta las conexiones en vivo que ya no valen.
+tablero.alConfirmarse("sesiones.cerradas", ({ usuarioId, motivo }) => canalEnVivo.revisarSesiones(usuarioId, motivo));
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {

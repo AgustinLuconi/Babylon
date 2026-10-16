@@ -144,6 +144,7 @@ export class UsuarioService {
       if (sobrantes > 0) {
         const menosUsadas = [...activas].sort((a, b) => a.ultimoUsoEn.getTime() - b.ultimoUsoEn.getTime()).slice(0, sobrantes);
         for (const s of menosUsadas) await this.sesionRepo.cerrar(s.id, usuario.id, ahora, tx);
+        await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cerrada-desde-otro-dispositivo" }, tx);
       }
       await this.sesionRepo.create(
         {
@@ -246,7 +247,10 @@ export class UsuarioService {
       // Solo cambia el estado (no se reescribe la fila).
       const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
       // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.
-      if (estado === "inactivo") await this.sesionRepo.cerrarTodas(id, new Date(), undefined, tx);
+      if (estado === "inactivo") {
+        await this.sesionRepo.cerrarTodas(id, new Date(), undefined, tx);
+        await this.anuncios.publicar("sesiones.cerradas", { usuarioId: id, motivo: "cuenta-desactivada" }, tx);
+      }
       const profesor = await this.profesorRepo.findByUsuarioId(id, tx);
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
@@ -282,6 +286,7 @@ export class UsuarioService {
       }
       await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
       await this.sesionRepo.cerrarTodas(usuarioId, ahora, sesionActualId, tx);
+      await this.anuncios.publicar("sesiones.cerradas", { usuarioId, motivo: "contrasena-cambiada" }, tx);
       // Un enlace de recuperación pedido antes ya no debe poder cambiar la contraseña.
       await this.usuarioRepo.invalidarTokens(usuarioId, "recuperacion", ahora, tx);
     });
@@ -296,6 +301,7 @@ export class UsuarioService {
   // Cierra la sesión con la que se hizo el pedido (el token deja de valer en el servidor).
   async cerrarSesion(sesionId: string, usuarioId: string): Promise<void> {
     await this.sesionRepo.cerrar(sesionId, usuarioId, new Date());
+    await this.anuncios.publicar("sesiones.cerradas", { usuarioId, motivo: "cerrada-por-el-usuario" });
   }
 
   // Abrir la lista cuenta como usar la sesión actual (queda con la hora de ahora).
@@ -320,10 +326,13 @@ export class UsuarioService {
     }
     const cerrada = await this.sesionRepo.cerrar(sesionId, usuarioId, new Date());
     if (!cerrada) throw new EntityNotFoundError("Sesion", sesionId);
+    await this.anuncios.publicar("sesiones.cerradas", { usuarioId, motivo: "cerrada-desde-otro-dispositivo" });
   }
 
   async cerrarOtrasSesiones(usuarioId: string, sesionActualId: string): Promise<number> {
-    return this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId);
+    const cerradas = await this.sesionRepo.cerrarTodas(usuarioId, new Date(), sesionActualId);
+    if (cerradas > 0) await this.anuncios.publicar("sesiones.cerradas", { usuarioId, motivo: "cerrada-desde-otro-dispositivo" });
+    return cerradas;
   }
 
   async yo(usuarioId: string, rol: Rol): Promise<DatosPropios> {
@@ -436,6 +445,7 @@ export class UsuarioService {
       // El enlace llegó a su correo: si el email no estaba verificado, ahora lo está.
       await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, ...(usuario.emailVerificadoEn ? {} : { emailVerificadoEn: ahora }) }, tx);
       await this.sesionRepo.cerrarTodas(usuario.id, ahora, undefined, tx);
+      await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "contrasena-cambiada" }, tx);
       await this.usuarioRepo.invalidarTokens(usuario.id, "recuperacion", ahora, tx);
     });
   }

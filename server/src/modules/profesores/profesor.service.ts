@@ -169,7 +169,10 @@ export class ProfesorService {
               tx,
             );
             // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
-            if (actualizado.estado === "inactivo") await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
+            if (actualizado.estado === "inactivo") {
+              await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
+              await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cuenta-desactivada" }, tx);
+            }
           if (actualizado.estado !== profesor.estado) await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
           }
         }

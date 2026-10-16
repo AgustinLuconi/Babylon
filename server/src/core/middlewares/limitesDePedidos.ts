@@ -47,3 +47,14 @@ export const limiteConsultarInvitacion = rateLimit({ ...base, limit: 5 });
 export const limiteActivarCuenta = rateLimit({ ...base, limit: 5 });
 
 export const limiteVerificarEmail = rateLimit({ ...base, limit: 5 });
+
+// Aperturas de la conexión en vivo: 10 por minuto por sesión (va después de authMiddleware). Una pestaña que se
+// reconecta sin parar no puede saturar al servidor.
+export const limiteTiempoReal = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: responderDemasiados,
+  keyGenerator: (req) => req.auth?.sesionId ?? ipKeyGenerator(req.ip ?? ""),
+});
