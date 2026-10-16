@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AuthorizationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "./documento.repository";
-import type { Documento } from "./documento.entity";
+import type { Documento, TipoDocumento } from "./documento.entity";
 import type { AutorizarImagenInput } from "./documento.schema";
 
 export class DocumentoService {
@@ -171,5 +171,10 @@ export class DocumentoService {
       fechaAutorizacion: undefined,
       tipoAutorizacion: undefined,
     });
+  }
+
+  // Admin/Secretario: qué le falta a cada alumno que debe documentación (solo los que tienen algo pendiente).
+  async listarFaltantes(): Promise<Record<string, TipoDocumento[]>> {
+    return Object.fromEntries((await this.documentoRepo.findFaltantes()).map((a) => [a.alumnoId, a.faltan]));
   }
 }

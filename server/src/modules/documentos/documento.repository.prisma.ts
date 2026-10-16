@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
 import type { DocumentoRepository } from "./documento.repository";
 import type { Documento, TipoDocumento } from "./documento.entity";
+import { documentosFaltantes, type AlumnoConFaltantes } from "./documento.faltantes";
 
 type FilaDocumento = Awaited<ReturnType<PrismaClient["documento"]["findUniqueOrThrow"]>>;
 
@@ -76,5 +77,15 @@ export class PrismaDocumentoRepository implements DocumentoRepository {
     } catch {
       throw new EntityNotFoundError("Documento", id);
     }
+  }
+
+  async findFaltantes(tx?: unknown): Promise<AlumnoConFaltantes[]> {
+    const alumnos = await this.client(tx).alumno.findMany({
+      where: { estado: "activo", inscripciones: { some: { ciclo: { activo: true } } } },
+      select: { id: true, nombre: true, padreId: true, documentos: { select: { tipo: true, estado: true } } },
+    });
+    return alumnos
+      .map((a) => ({ alumnoId: a.id, nombre: a.nombre, padreId: a.padreId, faltan: documentosFaltantes(a.documentos) }))
+      .filter((a) => a.faltan.length > 0);
   }
 }
