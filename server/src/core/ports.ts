@@ -35,3 +35,9 @@ export interface MensajeCorreo {
 export interface Mailer {
   enviar(mensaje: MensajeCorreo): Promise<void>;
 }
+
+// Anuncios entre módulos (ver core/eventos.ts). `M` es el mapa nombre → datos de los anuncios que publica un módulo.
+// `tx` es la transacción en curso: lo que se suscribe "dentro" corre en ella; sin `tx`, todo corre en el momento.
+export interface Publicador<M> {
+  publicar<K extends keyof M & string>(nombre: K, datos: M[K], tx?: unknown): Promise<void>;
+}
