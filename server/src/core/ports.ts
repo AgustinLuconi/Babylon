@@ -41,3 +41,36 @@ export interface Mailer {
 export interface Publicador<M> {
   publicar<K extends keyof M & string>(nombre: K, datos: M[K], tx?: unknown): Promise<void>;
 }
+
+// ── Tiempo real (ver core/tiempoReal.ts y core/adapters/CanalEnMemoria.ts) ──
+export type MotivoCierre =
+  | "cerrada-por-el-usuario"
+  | "cerrada-desde-otro-dispositivo"
+  | "contrasena-cambiada"
+  | "cuenta-desactivada"
+  | "vencida";
+
+// Lo que viaja por la conexión abierta: qué cambió, nunca datos personales (la pantalla vuelve a pedir lo que necesita).
+export interface SenalEnVivo {
+  tipo: string;
+  datos?: unknown;
+}
+
+export interface ConexionEnVivo {
+  sesionId: string;
+  usuarioId: string;
+  rol: Rol;
+  enviar(senal: SenalEnVivo): void;
+  cerrar(): void;
+}
+
+// Pieza intercambiable: hoy en memoria (un solo servidor); con varios servidores, otro adaptador (por ejemplo, con
+// LISTEN/NOTIFY de PostgreSQL) sin tocar el resto.
+export interface CanalEnVivo {
+  // Registra la conexión de una sesión (si ya tenía una, la reemplaza). Devuelve cómo darla de baja.
+  registrar(conexion: ConexionEnVivo): () => void;
+  enviarA(usuarioId: string, rol: Rol, senal: SenalEnVivo): void;
+  conectado(usuarioId: string, rol: Rol): boolean;
+  // Vuelve a validar las conexiones de la cuenta y corta, avisando el motivo, las de sesiones que ya no valen.
+  revisarSesiones(usuarioId: string, motivo: MotivoCierre): Promise<void>;
+}

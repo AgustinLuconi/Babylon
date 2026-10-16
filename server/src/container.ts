@@ -1,6 +1,7 @@
 import { configurarValidadorDeSesion } from "./core/middlewares/authMiddleware";
 import { prisma } from "./core/database";
 import { PrismaUnitOfWork } from "./core/adapters/PrismaUnitOfWork";
+import { CanalEnMemoria } from "./core/adapters/CanalEnMemoria";
 import { ConsoleMailer } from "./core/adapters/ConsoleMailer";
 import { SmtpMailer } from "./core/adapters/SmtpMailer";
 import { config } from "./core/config";
@@ -41,6 +42,8 @@ import { AsistenciaController } from "./modules/asistencia/asistencia.controller
 import { PrismaCuotaRepository } from "./modules/cuotas/cuota.repository.prisma";
 import { CuotaService } from "./modules/cuotas/cuota.service";
 import { NotificacionService } from "./modules/notificaciones/notificacion.service";
+import { PrismaNotificacionRepository } from "./modules/notificaciones/notificacion.repository.prisma";
+import { PrismaCriteriosDeAvisos } from "./modules/notificaciones/notificacion.criterios.prisma";
 import { NotificacionController } from "./modules/notificaciones/notificacion.controller";
 import { PrismaConfiguracionRepository } from "./modules/configuraciones/configuracion.repository.prisma";
 import { ConfiguracionService } from "./modules/configuraciones/configuracion.service";
@@ -70,7 +73,10 @@ import { ReporteController } from "./modules/reportes/reporte.controller";
 // desarrollo ya no se siembran acá — correr `npm run prisma:seed`. ---
 const usuarioRepository = new PrismaUsuarioRepository(prisma);
 const sesionRepository = new PrismaSesionRepository(prisma);
-configurarValidadorDeSesion(crearValidadorDeSesion(sesionRepository));
+// El mismo validador sirve a authMiddleware y al canal en vivo (que vuelve a validar las conexiones abiertas).
+const validadorDeSesion = crearValidadorDeSesion(sesionRepository);
+configurarValidadorDeSesion(validadorDeSesion);
+const canalEnVivo = new CanalEnMemoria(validadorDeSesion);
 const cicloRepository = new PrismaCicloRepository(prisma);
 const padreRepository = new PrismaPadreRepository(prisma);
 const profesorRepository = new PrismaProfesorRepository(prisma);
@@ -125,14 +131,22 @@ const calificacionService = new CalificacionService(
 const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository);
 const chatService = new ChatService(chatRepository, usuarioRepository);
 const reporteService = new ReporteService(prisma, documentoRepository);
-const notificacionService = new NotificacionService(prisma);
+const notificacionService = new NotificacionService(
+  new PrismaNotificacionRepository(prisma),
+  new PrismaCriteriosDeAvisos(prisma, documentoRepository),
+  canalEnVivo,
+  unitOfWork,
+);
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {
   // Expuesto para la tarea periódica de cuotas (ver server.ts).
   cuotaService,
-  // Expuesto para verificar los avisos con fechas fijas.
+  // Expuesto para las tareas periódicas de avisos y para verificar con fechas fijas.
   notificacionService,
+  // Expuestos para la ruta en vivo (ver server.ts).
+  canalEnVivo,
+  validadorDeSesion,
   // Expuesto para la depuración diaria de sesiones y para verificar los flujos.
   usuarioService,
   // Expuesto para verificar el adaptador de correo elegido.
@@ -152,5 +166,5 @@ export const container = {
   observacionController: new ObservacionController(observacionService, padreService, profesorService),
   chatController: new ChatController(chatService, padreService),
   reporteController: new ReporteController(reporteService),
-  notificacionController: new NotificacionController(notificacionService, padreService, profesorService),
+  notificacionController: new NotificacionController(notificacionService),
 };
