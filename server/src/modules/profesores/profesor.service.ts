@@ -173,7 +173,7 @@ export class ProfesorService {
               await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
               await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cuenta-desactivada" }, tx);
             }
-          if (actualizado.estado !== profesor.estado) await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+            if (actualizado.estado !== profesor.estado) await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
           }
         }
       }
