@@ -6,7 +6,8 @@ export type FiltroHistorial = "todas" | "no-leidas" | "pendientes";
 export interface OpcionesHistorial {
   desde: Date;
   filtro: FiltroHistorial;
-  despuesDe?: string;
+  // Último aviso de la página anterior: se siguen los más viejos que él (por fecha y, a igual fecha, por id).
+  despuesDe?: { fecha: Date; id: string };
   limite: number;
 }
 

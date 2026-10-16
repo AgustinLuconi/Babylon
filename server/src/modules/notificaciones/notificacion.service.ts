@@ -39,6 +39,15 @@ export interface Preferencia {
 }
 
 const llaveDe = (d: Destinatario) => `${d.usuarioId}|${d.rol}`;
+
+// Marcador de página del historial: fecha y id del último aviso mostrado ("2026-10-16T12:00:00.000Z|<id>").
+const marcador = (n: Notificacion) => `${n.actualizadaEn.toISOString()}|${n.id}`;
+function leerMarcador(texto: string): { fecha: Date; id: string } {
+  const [iso, id] = texto.split("|");
+  const fecha = new Date(iso ?? "");
+  if (!id || Number.isNaN(fecha.getTime())) throw new ValidationError("La página pedida no es válida");
+  return { fecha, id };
+}
 const aVista = (n: Notificacion): AvisoVista => ({
   id: n.id,
   tipo: n.tipo,
@@ -117,8 +126,9 @@ export class NotificacionService {
     ahora: Date = new Date(),
   ): Promise<{ avisos: AvisoVista[]; siguiente: string | null }> {
     const desde = new Date(ahora.getTime() - DIAS_DE_HISTORIAL * DIA_MS);
-    const avisos = await this.repo.historial(d, { desde, filtro, despuesDe, limite: POR_PAGINA });
-    return { avisos: avisos.map(aVista), siguiente: avisos.length === POR_PAGINA ? avisos[avisos.length - 1].id : null };
+    const avisos = await this.repo.historial(d, { desde, filtro, despuesDe: despuesDe ? leerMarcador(despuesDe) : undefined, limite: POR_PAGINA });
+    const ultimo = avisos.at(-1);
+    return { avisos: avisos.map(aVista), siguiente: ultimo && avisos.length === POR_PAGINA ? marcador(ultimo) : null };
   }
 
   async marcarLeida(d: Destinatario, id: string, ahora: Date = new Date()): Promise<void> {

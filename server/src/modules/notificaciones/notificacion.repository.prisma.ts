@@ -112,11 +112,15 @@ export class PrismaNotificacionRepository implements NotificacionRepository {
   async historial({ usuarioId, rol }: Destinatario, { desde, filtro, despuesDe, limite }: OpcionesHistorial): Promise<Notificacion[]> {
     const porFiltro: Prisma.NotificacionWhereInput =
       filtro === "no-leidas" ? { leidaEn: null, resueltaEn: null } : filtro === "pendientes" ? { clase: "estado", resueltaEn: null } : {};
+    // Marcador por valor (fecha + id) y no por fila: aunque el último aviso de la página anterior cambie de fecha o deje
+    // de cumplir el filtro, la página siguiente sigue desde el mismo punto, sin repetir ni saltear.
+    const siguientes: Prisma.NotificacionWhereInput = despuesDe
+      ? { OR: [{ actualizadaEn: { lt: despuesDe.fecha } }, { actualizadaEn: despuesDe.fecha, id: { lt: despuesDe.id } }] }
+      : {};
     const filas = await this.prisma.notificacion.findMany({
-      where: { usuarioId, rol, actualizadaEn: { gte: desde }, ...porFiltro },
+      where: { usuarioId, rol, actualizadaEn: { gte: desde }, ...porFiltro, ...siguientes },
       orderBy: [{ actualizadaEn: "desc" }, { id: "desc" }],
       take: limite,
-      ...(despuesDe ? { cursor: { id: despuesDe }, skip: 1 } : {}),
     });
     return filas.map(aEntidad);
   }
