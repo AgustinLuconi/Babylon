@@ -165,7 +165,7 @@ El aviso guarda `recurso` (tipo e identificadores). La dirección se arma al toc
 |---|---|---|---|
 | Cuotas vencidas (agrupado) | `/cuotas?pestana=vencidas` | — | — |
 | Documentación pendiente (agrupado) | `/alumnos?ciclo=activo&documentacion=pendiente` | — | — |
-| Evaluación (próxima) | `/reportes` | — | — |
+| Evaluación (próxima) | `/dashboard` (corregido al implementar: `/reportes` es solo de admin, la secretaría terminaría rebotada; el panel de ambos roles muestra las próximas evaluaciones) | — | — |
 | Asistencia (curso + fecha) | — | `/asistencia?curso=…&fecha=AAAA-MM-DD` | — |
 | Evaluación (sin publicar) | — | `/calificaciones?curso=…&evaluacion=…` | — |
 | Cierre (curso + período) | — | `/calificaciones?curso=…&vista=cierre&periodo=…` | — |
