@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AuthorizationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { Rol, UnitOfWork } from "../../core/ports";
+import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { Alumno } from "../alumnos/alumno.entity";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
@@ -11,6 +12,7 @@ import type { Pago } from "./pago.entity";
 import type { RegistrarPagoInput } from "./cuota.schema";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
 import { esMesLectivo, PORCENTAJE_DESCUENTO_HERMANOS, vencimientoDelMes } from "./cuota.calendario";
+import type { EventosCuotas } from "./cuota.eventos";
 
 export interface Solicitante {
   rol: Rol;
@@ -28,6 +30,7 @@ export class CuotaService {
     private readonly cicloRepo: CicloRepository,
     private readonly configuracionRepo: ConfiguracionRepository,
     private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosCuotas> = sinAnuncios(),
   ) {}
 
   // Cada cuota pagada incluye la fecha en que se registró el pago ("Pagada el ..."
@@ -87,6 +90,7 @@ export class CuotaService {
         pagosRegistrados.push(pago);
       }
 
+      await this.anuncios.publicar("cuotas.cambiaron", { motivo: "pago" }, tx);
       return pagosRegistrados;
     });
   }
@@ -153,13 +157,18 @@ export class CuotaService {
         await this.cuotaRepo.create(this.nuevaCuota(alumno, ctx), tx);
         creadas++;
       }
+      if (creadas > 0) await this.anuncios.publicar("cuotas.cambiaron", { motivo: "generacion" }, tx);
       return creadas;
     });
   }
 
   // Pasa a "vencida" las cuotas pendientes cuyo vencimiento ya pasó.
   async marcarVencidas(hoy: Date = new Date()): Promise<number> {
-    return this.cuotaRepo.marcarVencidas(inicioDeHoyUtc(hoy));
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const vencidas = await this.cuotaRepo.marcarVencidas(inicioDeHoyUtc(hoy), tx);
+      if (vencidas > 0) await this.anuncios.publicar("cuotas.cambiaron", { motivo: "vencimiento" }, tx);
+      return vencidas;
+    });
   }
 
   // Tarea periódica: marca vencidas y genera las cuotas del mes que falten.

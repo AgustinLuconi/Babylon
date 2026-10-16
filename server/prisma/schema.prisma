@@ -142,20 +142,22 @@ model Ciclo {
 }
 
 model Usuario {
-  id            String        @id
-  nombre        String
-  email         String        @unique
-  passwordHash  String
-  roles         Rol[]
-  estado        EstadoUsuario
-  fechaCreacion DateTime
+  id                String        @id
+  nombre            String
+  email             String        @unique
+  passwordHash      String
+  roles             Rol[]
+  estado            EstadoUsuario
+  fechaCreacion     DateTime
   emailVerificadoEn DateTime?
 
   padre    Padre?
   profesor Profesor?
 
-  tokens             TokenCuenta[]
-  sesiones           Sesion[]
+  tokens                     TokenCuenta[]
+  sesiones                   Sesion[]
+  notificaciones             Notificacion[]
+  notificacionesDesactivadas NotificacionDesactivada[]
 }
 
 model Padre {
@@ -175,14 +177,14 @@ model Padre {
 }
 
 model Profesor {
-  id        String        @id
+  id        String         @id
   nombre    String
   apellido  String?
-  dni       String?       @unique
+  dni       String?        @unique
   telefono  String?
   email     String?
   estado    EstadoProfesor @default(activo)
-  usuarioId String?       @unique
+  usuarioId String?        @unique
 
   usuario                  Usuario?                 @relation(fields: [usuarioId], references: [id])
   cursos                   Curso[]
@@ -310,14 +312,14 @@ model Documento {
 }
 
 model Evaluacion {
-  id      String           @id
-  cursoId String
-  nombre  String
-  tipo    TipoEvaluacion
-  fecha   DateTime
-  periodo PeriodoAcademico
-  escala  EscalaEvaluacion
-  estado  EstadoEvaluacion
+  id          String           @id
+  cursoId     String
+  nombre      String
+  tipo        TipoEvaluacion
+  fecha       DateTime
+  periodo     PeriodoAcademico
+  escala      EscalaEvaluacion
+  estado      EstadoEvaluacion
   // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
   publicadaEn DateTime?
 
@@ -451,4 +453,68 @@ model Sesion {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId, cerradaEn, expiraEn])
+}
+
+enum TipoNotificacion {
+  cuotas_vencidas
+  documentacion_pendiente
+  evaluacion_proxima
+  asistencia_pendiente
+  notas_sin_publicar
+  cierre_sin_publicar
+  cuota
+  documentacion_hijo
+  nota_publicada
+  cierre_publicado
+  observacion_nueva
+}
+
+enum ClaseNotificacion {
+  estado
+  evento
+}
+
+enum TonoNotificacion {
+  danger
+  warning
+  info
+}
+
+// Aviso de la campana, guardado para una cuenta en uno de sus roles. Los de "estado" quedan abiertos mientras la
+// situación siga (resueltaEn nulo); los de "evento" ocurren una vez. `clave` identifica de qué trata (una cuota, una
+// evaluación, "cuotas vencidas"…): hay a lo sumo una fila por cuenta, rol y clave. `recurso` dice a qué lleva (la
+// pantalla la arma el client según el rol). `nivel` sube cuando el aviso se agrava y lo vuelve a marcar no leído.
+model Notificacion {
+  id            String            @id
+  usuarioId     String
+  rol           Rol
+  tipo          TipoNotificacion
+  clase         ClaseNotificacion
+  clave         String
+  tono          TonoNotificacion
+  texto         String
+  recurso       Json
+  nivel         Int               @default(0)
+  creadaEn      DateTime
+  actualizadaEn DateTime
+  leidaEn       DateTime?
+  resueltaEn    DateTime?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, rol, clave])
+  @@index([usuarioId, rol, resueltaEn, leidaEn])
+  @@index([tipo])
+  @@index([actualizadaEn])
+}
+
+// Tipos de aviso que una cuenta apagó para uno de sus roles: que exista la fila quiere decir "apagado".
+model NotificacionDesactivada {
+  usuarioId String
+  rol       Rol
+  tipo      TipoNotificacion
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, rol, tipo])
 }

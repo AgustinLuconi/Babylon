@@ -22,6 +22,10 @@ const MENSAJES_MOTIVO: Record<string, { texto: string; tono: "warning" | "succes
   "sesion-vencida": { texto: "Tu sesión venció, ingresá de nuevo.", tono: "warning" },
   "contrasena-actualizada": { texto: "Contraseña actualizada, ya podés ingresar.", tono: "success" },
   "cuenta-activada": { texto: "Cuenta activada. Ingresá con tu email y contraseña.", tono: "success" },
+  "cerrada-por-el-usuario": { texto: "Cerraste la sesión en otra pestaña.", tono: "warning" },
+  "cerrada-desde-otro-dispositivo": { texto: "Tu sesión se cerró desde otro dispositivo.", tono: "warning" },
+  "contrasena-cambiada": { texto: "Tu contraseña cambió: ingresá con la nueva.", tono: "warning" },
+  "cuenta-desactivada": { texto: "Tu cuenta fue desactivada. Consultá con el instituto.", tono: "warning" },
 };
 
 export default function LoginPage() {

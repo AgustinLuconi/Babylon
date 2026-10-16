@@ -23,6 +23,7 @@ import { ORDEN_DOCUMENTOS, TIPO_DOCUMENTO_LABELS } from "@/features/documentos/t
 import { useObservacionesPorAlumno } from "@/features/observaciones/hooks/useObservacionesPorAlumno";
 import { CATEGORIA_LABELS, type CategoriaObservacionPredefinida } from "@/features/observaciones/types";
 import { useMisHijos } from "../hooks/useMisHijos";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 
 const TABS = [
   { id: "home", label: "Resumen", ruta: "/mis-hijos" },
@@ -57,14 +58,25 @@ function tabIdDesdeRuta(pathname: string): TabId {
   return match?.id ?? "home";
 }
 
+// Último hijo elegido en esta pestaña: el menú lleva a /mis-hijos/cuotas, /mis-hijos/calificaciones… sin ?hijo, y al
+// cambiar de pestaña tiene que seguir el mismo hijo. Si no es un hijo de la cuenta actual, se ignora.
+let ultimoHijoElegido: string | null = null;
+
 export default function ParentDashboardPage() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const tab = tabIdDesdeRuta(pathname);
   const { data: hijos } = useMisHijos();
-  const [kidIdx, setKidIdx] = useState(0);
-
-  const kid = hijos?.[kidIdx];
+  // Hijo en la dirección (?hijo=): el aviso "Cuota de Tomás por vencer" abre en Tomás. Un hijo que no es de la cuenta
+  // se ignora y se muestra el último elegido o el primero.
+  const { leer, escribir } = useFiltrosDeUrl();
+  const hijoPedido = leer("hijo");
+  const kid = hijos?.find((h) => h.id === hijoPedido) ?? hijos?.find((h) => h.id === ultimoHijoElegido) ?? hijos?.[0];
+  const kidIdx = kid && hijos ? hijos.indexOf(kid) : 0;
+  useEffect(() => {
+    if (kid) ultimoHijoElegido = kid.id;
+  }, [kid]);
+  const elegirHijo = (id: string) => escribir({ hijo: id });
 
   const { data: calificaciones } = useCalificacionesDeAlumno(kid?.id);
   const { data: notasCierre } = useNotasCierreDeAlumno(kid?.id);
@@ -200,7 +212,8 @@ export default function ParentDashboardPage() {
           {hijos.map((h, i) => (
             <button
               key={h.id}
-              onClick={() => setKidIdx(i)}
+              onClick={() => elegirHijo(h.id)}
+              aria-pressed={i === kidIdx}
               className="flex flex-1 items-center justify-center gap-2 rounded px-3 py-2 text-[12.5px] font-medium transition-all"
               style={{
                 background: i === kidIdx ? "var(--bg)" : "transparent",

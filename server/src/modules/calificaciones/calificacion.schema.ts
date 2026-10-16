@@ -34,3 +34,7 @@ export const cargarNotaCierreSchema = z.object({
 });
 
 export type CargarNotaCierreInput = z.infer<typeof cargarNotaCierreSchema>;
+
+// Lotes de notas de cierre (la pantalla guarda y publica el curso entero de una vez).
+export const cargarNotasCierreSchema = z.object({ notas: z.array(cargarNotaCierreSchema).min(1).max(100) });
+export const publicarNotasCierreSchema = z.object({ ids: z.array(z.string().min(1)).min(1).max(100) });

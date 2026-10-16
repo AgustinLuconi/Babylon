@@ -5,6 +5,8 @@ import type { DocumentoController } from "./documento.controller";
 export function documentoRoutes(controller: DocumentoController): Router {
   const router = Router();
 
+  router.get("/faltantes", authMiddleware, requireRole("admin", "secretario"), controller.listarFaltantes);
+
   router.get(
     "/alumnos/:alumnoId",
     authMiddleware,

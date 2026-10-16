@@ -1,13 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { notificacionService } from "../notificacionService";
 
-const CINCO_MINUTOS = 5 * 60 * 1000;
-
+// La campana se actualiza sola con las señales en vivo (core/tiempoReal); al volver a la pestaña también se refresca.
 export function useNotificaciones() {
-  return useQuery({
-    queryKey: ["notificaciones"],
-    queryFn: notificacionService.listar,
-    refetchInterval: CINCO_MINUTOS,
-    refetchOnWindowFocus: true,
-  });
+  return useQuery({ queryKey: ["notificaciones"], queryFn: notificacionService.campana, refetchOnWindowFocus: true });
 }

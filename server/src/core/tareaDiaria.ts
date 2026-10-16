@@ -32,3 +32,11 @@ export function programarTareaDiaria(nombre: string, tarea: () => Promise<void>)
   void correr();
   programarSiguiente();
 }
+
+// Corre `tarea` cada `cadaMs`, sin correr al arrancar (la tarea diaria ya hace la revisión completa al levantar el
+// servidor). Una corrida que falla se registra con su nombre y no impide las siguientes.
+export function programarTareaPeriodica(nombre: string, cadaMs: number, tarea: () => Promise<void>): void {
+  setInterval(() => {
+    tarea().catch((error) => console.error(`[${nombre}] falló la tarea periódica:`, error));
+  }, cadaMs).unref();
+}

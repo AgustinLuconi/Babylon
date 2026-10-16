@@ -34,13 +34,9 @@ export function calificacionRoutes(controller: CalificacionController): Router {
     requireRole("profesor"),
     controller.cargarCalificaciones,
   );
-  router.post("/notas-cierre", authMiddleware, requireRole("profesor"), controller.cargarNotaCierre);
-  router.patch(
-    "/notas-cierre/:id/publicar",
-    authMiddleware,
-    requireRole("profesor"),
-    controller.publicarNotaCierre,
-  );
+  // Notas de cierre: se cargan y se publican por lote (todo el curso de una vez).
+  router.post("/notas-cierre", authMiddleware, requireRole("profesor"), controller.cargarNotasCierre);
+  router.post("/notas-cierre/publicar", authMiddleware, requireRole("profesor"), controller.publicarNotasCierre);
 
   router.get("/alumnos/:alumnoId", authMiddleware, lectores, controller.listarCalificacionesPorAlumno);
   router.get("/alumnos/:alumnoId/notas-cierre", authMiddleware, lectores, controller.listarNotasCierrePorAlumno);

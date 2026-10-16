@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import type { DocumentoRepository } from "../documentos/documento.repository";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
 
 export interface CuotaVencidaResumen {
@@ -103,7 +104,10 @@ interface ContextoCiclo {
 // módulos, no un agregado de dominio — consulta Prisma directo en vez de
 // pasar por cada repository, porque no hay ninguna regla de negocio acá.
 export class ReporteService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly documentoRepo: DocumentoRepository,
+  ) {}
 
   // `cicloId` es opcional en los dos métodos públicos: sin él, se comporta
   // exactamente como antes de que existiera el concepto de Ciclo (todos los
@@ -132,7 +136,7 @@ export class ReporteService {
     const contexto = await this.resolverContextoCiclo(cicloId);
     const alumnoIdsFiltro = contexto ? Array.from(contexto.alumnoIds) : undefined;
 
-    const [alumnosRaw, cuotas, asistencias, cursos, evaluaciones, pagos, observacionesRecientes, documentosImagen] =
+    const [alumnosRaw, cuotas, asistencias, cursos, evaluaciones, pagos, observacionesRecientes] =
       await Promise.all([
         this.prisma.alumno.findMany({
           where: alumnoIdsFiltro ? { id: { in: alumnoIdsFiltro } } : undefined,
@@ -180,12 +184,6 @@ export class ReporteService {
           orderBy: { fecha: "desc" },
           take: 5,
           include: { alumno: true },
-        }),
-        this.prisma.documento.findMany({
-          where: {
-            tipo: "autorizacion_imagen",
-            ...(alumnoIdsFiltro ? { alumnoId: { in: alumnoIdsFiltro } } : {}),
-          },
         }),
       ]);
     const pagosRecientes = pagos.slice(0, 5);
@@ -299,10 +297,9 @@ export class ReporteService {
     const cobradoHoyMonto = pagosHoy.reduce((a, p) => a + p.monto, 0);
     const cobradoHoyCount = pagosHoy.length;
 
-    const alumnosConImagenAutorizada = new Set(
-      documentosImagen.filter((d) => d.estado === "autorizado").map((d) => d.alumnoId),
-    );
-    const documentacionPendienteCount = alumnos.filter((a) => !alumnosConImagenAutorizada.has(a.id)).length;
+    // Mismo criterio que los avisos y el filtro de Alumnos (documentos/documento.faltantes.ts): alumnos activos del
+    // ciclo activo a los que les falta cualquiera de los tres documentos.
+    const documentacionPendienteCount = (await this.documentoRepo.findFaltantes()).length;
 
     return {
       tendencias: this.calcularTendencias(contexto?.anio, alumnos, cuotas, asistencias),

@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { EntityNotFoundError } from "../../core/errors";
-import type { UnitOfWork } from "../../core/ports";
+import type { Publicador, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { CursoRepository } from "./curso.repository";
 import type { Curso } from "./curso.entity";
 import type { Horario } from "./horario.entity";
 import type { ActualizarCursoInput, CrearCursoInput } from "./curso.schema";
+import type { EventosCursos } from "./curso.eventos";
 
 export class CursoService {
   constructor(
@@ -14,6 +16,7 @@ export class CursoService {
     private readonly profesorRepo: ProfesorRepository,
     private readonly cicloRepo: CicloRepository,
     private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosCursos> = sinAnuncios(),
   ) {}
 
   async listarCursos(): Promise<Curso[]> {
@@ -56,13 +59,15 @@ export class CursoService {
       cupo: datos.cupo,
       estado: "activo",
     };
-    await this.cursoRepo.create(curso);
-
-    for (const horario of datos.horarios) {
-      await this.cursoRepo.agregarHorario({ id: randomUUID(), cursoId: curso.id, ...horario });
-    }
-
-    return curso;
+    // Atómico: el curso con sus horarios (antes podía quedar un curso sin horarios si fallaba a mitad de camino).
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.cursoRepo.create(curso, tx);
+      for (const horario of datos.horarios) {
+        await this.cursoRepo.agregarHorario({ id: randomUUID(), cursoId: curso.id, ...horario }, tx);
+      }
+      await this.anuncios.publicar("cursos.cambiaron", { cursoId: curso.id }, tx);
+      return curso;
+    });
   }
 
   async listarHorarios(): Promise<Horario[]> {
@@ -100,6 +105,7 @@ export class CursoService {
         }
       }
 
+      await this.anuncios.publicar("cursos.cambiaron", { cursoId: id }, tx);
       return actualizado;
     });
   }

@@ -27,6 +27,7 @@ import {
   type PeriodoAcademico,
   type TipoEvaluacion,
 } from "../types";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 
 function colorNota(nota: number): string {
   if (nota >= 7) return "var(--brand)";
@@ -36,17 +37,16 @@ function colorNota(nota: number): string {
 
 export default function CalificacionesProfesorPage() {
   const { data: cursos } = useCursosDelCicloActivo();
-  const [cursoId, setCursoId] = useState<string | undefined>(undefined);
-  const [view, setView] = useState<"evals" | "cierre">("evals");
-
-  useEffect(() => {
-    if (!cursoId && cursos && cursos.length > 0) setCursoId(cursos[0].id);
-  }, [cursos, cursoId]);
+  // Curso, vista, evaluación y período en la dirección: los avisos del profesor abren exactamente lo que señalan.
+  const { leer, escribir } = useFiltrosDeUrl();
+  const cursoPedido = leer("curso");
+  const cursoId = cursos?.some((c) => c.id === cursoPedido) ? (cursoPedido as string) : cursos?.[0]?.id;
+  const view: "evals" | "cierre" = leer("vista") === "cierre" ? "cierre" : "evals";
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={cursoId ?? ""} onChange={(e) => setCursoId(e.target.value)} className="w-auto">
+        <Select value={cursoId ?? ""} onChange={(e) => escribir({ curso: e.target.value, evaluacion: null, periodo: null })} className="w-auto">
           {cursos?.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre}
@@ -60,7 +60,8 @@ export default function CalificacionesProfesorPage() {
           {(["evals", "cierre"] as const).map((id) => (
             <button
               key={id}
-              onClick={() => setView(id)}
+              onClick={() => escribir({ vista: id === "cierre" ? "cierre" : null, evaluacion: null, periodo: null })}
+              aria-pressed={view === id}
               className="rounded px-3.5 py-1.5 text-[12.5px] font-medium transition-all"
               style={{
                 background: view === id ? "var(--bg)" : "transparent",
@@ -85,8 +86,10 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
   const crearEvaluacion = useCrearEvaluacion();
   const publicarEvaluacion = usePublicarEvaluacion();
 
-  const [periodFilter, setPeriodFilter] = useState<"all" | PeriodoAcademico>("all");
-  const [selectedEvalId, setSelectedEvalId] = useState<string | undefined>(undefined);
+  const { leer, escribir } = useFiltrosDeUrl();
+  const periodoPedido = leer("periodo");
+  const periodFilter: "all" | PeriodoAcademico = periodoPedido === "julio" || periodoPedido === "noviembre" ? periodoPedido : "all";
+  const setPeriodFilter = (id: "all" | PeriodoAcademico) => escribir({ periodo: id === "all" ? null : id, evaluacion: null });
   const [showNewEval, setShowNewEval] = useState(false);
 
   const visibleEvals = useMemo(
@@ -94,12 +97,9 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
     [evaluaciones, periodFilter],
   );
 
-  useEffect(() => {
-    if (visibleEvals.length > 0 && !visibleEvals.find((e) => e.id === selectedEvalId)) {
-      setSelectedEvalId(visibleEvals[0].id);
-    }
-    if (visibleEvals.length === 0) setSelectedEvalId(undefined);
-  }, [visibleEvals, selectedEvalId]);
+  const evaluacionPedida = leer("evaluacion");
+  const selectedEvalId = visibleEvals.some((e) => e.id === evaluacionPedida) ? (evaluacionPedida as string) : visibleEvals[0]?.id;
+  const setSelectedEvalId = (id: string) => escribir({ evaluacion: id });
 
   const evalObj = visibleEvals.find((e) => e.id === selectedEvalId);
 
@@ -159,6 +159,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             <button
               key={id}
               onClick={() => setPeriodFilter(id)}
+              aria-pressed={periodFilter === id}
               className="rounded px-3 py-1.5 text-[12.5px] font-medium transition-all"
               style={{
                 background: periodFilter === id ? "var(--brand)" : "var(--bg)",
@@ -175,6 +176,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
             <button
               key={e.id}
               onClick={() => setSelectedEvalId(e.id)}
+              aria-pressed={selectedEvalId === e.id}
               className="flex items-center gap-2 rounded px-3 py-1.5 text-[12.5px] font-medium transition-all"
               style={{
                 background: selectedEvalId === e.id ? "var(--brand)" : "var(--bg)",
@@ -394,7 +396,9 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
 }
 
 function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
-  const [periodo, setPeriodo] = useState<PeriodoAcademico>("julio");
+  const { leer, escribir } = useFiltrosDeUrl();
+  const periodo: PeriodoAcademico = leer("periodo") === "noviembre" ? "noviembre" : "julio";
+  const setPeriodo = (p: PeriodoAcademico) => escribir({ periodo: p === "julio" ? null : p });
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
   const { data: notasExistentes } = useNotasCierrePorCurso(cursoId, periodo);
   const cargarNotasCierre = useCargarNotasCierre();
@@ -449,6 +453,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
           <button
             key={p}
             onClick={() => setPeriodo(p)}
+            aria-pressed={periodo === p}
             className="rounded px-3 py-1.5 text-[12.5px] font-medium transition-all"
             style={{
               background: periodo === p ? "var(--brand)" : "var(--bg)",

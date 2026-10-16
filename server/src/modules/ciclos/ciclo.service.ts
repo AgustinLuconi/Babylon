@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { ConflictError, EntityNotFoundError } from "../../core/errors";
-import type { UnitOfWork } from "../../core/ports";
+import type { Publicador, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CicloRepository } from "./ciclo.repository";
 import type { Ciclo } from "./ciclo.entity";
 import type { CrearCicloInput } from "./ciclo.schema";
+import type { EventosCiclos } from "./ciclo.eventos";
 
 export class CicloService {
   constructor(
     private readonly cicloRepo: CicloRepository,
     private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosCiclos> = sinAnuncios(),
   ) {}
 
   async listarCiclos(): Promise<Ciclo[]> {
@@ -43,7 +46,9 @@ export class CicloService {
         throw new EntityNotFoundError("Ciclo", id);
       }
       await this.cicloRepo.desactivarTodos(tx);
-      return this.cicloRepo.update(id, { ...ciclo, activo: true }, tx);
+      const activo = await this.cicloRepo.update(id, { ...ciclo, activo: true }, tx);
+      await this.anuncios.publicar("ciclo.activado", { cicloId: id }, tx);
+      return activo;
     });
   }
 }

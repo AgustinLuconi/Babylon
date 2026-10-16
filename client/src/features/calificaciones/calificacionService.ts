@@ -19,10 +19,10 @@ export const calificacionService = {
     apiClient.get<Calificacion[]>(`/api/calificaciones/evaluaciones/${evaluacionId}/calificaciones`),
   cargarCalificaciones: (evaluacionId: string, datos: CargarCalificacionesInput) =>
     apiClient.post<Calificacion[]>(`/api/calificaciones/evaluaciones/${evaluacionId}/calificaciones`, datos),
-  cargarNotaCierre: (datos: CargarNotaCierreInput) =>
-    apiClient.post<NotaCierre>("/api/calificaciones/notas-cierre", datos),
-  publicarNotaCierre: (notaCierreId: string) =>
-    apiClient.patch<NotaCierre>(`/api/calificaciones/notas-cierre/${notaCierreId}/publicar`),
+  // Por lote: el curso entero en un solo pedido (todo o nada).
+  cargarNotasCierre: (notas: CargarNotaCierreInput[]) =>
+    apiClient.post<NotaCierre[]>("/api/calificaciones/notas-cierre", { notas }),
+  publicarNotasCierre: (ids: string[]) => apiClient.post<NotaCierre[]>("/api/calificaciones/notas-cierre/publicar", { ids }),
   listarCalificacionesPorAlumno: (alumnoId: string) =>
     apiClient.get<CalificacionConEvaluacion[]>(`/api/calificaciones/alumnos/${alumnoId}`),
   listarNotasCierrePorAlumno: (alumnoId: string) =>

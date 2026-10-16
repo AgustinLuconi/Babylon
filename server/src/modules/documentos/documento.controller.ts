@@ -56,4 +56,8 @@ export class DocumentoController {
     const documento = await this.documentoService.revocarAutorizacion(String(req.params.alumnoId));
     res.status(200).json(documento);
   };
+
+  listarFaltantes = async (_req: Request, res: Response) => {
+    res.status(200).json(await this.documentoService.listarFaltantes());
+  };
 }

@@ -1,183 +1,192 @@
-import type { PrismaClient } from "@prisma/client";
-import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
+import { randomUUID } from "node:crypto";
+import { alConfirmar } from "../../core/alConfirmar";
+import { EntityNotFoundError, ValidationError } from "../../core/errors";
+import type { CanalEnVivo, UnitOfWork } from "../../core/ports";
+import type { CriteriosDeAvisos } from "./notificacion.criterios";
+import type {
+  AvisoEsperado,
+  Destinatario,
+  Notificacion,
+  RecursoAviso,
+  TipoEstado,
+  TipoNotificacion,
+  TonoNotificacion,
+} from "./notificacion.entity";
+import { reconciliar } from "./notificacion.reconciliar";
+import type { FiltroHistorial, NotificacionRepository } from "./notificacion.repository";
+import { TIPOS, TIPOS_ESTADO, tiposDelRol } from "./notificacion.tipos";
 
-// Avisos de la campana: se derivan del estado actual (algo pendiente o vencido
-// que hay que atender), no de un historial de eventos — no existe "leído". Igual
-// que reportes/, es una composición de lectura sobre otros módulos, así que
-// consulta Prisma directo. Todo "hoy" se calcula en hora de Argentina.
+const DIA_MS = 24 * 60 * 60 * 1000;
+const MAX_CAMPANA = 10;
+const POR_PAGINA = 50;
+const DIAS_DE_HISTORIAL = 30;
 
-export type TonoNotificacion = "danger" | "warning" | "info";
-
-export interface Notificacion {
+export interface AvisoVista {
   id: string;
+  tipo: TipoNotificacion;
   tono: TonoNotificacion;
   texto: string;
-  ruta: string;
+  recurso: RecursoAviso;
+  leida: boolean;
+  resuelta: boolean;
+  fecha: Date;
 }
 
-const MAX_NOTIFICACIONES = 10;
-const DIA_MS = 24 * 60 * 60 * 1000;
-const DIAS_AVISO_VENCIMIENTO = 5;
-const DIAS_NOVEDADES = 7;
-const ORDEN_TONO: Record<TonoNotificacion, number> = { danger: 0, warning: 1, info: 2 };
-const DIAS_SEMANA = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"] as const;
-const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-const PERIODOS: Record<string, string> = { julio: "1° Cierre", noviembre: "2° Cierre" };
-
-const formatMonto = (monto: number) => `$${monto.toLocaleString("es-AR")}`;
-const formatDiaMes = (fecha: Date) => `${String(fecha.getUTCDate()).padStart(2, "0")}/${String(fecha.getUTCMonth() + 1).padStart(2, "0")}`;
-
-function ordenar(lista: Notificacion[]): Notificacion[] {
-  return lista.sort((a, b) => ORDEN_TONO[a.tono] - ORDEN_TONO[b.tono]).slice(0, MAX_NOTIFICACIONES);
+export interface Preferencia {
+  tipo: TipoNotificacion;
+  etiqueta: string;
+  activa: boolean;
 }
 
+const llaveDe = (d: Destinatario) => `${d.usuarioId}|${d.rol}`;
+
+// Marcador de página del historial: fecha y id del último aviso mostrado ("2026-10-16T12:00:00.000Z|<id>").
+const marcador = (n: Notificacion) => `${n.actualizadaEn.toISOString()}|${n.id}`;
+function leerMarcador(texto: string): { fecha: Date; id: string } {
+  const [iso, id] = texto.split("|");
+  const fecha = new Date(iso ?? "");
+  if (!id || Number.isNaN(fecha.getTime())) throw new ValidationError("La página pedida no es válida");
+  return { fecha, id };
+}
+const aVista = (n: Notificacion): AvisoVista => ({
+  id: n.id,
+  tipo: n.tipo,
+  tono: n.tono,
+  texto: n.texto,
+  recurso: n.recurso,
+  leida: n.leidaEn !== null,
+  resuelta: n.resueltaEn !== null,
+  fecha: n.actualizadaEn,
+});
+
+// Avisos guardados por cuenta y rol. Los de estado se sincronizan por tipo completo con su criterio
+// (notificacion.criterios); los de evento se crean una vez. Todo se escribe dentro de la transacción de quien lo pide,
+// y la señal en tiempo real sale recién después de confirmarla.
 export class NotificacionService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly repo: NotificacionRepository,
+    private readonly criterios: CriteriosDeAvisos,
+    private readonly canal: CanalEnVivo,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  // Admin/Secretario. Son los mismos avisos que muestra el resumen del panel (cuotas más
-  // atrasadas, documentación pendiente, próximas evaluaciones), pero con consultas
-  // livianas: el resumen completo recorre todas las cuotas, pagos y asistencias.
-  async listarParaStaff(): Promise<Notificacion[]> {
-    const [vencidas, sinAutorizacionDeImagen, proximasEvaluaciones] = await Promise.all([
-      // Las más atrasadas son las de vencimiento más antiguo.
-      this.prisma.cuota.findMany({
-        where: { estado: "vencida" },
-        // `id` desempata las que vencen el mismo día, para que los avisos sean estables entre consultas.
-        orderBy: [{ vencimiento: "asc" }, { id: "asc" }],
-        take: 5,
-        include: { alumno: true },
-      }),
-      this.prisma.alumno.count({
-        where: { documentos: { none: { tipo: "autorizacion_imagen", estado: "autorizado" } } },
-      }),
-      // `fecha` es medianoche UTC (fecha calendario): se compara contra el inicio del día argentino.
-      this.prisma.evaluacion.findMany({
-        where: { fecha: { gte: inicioDeHoyUtc() } },
-        orderBy: { fecha: "asc" },
-        take: 3,
-        include: { curso: true },
-      }),
-    ]);
-
-    const lista: Notificacion[] = vencidas.map((c) => ({
-      id: `cuota-${c.alumnoId}-${c.mes}-${c.anio}`,
-      tono: "danger",
-      texto: `Cuota vencida: ${c.alumno.nombre} ${c.alumno.apellido} — ${formatMonto(c.montoFinal)}`,
-      ruta: "/cuotas",
-    }));
-    if (sinAutorizacionDeImagen > 0) {
-      lista.push({
-        id: "documentacion-pendiente",
-        tono: "warning",
-        texto: `${sinAutorizacionDeImagen} alumno${sinAutorizacionDeImagen !== 1 ? "s" : ""} con autorización de imagen pendiente`,
-        ruta: "/alumnos",
-      });
+  // Cada tipo queda bloqueado hasta el final de la transacción: dos operaciones que sincronizan el mismo tipo a la vez
+  // van de a una (si no, las dos crearían la misma fila y una fallaría por la clave única).
+  async sincronizar(tipos: TipoEstado[], tx: unknown, ahora: Date = new Date()): Promise<void> {
+    const orden = [...new Set(tipos)].sort();
+    await this.repo.bloquearTipos(orden, tx);
+    const afectados: Destinatario[] = [];
+    for (const tipo of orden) {
+      const apagados = new Set((await this.repo.findDesactivadas(tipo, tx)).map(llaveDe));
+      const esperados = (await this.criterios.esperados(tipo, ahora, tx)).filter((e) => !apagados.has(llaveDe(e)));
+      const cambios = reconciliar(await this.repo.findPorTipo(tipo, tx), esperados, ahora, randomUUID);
+      await this.repo.crearVarias(cambios.crear, tx);
+      for (const { id, datos } of cambios.actualizar) await this.repo.actualizarParcial(id, datos, tx);
+      await this.repo.resolverVarios(cambios.resolver, ahora, tx);
+      afectados.push(...cambios.afectados);
     }
-    for (const e of proximasEvaluaciones) {
-      lista.push({ id: `evaluacion-${e.id}`, tono: "info", texto: `Evaluación próxima: ${e.nombre} — ${e.curso.nombre}`, ruta: "/reportes" });
-    }
-    return ordenar(lista);
+    this.avisarAlConfirmar(afectados, tx);
   }
 
-  async listarParaProfesor(profesorId: string, ahora: Date = new Date()): Promise<Notificacion[]> {
-    const cursos = await this.prisma.curso.findMany({
-      where: { profesorId, estado: "activo", ciclo: { activo: true } },
-      include: { horarios: true },
-    });
-    const nombreCurso = new Map(cursos.map((c) => [c.id, c.nombre]));
-    const cursoIds = cursos.map((c) => c.id);
-    const lista: Notificacion[] = [];
-
-    // Clase de hoy (hora de Argentina) que ya empezó y no tiene asistencia.
-    const { hora, minuto } = fechaHoraEnArgentina(ahora);
-    const ahoraHHMM = `${String(hora).padStart(2, "0")}:${String(minuto).padStart(2, "0")}`;
-    const hoy = inicioDeHoyUtc(ahora);
-    const diaSemana = DIAS_SEMANA[hoy.getUTCDay()];
-    for (const curso of cursos) {
-      const clase = curso.horarios.find((h) => h.diaSemana === diaSemana && h.horaInicio <= ahoraHHMM);
-      if (!clase) continue;
-      const tomada = await this.prisma.asistencia.count({
-        where: { cursoId: curso.id, fecha: { gte: hoy, lt: new Date(hoy.getTime() + DIA_MS) } },
-      });
-      if (tomada === 0) {
-        lista.push({ id: `asistencia-${curso.id}`, tono: "warning", texto: `Falta tomar asistencia de ${curso.nombre} (hoy ${clase.horaInicio})`, ruta: "/asistencia" });
-      }
-    }
-
-    // Evaluaciones con notas cargadas que siguen en borrador.
-    const evaluaciones = await this.prisma.evaluacion.findMany({
-      where: { cursoId: { in: cursoIds }, estado: "borrador", calificaciones: { some: {} } },
-    });
-    for (const e of evaluaciones) {
-      lista.push({ id: `evaluacion-borrador-${e.id}`, tono: "info", texto: `"${e.nombre}" (${nombreCurso.get(e.cursoId)}) tiene notas cargadas y sigue sin publicar`, ruta: "/calificaciones" });
-    }
-
-    // Notas de cierre en borrador, una por curso y período.
-    const cierres = await this.prisma.notaCierre.groupBy({
-      by: ["cursoId", "periodo"],
-      where: { cursoId: { in: cursoIds }, estado: "borrador" },
-    });
-    for (const c of cierres) {
-      lista.push({ id: `cierre-${c.cursoId}-${c.periodo}`, tono: "info", texto: `Notas de cierre de ${nombreCurso.get(c.cursoId)} (${PERIODOS[c.periodo] ?? c.periodo}) en borrador`, ruta: "/calificaciones" });
-    }
-    return ordenar(lista);
+  async notasPublicadas(evaluacionId: string, alumnoIds: string[] | null, tx: unknown): Promise<void> {
+    await this.registrarEventos(await this.criterios.notasPublicadas(evaluacionId, alumnoIds, tx), tx);
   }
 
-  async listarParaPadre(padreId: string, ahora: Date = new Date()): Promise<Notificacion[]> {
-    const hijos = await this.prisma.alumno.findMany({ where: { padreId, estado: "activo" }, select: { id: true, nombre: true } });
-    const nombreHijo = new Map(hijos.map((h) => [h.id, h.nombre]));
-    const ids = hijos.map((h) => h.id);
-    const hoy = inicioDeHoyUtc(ahora);
-    const desde = new Date(ahora.getTime() - DIAS_NOVEDADES * DIA_MS);
-    const lista: Notificacion[] = [];
+  async cierrePublicado(notaCierreId: string, tx: unknown): Promise<void> {
+    await this.registrarEventos(await this.criterios.cierrePublicado(notaCierreId, tx), tx);
+  }
 
-    const cuotas = await this.prisma.cuota.findMany({ where: { alumnoId: { in: ids }, estado: { in: ["vencida", "pendiente"] } } });
-    for (const c of cuotas) {
-      const mes = `${MESES[c.mes - 1]} ${c.anio}`;
-      if (c.estado === "vencida") {
-        lista.push({ id: `cuota-${c.id}`, tono: "danger", texto: `Cuota de ${mes} de ${nombreHijo.get(c.alumnoId)} vencida — ${formatMonto(c.montoFinal)}`, ruta: "/mis-hijos/cuotas" });
-        continue;
-      }
-      const dias = Math.round((c.vencimiento.getTime() - hoy.getTime()) / DIA_MS);
-      if (dias >= 0 && dias <= DIAS_AVISO_VENCIMIENTO) {
-        lista.push({ id: `cuota-${c.id}`, tono: "warning", texto: `La cuota de ${mes} de ${nombreHijo.get(c.alumnoId)} vence el ${formatDiaMes(c.vencimiento)}`, ruta: "/mis-hijos/cuotas" });
-      }
-    }
+  async observacionNueva(observacionId: string, tx: unknown): Promise<void> {
+    await this.registrarEventos(await this.criterios.observacionNueva(observacionId, tx), tx);
+  }
 
-    // Mismo criterio que el panel del padre: la autorización de imagen debe estar "autorizada" y el
-    // formulario y la copia del DNI "cargados". No tener ninguna fila de un documento también es
-    // pendiente (un alumno recién inscripto todavía no tiene ninguna).
-    const documentos = await this.prisma.documento.findMany({ where: { alumnoId: { in: ids } } });
-    for (const hijo of hijos) {
-      const delHijo = documentos.filter((d) => d.alumnoId === hijo.id);
-      const estadoDe = (tipo: string) => delHijo.find((d) => d.tipo === tipo)?.estado;
-      const pendiente =
-        estadoDe("autorizacion_imagen") !== "autorizado" ||
-        estadoDe("formulario_inscripcion") !== "cargado" ||
-        estadoDe("copia_dni") !== "cargado";
-      if (pendiente) {
-        lista.push({ id: `documentacion-${hijo.id}`, tono: "warning", texto: `${hijo.nombre} tiene documentación pendiente`, ruta: "/mis-hijos/documentacion" });
-      }
-    }
+  // Revisión completa (al arrancar y a las 03:00): una transacción por tipo, para no tener bloqueos largos.
+  async sincronizarTodo(ahora: Date = new Date()): Promise<void> {
+    for (const tipo of TIPOS_ESTADO) await this.unitOfWork.runInTransaction((tx) => this.sincronizar([tipo], tx, ahora));
+  }
 
-    // Novedades de los últimos 7 días. Nunca borradores: solo lo publicado.
-    const evaluaciones = await this.prisma.evaluacion.findMany({
-      where: { estado: "publicada", publicadaEn: { gte: desde }, calificaciones: { some: { alumnoId: { in: ids } } } },
-      include: { calificaciones: { where: { alumnoId: { in: ids } }, select: { alumnoId: true } } },
+  // Cada 15 minutos: la asistencia pendiente depende de la hora (una clase que acaba de empezar).
+  async sincronizarAsistencia(ahora: Date = new Date()): Promise<void> {
+    await this.unitOfWork.runInTransaction((tx) => this.sincronizar(["asistencia_pendiente"], tx, ahora));
+  }
+
+  async limpiar(ahora: Date = new Date()): Promise<number> {
+    return this.repo.limpiar(new Date(ahora.getTime() - DIAS_DE_HISTORIAL * DIA_MS));
+  }
+
+  async campana(d: Destinatario): Promise<{ noLeidas: number; avisos: AvisoVista[] }> {
+    const [avisos, noLeidas] = await Promise.all([this.repo.campana(d, MAX_CAMPANA), this.repo.contarNoLeidas(d)]);
+    return { noLeidas, avisos: avisos.map(aVista) };
+  }
+
+  async historial(
+    d: Destinatario,
+    filtro: FiltroHistorial,
+    despuesDe?: string,
+    ahora: Date = new Date(),
+  ): Promise<{ avisos: AvisoVista[]; siguiente: string | null }> {
+    const desde = new Date(ahora.getTime() - DIAS_DE_HISTORIAL * DIA_MS);
+    const avisos = await this.repo.historial(d, { desde, filtro, despuesDe: despuesDe ? leerMarcador(despuesDe) : undefined, limite: POR_PAGINA });
+    const ultimo = avisos.at(-1);
+    return { avisos: avisos.map(aVista), siguiente: ultimo && avisos.length === POR_PAGINA ? marcador(ultimo) : null };
+  }
+
+  async marcarLeida(d: Destinatario, id: string, ahora: Date = new Date()): Promise<void> {
+    if (!(await this.repo.marcarLeida(id, d, ahora))) throw new EntityNotFoundError("Notificacion", id);
+    await this.avisar([d]);
+  }
+
+  async leerTodas(d: Destinatario, ahora: Date = new Date()): Promise<number> {
+    const marcadas = await this.repo.marcarTodasLeidas(d, ahora);
+    await this.avisar([d]);
+    return marcadas;
+  }
+
+  async preferencias(d: Destinatario): Promise<Preferencia[]> {
+    const apagados = new Set(await this.repo.findDesactivadasDe(d));
+    return tiposDelRol(d.rol).map((tipo) => ({ tipo, etiqueta: TIPOS[tipo].etiqueta, activa: !apagados.has(tipo) }));
+  }
+
+  // Apagar borra los avisos de ese tipo; encender sincroniza en el momento, así vuelven los de estado vigentes.
+  async cambiarPreferencia(d: Destinatario, tipo: TipoNotificacion, activa: boolean): Promise<void> {
+    if (!tiposDelRol(d.rol).includes(tipo)) throw new ValidationError("Ese tipo de aviso no corresponde a tu rol");
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      if (!activa) {
+        // Mismo bloqueo que la sincronización: si hay una en curso de este tipo (por ejemplo, la de un pago), se espera a
+        // que termine en lugar de borrar avisos que ella está actualizando.
+        await this.repo.bloquearTipos([tipo], tx);
+        await this.repo.desactivar(d, tipo, tx);
+        this.avisarAlConfirmar([d], tx);
+        return;
+      }
+      await this.repo.activar(d, tipo, tx);
+      if (TIPOS[tipo].clase === "estado") await this.sincronizar([tipo as TipoEstado], tx);
     });
-    for (const e of evaluaciones) {
-      for (const cal of e.calificaciones) {
-        lista.push({ id: `nota-${e.id}-${cal.alumnoId}`, tono: "info", texto: `Nueva nota de ${nombreHijo.get(cal.alumnoId)}: ${e.nombre}`, ruta: "/mis-hijos/calificaciones" });
-      }
+  }
+
+  // Avisos de evento: uno por clave (si ya existe se ignora), salvo para quien apagó ese tipo.
+  private async registrarEventos(esperados: AvisoEsperado[], tx: unknown, ahora: Date = new Date()): Promise<void> {
+    if (esperados.length === 0) return;
+    const apagados = new Set<string>();
+    for (const tipo of new Set(esperados.map((e) => e.tipo))) {
+      for (const d of await this.repo.findDesactivadas(tipo, tx)) apagados.add(`${llaveDe(d)}|${tipo}`);
     }
-    const cierres = await this.prisma.notaCierre.findMany({ where: { alumnoId: { in: ids }, estado: "publicada", publicadaEn: { gte: desde } } });
-    for (const c of cierres) {
-      lista.push({ id: `cierre-${c.id}`, tono: "info", texto: `Nota de cierre (${PERIODOS[c.periodo] ?? c.periodo}) de ${nombreHijo.get(c.alumnoId)} publicada`, ruta: "/mis-hijos/calificaciones" });
+    const nuevos: Notificacion[] = esperados
+      .filter((e) => !apagados.has(`${llaveDe(e)}|${e.tipo}`))
+      .map((e) => ({ ...e, id: randomUUID(), clase: "evento", creadaEn: ahora, actualizadaEn: ahora, leidaEn: null, resueltaEn: null }));
+    this.avisarAlConfirmar(await this.repo.crearEventos(nuevos, tx), tx);
+  }
+
+  private avisarAlConfirmar(destinatarios: Destinatario[], tx: unknown): void {
+    if (destinatarios.length > 0) alConfirmar(tx, () => this.avisar(destinatarios));
+  }
+
+  // Señal "tu campana cambió" a las conexiones abiertas de esa cuenta con ese rol: solo el número de no leídos.
+  private async avisar(destinatarios: Destinatario[]): Promise<void> {
+    const unicos = new Map(destinatarios.map((d) => [llaveDe(d), d]));
+    for (const d of unicos.values()) {
+      if (!this.canal.conectado(d.usuarioId, d.rol)) continue;
+      this.canal.enviarA(d.usuarioId, d.rol, { tipo: "notificaciones", datos: { noLeidas: await this.repo.contarNoLeidas(d) } });
     }
-    const observaciones = await this.prisma.observacion.findMany({ where: { alumnoId: { in: ids }, fecha: { gte: desde } } });
-    for (const o of observaciones) {
-      lista.push({ id: `observacion-${o.id}`, tono: "info", texto: `Nueva observación sobre ${nombreHijo.get(o.alumnoId)}`, ruta: "/mis-hijos" });
-    }
-    return ordenar(lista);
   }
 }

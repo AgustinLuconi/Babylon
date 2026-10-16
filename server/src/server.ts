@@ -7,6 +7,7 @@ import express from "express";
 import cors from "cors";
 import { config } from "./core/config";
 import { errorHandler } from "./core/middlewares/errorHandler";
+import { tiempoRealRoutes } from "./core/tiempoReal";
 import { container } from "./container";
 import { invitacionRoutes } from "./modules/usuarios/invitacion.routes";
 import { usuarioRoutes } from "./modules/usuarios/usuario.routes";
@@ -26,6 +27,7 @@ import { observacionRoutes } from "./modules/observaciones/observacion.routes";
 import { chatRoutes } from "./modules/chats/chat.routes";
 import { reporteRoutes } from "./modules/reportes/reporte.routes";
 import { notificacionRoutes } from "./modules/notificaciones/notificacion.routes";
+import { iniciarAvisosPeriodicos } from "./modules/notificaciones/notificacion.scheduler";
 
 const app = express();
 
@@ -55,6 +57,7 @@ app.use("/api/observaciones", observacionRoutes(container.observacionController)
 app.use("/api/chats", chatRoutes(container.chatController));
 app.use("/api/reportes", reporteRoutes(container.reporteController));
 app.use("/api/notificaciones", notificacionRoutes(container.notificacionController));
+app.use("/api/tiempo-real", tiempoRealRoutes(container.canalEnVivo, container.validadorDeSesion));
 
 app.use(errorHandler);
 
@@ -62,4 +65,5 @@ app.listen(config.PORT, "0.0.0.0", () => {
   console.log(`Babylon API escuchando en http://localhost:${config.PORT}`);
   iniciarMantenimientoDeCuotas(container.cuotaService);
   iniciarDepuracionDeSesiones(container.usuarioService);
+  iniciarAvisosPeriodicos(container.notificacionService);
 });

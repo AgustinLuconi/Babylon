@@ -8,6 +8,8 @@ export interface AuthPayload {
   rol: Rol;
   // Id de la Sesion con la que se inició (claim `sid` del token): identifica "esta sesión".
   sesionId: string;
+  // Cuándo vence el token (claim `exp`): la conexión en vivo se corta en ese momento.
+  expiraEn: Date | null;
 }
 
 declare global {
@@ -35,7 +37,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  let payload: { sub: string; rol: Rol; sid?: string };
+  let payload: { sub: string; rol: Rol; sid?: string; exp?: number };
   try {
     payload = jwt.verify(token, config.JWT_SECRET) as typeof payload;
   } catch {
@@ -55,7 +57,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  req.auth = { sub: payload.sub, rol: payload.rol, sesionId: payload.sid };
+  req.auth = { sub: payload.sub, rol: payload.rol, sesionId: payload.sid, expiraEn: payload.exp ? new Date(payload.exp * 1000) : null };
   next();
 }
 

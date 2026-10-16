@@ -7,6 +7,7 @@ import ActivarCuentaPage from "@/features/auth/pages/ActivarCuentaPage";
 import VerificarEmailPage from "@/features/auth/pages/VerificarEmailPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import MiCuentaPage from "@/features/cuenta/pages/MiCuentaPage";
+import NotificacionesPage from "@/features/notificaciones/pages/NotificacionesPage";
 import AlumnosListPage from "@/features/alumnos/pages/AlumnosListPage";
 import AlumnoDetailPage from "@/features/alumnos/pages/AlumnoDetailPage";
 import InscribirAlumnoPage from "@/features/alumnos/pages/InscribirAlumnoPage";
@@ -38,6 +39,7 @@ export function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/mi-cuenta" element={<MiCuentaPage />} />
+          <Route path="/notificaciones" element={<NotificacionesPage />} />
 
           <Route element={<ProtectedRoute rolesPermitidos={["admin", "secretario"]} />}>
             <Route path="/alumnos" element={<AlumnosListPage />} />

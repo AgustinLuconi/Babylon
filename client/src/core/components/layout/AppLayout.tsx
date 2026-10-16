@@ -11,6 +11,7 @@ import { AREA_POR_ROL, navPorRol } from "./nav";
 import { obtenerTituloPagina } from "./pageTitles";
 import { GlobalSearch } from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
+import { TiempoReal } from "@/core/tiempoReal/TiempoReal";
 
 function BabylonLogo({ dark = false }: { dark?: boolean }) {
   return (
@@ -124,6 +125,7 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg-subtle)" }}>
+      <TiempoReal />
       <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[244px] shrink-0 md:flex">
         <SidebarContent />
       </aside>

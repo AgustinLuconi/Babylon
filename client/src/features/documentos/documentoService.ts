@@ -1,5 +1,5 @@
 import { apiClient } from "@/core/lib/apiClient";
-import type { AutorizarImagenInput, Documento, MarcarCargadoInput } from "./types";
+import type { AutorizarImagenInput, Documento, MarcarCargadoInput, TipoDocumento } from "./types";
 
 export const documentoService = {
   listarPorAlumno: (alumnoId: string) => apiClient.get<Documento[]>(`/api/documentos/alumnos/${alumnoId}`),
@@ -12,4 +12,6 @@ export const documentoService = {
     apiClient.patch<Documento>(`/api/documentos/alumnos/${alumnoId}/autorizacion-imagen/manual`),
   revocarAutorizacion: (alumnoId: string) =>
     apiClient.patch<Documento>(`/api/documentos/alumnos/${alumnoId}/autorizacion-imagen/revocar`),
+  // Admin/Secretario: qué le falta a cada alumno que debe documentación (solo los que deben algo).
+  faltantes: () => apiClient.get<Record<string, TipoDocumento[]>>("/api/documentos/faltantes"),
 };

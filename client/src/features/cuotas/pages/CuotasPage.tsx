@@ -16,6 +16,7 @@ import { useCuotas } from "../hooks/useCuotas";
 import { usePagos } from "../hooks/usePagos";
 import { useRegistrarPago } from "../hooks/useRegistrarPago";
 import { METODO_PAGO_LABELS, type EstadoCuota, type MetodoPago, type Pago } from "../types";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 
 const ESTADO_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
@@ -36,6 +37,8 @@ const MESES = [
 const METODOS: MetodoPago[] = ["efectivo", "transferencia", "mercadopago", "otro"];
 
 type Tab = "vencida" | "pendiente" | "pagada" | "todas";
+// Nombre de cada pestaña en la dirección (?pestana=vencidas): el enlace del aviso "Hay N cuotas vencidas" la abre.
+const PESTANA_EN_URL: Record<Tab, string> = { vencida: "vencidas", pendiente: "pendientes", pagada: "cobradas", todas: "todas" };
 
 export default function CuotasPage() {
   const { data: alumnos } = useAlumnos();
@@ -44,7 +47,9 @@ export default function CuotasPage() {
   const { data: pagos } = usePagos();
   const registrarPago = useRegistrarPago();
 
-  const [tab, setTab] = useState<Tab>("vencida");
+  const { leer, escribir } = useFiltrosDeUrl();
+  const tab = (Object.keys(PESTANA_EN_URL) as Tab[]).find((t) => PESTANA_EN_URL[t] === leer("pestana")) ?? "vencida";
+  const setTab = (t: Tab) => escribir({ pestana: t === "vencida" ? null : PESTANA_EN_URL[t] });
   const [busqueda, setBusqueda] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -181,6 +186,7 @@ export default function CuotasPage() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
               className="flex items-center gap-1.5 rounded px-3 py-1.5 text-[12.5px] font-medium transition-all"
               style={{
                 background: tab === t.id ? "var(--bg)" : "transparent",

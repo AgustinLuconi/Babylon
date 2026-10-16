@@ -68,9 +68,9 @@ Pieza genérica, sin lógica de negocio. Cada módulo declara sus anuncios en `<
 
 - `notificacion.entity.ts`, `notificacion.repository(.prisma).ts`, `notificacion.service.ts`, controller y routes.
 - **Criterio en un solo lugar por tipo:**
-  - Cada tipo de estado tiene una función de **sincronización** que, para un alcance dado (todo el instituto, un alumno, un curso o una cuenta), calcula qué avisos tienen que estar abiertos y abre, actualiza o resuelve las filas.
-  - Los anuncios de los módulos **no repiten ese cálculo**: solo piden sincronizar el alcance afectado, dentro de la transacción.
-  - La revisión nocturna llama a las mismas funciones con alcance "todo".
+  - Cada tipo de estado tiene una función de **sincronización** que calcula qué avisos tienen que estar abiertos en todo el instituto y abre, actualiza o resuelve las filas. Se sincroniza siempre el tipo completo (con el volumen del instituto son pocas consultas), bloqueando el tipo dentro de la transacción (`pg_advisory_xact_lock`) para que dos operaciones simultáneas no choquen.
+  - Los anuncios de los módulos **no repiten ese cálculo**: solo piden sincronizar los tipos afectados, dentro de la transacción.
+  - La revisión nocturna llama a las mismas funciones.
 - Los eventos (`nota_publicada`, `cierre_publicado`, `observacion_nueva`) se crean directo desde su anuncio.
 - **Criterio único de documentación** en `modules/documentos/` (función pura de documentos faltantes por alumno). Lo usan `notificaciones`, `reportes` (número del panel) y el endpoint nuevo de faltantes. Se eliminan las tres copias actuales.
 
@@ -115,7 +115,7 @@ Pieza genérica, sin lógica de negocio. Cada módulo declara sus anuncios en `<
 - **Destinatario:** la señal de avisos va a las conexiones de esa cuenta **con ese rol**. Silvana como profesora no recibe señales de sus avisos de administradora.
 
 **Cierre de sesión remoto:**
-- `SesionRepository.cerrarTodas` pasa a devolver los ids que cerró.
+- El anuncio "sesiones cerradas" lleva la cuenta y el motivo. El canal vuelve a validar las conexiones abiertas de esa cuenta con el validador de `authMiddleware` y corta las que ya no valen (`cerrarTodas` no cambia).
 - Todos los caminos que cierran sesiones anuncian "sesiones cerradas" con un motivo: cerrar sesión, cerrar otra sesión o las demás desde Mi cuenta, cambiar o recuperar la contraseña, desactivar la cuenta (por usuarios o por la ficha del profesor) y el tope de 10 sesiones.
 - Motivos según el camino:
   - `cerrada-por-el-usuario`: cerrar sesión (llega a las otras pestañas de esa misma sesión);
@@ -165,7 +165,7 @@ El aviso guarda `recurso` (tipo e identificadores). La dirección se arma al toc
 |---|---|---|---|
 | Cuotas vencidas (agrupado) | `/cuotas?pestana=vencidas` | — | — |
 | Documentación pendiente (agrupado) | `/alumnos?ciclo=activo&documentacion=pendiente` | — | — |
-| Evaluación (próxima) | `/reportes` | — | — |
+| Evaluación (próxima) | `/dashboard` (corregido al implementar: `/reportes` es solo de admin, la secretaría terminaría rebotada; el panel de ambos roles muestra las próximas evaluaciones) | — | — |
 | Asistencia (curso + fecha) | — | `/asistencia?curso=…&fecha=AAAA-MM-DD` | — |
 | Evaluación (sin publicar) | — | `/calificaciones?curso=…&evaluacion=…` | — |
 | Cierre (curso + período) | — | `/calificaciones?curso=…&vista=cierre&periodo=…` | — |

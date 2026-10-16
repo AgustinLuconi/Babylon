@@ -5,8 +5,7 @@ import type { NotaCierre } from "../types";
 export function usePublicarNotasCierre() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (notaCierreIds: string[]): Promise<NotaCierre[]> =>
-      Promise.all(notaCierreIds.map((id) => calificacionService.publicarNotaCierre(id))),
+    mutationFn: (notaCierreIds: string[]): Promise<NotaCierre[]> => calificacionService.publicarNotasCierre(notaCierreIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calificaciones"] });
     },
