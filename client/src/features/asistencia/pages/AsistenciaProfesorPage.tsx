@@ -63,6 +63,12 @@ const ESTADO_BG: Record<EstadoAsistencia, string> = {
   ausente: "var(--danger-soft)",
 };
 
+// AAAA-MM-DD que existe en el calendario (2026-13-45 no).
+function esFechaReal(texto: string): boolean {
+  const fecha = new Date(`${texto}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(texto) && !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === texto;
+}
+
 export default function AsistenciaProfesorPage() {
   const queryClient = useQueryClient();
   const { data: cursos } = useCursosDelCicloActivo();
@@ -71,15 +77,17 @@ export default function AsistenciaProfesorPage() {
   // curso que no es del profesor cae en el primero propio; sin fecha, la última clase del curso.
   const { leer, escribir } = useFiltrosDeUrl();
   const cursoPedido = leer("curso");
-  const cursoId = cursos?.some((c) => c.id === cursoPedido) ? (cursoPedido as string) : cursos?.[0]?.id;
+  const cursoEsPropio = !!cursos?.some((c) => c.id === cursoPedido);
+  const cursoId = cursoEsPropio ? (cursoPedido as string) : cursos?.[0]?.id;
   const setCursoId = (id: string) => escribir({ curso: id, fecha: null });
 
   const horariosDelCurso = useMemo(() => (horarios ?? []).filter((h) => h.cursoId === cursoId), [horarios, cursoId]);
   const sesiones = useMemo(() => sesionesPasadas(horariosDelCurso, 8), [horariosDelCurso]);
   const primeraSesion = sesiones[0]?.getTime();
-  const fechaPedida = leer("fecha");
+  // La fecha del enlace solo vale para el curso del enlace: si ese curso se descartó, también la fecha.
+  const fechaPedida = cursoEsPropio ? leer("fecha") : null;
   const fecha =
-    fechaPedida && /^\d{4}-\d{2}-\d{2}$/.test(fechaPedida)
+    fechaPedida && esFechaReal(fechaPedida)
       ? fechaPedida
       : primeraSesion
         ? fechaLocalISO(new Date(primeraSesion))
