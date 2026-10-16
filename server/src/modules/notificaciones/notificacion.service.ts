@@ -142,6 +142,9 @@ export class NotificacionService {
     if (!tiposDelRol(d.rol).includes(tipo)) throw new ValidationError("Ese tipo de aviso no corresponde a tu rol");
     await this.unitOfWork.runInTransaction(async (tx) => {
       if (!activa) {
+        // Mismo bloqueo que la sincronización: si hay una en curso de este tipo (por ejemplo, la de un pago), se espera a
+        // que termine en lugar de borrar avisos que ella está actualizando.
+        await this.repo.bloquearTipos([tipo], tx);
         await this.repo.desactivar(d, tipo, tx);
         this.avisarAlConfirmar([d], tx);
         return;
