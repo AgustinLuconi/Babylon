@@ -15,6 +15,7 @@ import type { DiaSemana, Horario } from "@/features/cursos/types";
 import { asistenciaService } from "../asistenciaService";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 
 const DIAS_ORDEN: DiaSemana[] = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
 
@@ -66,20 +67,24 @@ export default function AsistenciaProfesorPage() {
   const queryClient = useQueryClient();
   const { data: cursos } = useCursosDelCicloActivo();
   const { data: horarios } = useHorarios();
-  const [cursoId, setCursoId] = useState<string | undefined>(undefined);
-  const [fecha, setFecha] = useState(hoyLocalISO());
-
-  useEffect(() => {
-    if (!cursoId && cursos && cursos.length > 0) setCursoId(cursos[0].id);
-  }, [cursos, cursoId]);
+  // Curso y fecha en la dirección (el aviso "Falta tomar asistencia de 3° A del 14/10" abre ese curso en ese día). Un
+  // curso que no es del profesor cae en el primero propio; sin fecha, la última clase del curso.
+  const { leer, escribir } = useFiltrosDeUrl();
+  const cursoPedido = leer("curso");
+  const cursoId = cursos?.some((c) => c.id === cursoPedido) ? (cursoPedido as string) : cursos?.[0]?.id;
+  const setCursoId = (id: string) => escribir({ curso: id, fecha: null });
 
   const horariosDelCurso = useMemo(() => (horarios ?? []).filter((h) => h.cursoId === cursoId), [horarios, cursoId]);
   const sesiones = useMemo(() => sesionesPasadas(horariosDelCurso, 8), [horariosDelCurso]);
   const primeraSesion = sesiones[0]?.getTime();
-
-  useEffect(() => {
-    setFecha(primeraSesion ? fechaLocalISO(new Date(primeraSesion)) : hoyLocalISO());
-  }, [cursoId, primeraSesion]);
+  const fechaPedida = leer("fecha");
+  const fecha =
+    fechaPedida && /^\d{4}-\d{2}-\d{2}$/.test(fechaPedida)
+      ? fechaPedida
+      : primeraSesion
+        ? fechaLocalISO(new Date(primeraSesion))
+        : hoyLocalISO();
+  const setFecha = (nueva: string) => escribir({ fecha: nueva });
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
   const tomarAsistencia = useTomarAsistencia();
