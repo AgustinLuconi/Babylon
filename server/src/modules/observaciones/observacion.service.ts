@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { AuthorizationError, EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { Rol } from "../../core/ports";
+import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { ObservacionRepository } from "./observacion.repository";
 import { CATEGORIAS_PREDEFINIDAS, type CategoriaPersonalizada, type Observacion } from "./observacion.entity";
 import type { CrearCategoriaPersonalizadaInput, CrearObservacionInput } from "./observacion.schema";
+import type { EventosObservaciones } from "./observacion.eventos";
 
 export interface Solicitante {
   rol: Rol;
@@ -23,6 +25,8 @@ export class ObservacionService {
     private readonly alumnoRepo: AlumnoRepository,
     private readonly cursoRepo: CursoRepository,
     private readonly usuarioRepo: UsuarioRepository,
+    private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosObservaciones> = sinAnuncios(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -58,7 +62,11 @@ export class ObservacionService {
       texto: datos.texto,
       categoria: datos.categoria,
     };
-    return this.observacionRepo.create(observacion);
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const creada = await this.observacionRepo.create(observacion, tx);
+      await this.anuncios.publicar("observacion.creada", { observacionId: creada.id }, tx);
+      return creada;
+    });
   }
 
   // Enriquecida con el nombre real del emisor (join a Usuario por emisorId)

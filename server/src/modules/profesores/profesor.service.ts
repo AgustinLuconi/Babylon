@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { UnitOfWork } from "../../core/ports";
+import type { Publicador, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
 import type { SesionRepository } from "../usuarios/sesion.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
@@ -9,6 +10,7 @@ import type { Usuario } from "../usuarios/usuario.entity";
 import type { ProfesorRepository } from "./profesor.repository";
 import type { Profesor } from "./profesor.entity";
 import type { ActualizarProfesorInput, CrearProfesorInput, CrearProfesorSinCuentaInput } from "./profesor.schema";
+import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 
 export type ProfesorCreado = Profesor & { invitacion: EstadoInvitacion | null };
 
@@ -19,6 +21,7 @@ export class ProfesorService {
     private readonly sesionRepo: SesionRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly invitaciones: InvitacionService,
+    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
   ) {}
 
   async listarProfesores(): Promise<Profesor[]> {
@@ -77,7 +80,9 @@ export class ProfesorService {
         usuarioId,
         estado: "activo",
       };
-      return { profesor: await this.profesorRepo.create(profesor, tx), cuenta };
+      const creado = await this.profesorRepo.create(profesor, tx);
+      if (!cuenta) await this.anuncios.publicar("cuenta.cambio", { usuarioId }, tx);
+      return { profesor: creado, cuenta };
     });
 
     if (!cuenta) return { ...profesor, invitacion: null };
@@ -165,6 +170,7 @@ export class ProfesorService {
             );
             // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
             if (actualizado.estado === "inactivo") await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
+          if (actualizado.estado !== profesor.estado) await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
           }
         }
       }

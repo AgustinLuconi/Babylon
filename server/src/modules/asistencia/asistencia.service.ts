@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { AuthorizationError, EntityNotFoundError } from "../../core/errors";
-import type { Rol, UnitOfWork } from "../../core/ports";
+import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { AsistenciaRepository } from "./asistencia.repository";
 import type { Asistencia } from "./asistencia.entity";
 import type { RegistrarAsistenciaMasivaInput } from "./asistencia.schema";
+import type { EventosAsistencia } from "./asistencia.eventos";
 
 export interface Solicitante {
   rol: Rol;
@@ -18,6 +20,7 @@ export class AsistenciaService {
     private readonly cursoRepo: CursoRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosAsistencia> = sinAnuncios(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -73,6 +76,7 @@ export class AsistenciaService {
         asistencias.push(asistencia);
       }
 
+      await this.anuncios.publicar("asistencia.registrada", { cursoId: datos.cursoId }, tx);
       return asistencias;
     });
   }

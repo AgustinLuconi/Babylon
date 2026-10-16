@@ -2,7 +2,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import { config } from "../../core/config";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
+import type { Mailer, Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { Padre } from "../padres/padre.entity";
 import type { PadreRepository } from "../padres/padre.repository";
 import type { Profesor } from "../profesores/profesor.entity";
@@ -11,6 +12,7 @@ import { correoInvitacion } from "./correoInvitacion";
 import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
 import type { Usuario } from "./usuario.entity";
 import type { UsuarioRepository } from "./usuario.repository";
+import type { EventosUsuarios } from "./usuario.eventos";
 
 // Una cuenta pendiente no tiene contraseña utilizable: se guarda el hash de un valor al azar que nadie conoce.
 const HASH_DE_CUENTA_PENDIENTE = bcrypt.hashSync(randomBytes(32).toString("hex"), 10);
@@ -85,6 +87,7 @@ export class InvitacionService {
     private readonly profesorRepo: ProfesorRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
+    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
   ) {}
 
   // Dentro de la transacción de quien da el alta: crea la cuenta pendiente y su enlace. El correo se manda después,
@@ -227,6 +230,7 @@ export class InvitacionService {
       if (!usuario || usuario.estado !== "pendiente") throw new ValidationError(ENLACE_NO_VALIDO);
       await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, estado: "activo", emailVerificadoEn: ahora }, tx);
       await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", ahora, tx);
+      await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
     });
   }
 

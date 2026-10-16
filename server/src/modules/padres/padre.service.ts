@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError } from "../../core/errors";
-import type { UnitOfWork } from "../../core/ports";
+import type { Publicador, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { Usuario } from "../usuarios/usuario.entity";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
 import type { ActualizarPadreInput, CrearPadreInput, CrearPadreSinCuentaInput } from "./padre.schema";
+import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 
 export type PadreCreado = Padre & { invitacion: EstadoInvitacion | null };
 
@@ -17,6 +19,7 @@ export class PadreService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly invitaciones: InvitacionService,
+    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
   ) {}
 
   async listarPadres(): Promise<Padre[]> {
@@ -75,7 +78,10 @@ export class PadreService {
         vinculo: datos.vinculo,
         usuarioId,
       };
-      return { padre: await this.padreRepo.create(padre, tx), cuenta };
+      const creado = await this.padreRepo.create(padre, tx);
+      // Con contraseña la cuenta nace activa: ya le corresponden avisos (con invitación, cuando la active).
+      if (!cuenta) await this.anuncios.publicar("cuenta.cambio", { usuarioId }, tx);
+      return { padre: creado, cuenta };
     });
 
     if (!cuenta) return { ...padre, invitacion: null };

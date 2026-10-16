@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AuthorizationError, ConflictError, EntityNotFoundError } from "../../core/errors";
-import type { UnitOfWork } from "../../core/ports";
+import type { Publicador, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { CuotaService } from "../cuotas/cuota.service";
 import type { CursoRepository } from "../cursos/curso.repository";
@@ -8,6 +9,7 @@ import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { AlumnoRepository } from "./alumno.repository";
 import type { Alumno } from "./alumno.entity";
 import type { ActualizarAlumnoInput, NuevoAlumnoInput } from "./alumno.schema";
+import type { EventosAlumnos } from "./alumno.eventos";
 
 export interface HijoConCurso extends Alumno {
   cursoNombre: string | null;
@@ -23,6 +25,7 @@ export class AlumnoService {
     private readonly cicloRepo: CicloRepository,
     private readonly cuotaService: CuotaService,
     private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosAlumnos> = sinAnuncios(),
   ) {}
 
   async listarAlumnos(): Promise<Alumno[]> {
@@ -131,6 +134,7 @@ export class AlumnoService {
       // Cuota del mes de inscripción (si hay valor de cuota cargado y el mes
       // es lectivo); las de los meses siguientes las genera la tarea periódica.
       await this.cuotaService.generarCuotaInicial(creado, new Date(), tx);
+      await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: creado.id }, tx);
       return creado;
     });
   }
@@ -181,6 +185,7 @@ export class AlumnoService {
         }
       }
 
+      await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: id }, tx);
       return resultado;
     });
   }

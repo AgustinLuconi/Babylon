@@ -26,6 +26,7 @@ import { observacionRoutes } from "./modules/observaciones/observacion.routes";
 import { chatRoutes } from "./modules/chats/chat.routes";
 import { reporteRoutes } from "./modules/reportes/reporte.routes";
 import { notificacionRoutes } from "./modules/notificaciones/notificacion.routes";
+import { iniciarAvisosPeriodicos } from "./modules/notificaciones/notificacion.scheduler";
 
 const app = express();
 
@@ -62,4 +63,5 @@ app.listen(config.PORT, "0.0.0.0", () => {
   console.log(`Babylon API escuchando en http://localhost:${config.PORT}`);
   iniciarMantenimientoDeCuotas(container.cuotaService);
   iniciarDepuracionDeSesiones(container.usuarioService);
+  iniciarAvisosPeriodicos(container.notificacionService);
 });

@@ -10,7 +10,8 @@ import {
   ServicioNoDisponibleError,
   ValidationError,
 } from "../../core/errors";
-import type { Mailer, Rol, UnitOfWork } from "../../core/ports";
+import type { Mailer, Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import { correoRecuperacion } from "./correoRecuperacion";
 import { correoVerificacion } from "./correoVerificacion";
@@ -21,6 +22,7 @@ import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
+import type { EventosUsuarios } from "./usuario.eventos";
 import type {
   CambiarContrasenaInput,
   CambiarEstadoUsuarioInput,
@@ -92,6 +94,7 @@ export class UsuarioService {
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
     private readonly invitaciones: InvitacionService,
+    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
   ) {}
 
   async autenticar(
@@ -207,7 +210,11 @@ export class UsuarioService {
       fechaCreacion: ahora,
       emailVerificadoEn: null,
     };
-    await this.usuarioRepo.create(usuario);
+    // Con contraseña la cuenta nace activa: ya le corresponden avisos.
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.create(usuario, tx);
+      await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+    });
 
     const { passwordHash: _passwordHash, ...sinPassword } = usuario;
     return { ...sinPassword, invitacion: null };
@@ -244,6 +251,7 @@ export class UsuarioService {
       if (profesor) {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
       }
+      await this.anuncios.publicar("cuenta.cambio", { usuarioId: id }, tx);
       return resultado;
     });
 

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AuthorizationError, EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { Rol, UnitOfWork } from "../../core/ports";
+import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { sinAnuncios } from "../../core/eventos";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { CalificacionRepository } from "./calificacion.repository";
@@ -8,6 +9,7 @@ import type { Evaluacion } from "./evaluacion.entity";
 import type { Calificacion } from "./calificacion.entity";
 import type { NotaCierre } from "./notaCierre.entity";
 import type { CargarCalificacionesInput, CargarNotaCierreInput, CrearEvaluacionInput } from "./calificacion.schema";
+import type { EventosCalificaciones } from "./calificacion.eventos";
 
 export interface Solicitante {
   rol: Rol;
@@ -27,6 +29,7 @@ export class CalificacionService {
     private readonly cursoRepo: CursoRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
+    private readonly anuncios: Publicador<EventosCalificaciones> = sinAnuncios(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -79,7 +82,11 @@ export class CalificacionService {
       escala: datos.escala,
       estado: "borrador",
     };
-    return this.calificacionRepo.crearEvaluacion(evaluacion);
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const creada = await this.calificacionRepo.crearEvaluacion(evaluacion, tx);
+      await this.anuncios.publicar("evaluacion.creada", { evaluacionId: creada.id }, tx);
+      return creada;
+    });
   }
 
   async publicarEvaluacion(evaluacionId: string, profesorId: string): Promise<Evaluacion> {
@@ -89,10 +96,14 @@ export class CalificacionService {
     }
     await this.verificarDuenoDelCurso(evaluacion.cursoId, profesorId);
 
-    return this.calificacionRepo.actualizarEvaluacion(evaluacionId, {
-      ...evaluacion,
-      estado: "publicada",
-      publicadaEn: evaluacion.publicadaEn ?? new Date(),
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const publicada = await this.calificacionRepo.actualizarEvaluacion(
+        evaluacionId,
+        { ...evaluacion, estado: "publicada", publicadaEn: evaluacion.publicadaEn ?? new Date() },
+        tx,
+      );
+      await this.anuncios.publicar("evaluacion.publicada", { evaluacionId }, tx);
+      return publicada;
     });
   }
 
@@ -129,6 +140,7 @@ export class CalificacionService {
         };
         calificaciones.push(await this.calificacionRepo.guardarCalificacion(calificacion, tx));
       }
+      await this.anuncios.publicar("calificaciones.cargadas", { evaluacionId, alumnoIds: datos.notas.map((n) => n.alumnoId) }, tx);
       return calificaciones;
     });
   }
@@ -148,7 +160,11 @@ export class CalificacionService {
       // Vuelve a ser borrador: cuando se publique de nuevo cuenta como una publicación nueva (avisa al padre).
       publicadaEn: null,
     };
-    return this.calificacionRepo.guardarNotaCierre(notaCierre);
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const guardada = await this.calificacionRepo.guardarNotaCierre(notaCierre, tx);
+      await this.anuncios.publicar("cierre.cargado", { notaCierreId: guardada.id }, tx);
+      return guardada;
+    });
   }
 
   async publicarNotaCierre(notaCierreId: string, profesorId: string): Promise<NotaCierre> {
@@ -158,10 +174,13 @@ export class CalificacionService {
     }
     await this.verificarDuenoDelCurso(notaCierre.cursoId, profesorId);
 
-    return this.calificacionRepo.guardarNotaCierre({
-      ...notaCierre,
-      estado: "publicada",
-      publicadaEn: notaCierre.publicadaEn ?? new Date(),
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const publicada = await this.calificacionRepo.guardarNotaCierre(
+        { ...notaCierre, estado: "publicada", publicadaEn: notaCierre.publicadaEn ?? new Date() },
+        tx,
+      );
+      await this.anuncios.publicar("cierre.publicado", { notaCierreId }, tx);
+      return publicada;
     });
   }
 
