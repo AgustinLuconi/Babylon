@@ -16,6 +16,8 @@ export interface NotificacionRepository extends Repository<Notificacion> {
   findPorTipo(tipo: TipoNotificacion, tx?: unknown): Promise<Notificacion[]>;
   crearVarias(avisos: Notificacion[], tx?: unknown): Promise<void>;
   actualizarParcial(id: string, datos: Partial<Notificacion>, tx?: unknown): Promise<void>;
+  // Marca resueltos varios avisos en una sola sentencia.
+  resolverVarios(ids: string[], ahora: Date, tx?: unknown): Promise<void>;
   // Crea las que no existen (misma cuenta, rol y clave) y devuelve a quiénes se les creó algo.
   crearEventos(avisos: Notificacion[], tx?: unknown): Promise<Destinatario[]>;
   findDesactivadas(tipo: TipoNotificacion, tx?: unknown): Promise<Destinatario[]>;

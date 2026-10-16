@@ -73,6 +73,7 @@ export class NotificacionService {
       const cambios = reconciliar(await this.repo.findPorTipo(tipo, tx), esperados, ahora, randomUUID);
       await this.repo.crearVarias(cambios.crear, tx);
       for (const { id, datos } of cambios.actualizar) await this.repo.actualizarParcial(id, datos, tx);
+      await this.repo.resolverVarios(cambios.resolver, ahora, tx);
       afectados.push(...cambios.afectados);
     }
     this.avisarAlConfirmar(afectados, tx);

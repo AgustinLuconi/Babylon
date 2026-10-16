@@ -3,6 +3,8 @@ import type { AvisoEsperado, Destinatario, Notificacion, RecursoAviso } from "./
 export interface CambiosDeAvisos {
   crear: Notificacion[];
   actualizar: { id: string; datos: Partial<Notificacion> }[];
+  // Abiertos que ya no corresponden: se resuelven todos juntos (una sola sentencia).
+  resolver: string[];
   // Cuentas (con su rol) cuya campana cambió: reciben una señal en tiempo real.
   afectados: Destinatario[];
 }
@@ -25,6 +27,7 @@ export function reconciliar(
 ): CambiosDeAvisos {
   const crear: Notificacion[] = [];
   const actualizar: CambiosDeAvisos["actualizar"] = [];
+  const resolver: string[] = [];
   const afectados = new Map<string, Destinatario>();
   const afectar = ({ usuarioId, rol }: Destinatario) => afectados.set(`${usuarioId}|${rol}`, { usuarioId, rol });
   const porLlave = new Map(existentes.map((n) => [llave(n), n]));
@@ -48,9 +51,9 @@ export function reconciliar(
   }
   for (const n of existentes) {
     if (n.resueltaEn === null && !esperadas.has(llave(n))) {
-      actualizar.push({ id: n.id, datos: { resueltaEn: ahora, actualizadaEn: ahora } });
+      resolver.push(n.id);
       afectar(n);
     }
   }
-  return { crear, actualizar, afectados: [...afectados.values()] };
+  return { crear, actualizar, resolver, afectados: [...afectados.values()] };
 }

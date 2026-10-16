@@ -58,6 +58,12 @@ export class PrismaNotificacionRepository implements NotificacionRepository {
     await this.client(tx).notificacion.update({ where: { id }, data: aCambios(datos) });
   }
 
+  async resolverVarios(ids: string[], ahora: Date, tx?: unknown): Promise<void> {
+    if (ids.length > 0) {
+      await this.client(tx).notificacion.updateMany({ where: { id: { in: ids } }, data: { resueltaEn: ahora, actualizadaEn: ahora } });
+    }
+  }
+
   async crearEventos(avisos: Notificacion[], tx?: unknown): Promise<Destinatario[]> {
     if (avisos.length === 0) return [];
     const db = this.client(tx);
