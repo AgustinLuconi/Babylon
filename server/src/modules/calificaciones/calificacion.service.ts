@@ -145,42 +145,56 @@ export class CalificacionService {
     });
   }
 
-  async cargarNotaCierre(datos: CargarNotaCierreInput, profesorId: string): Promise<NotaCierre> {
-    await this.verificarDuenoDelCurso(datos.cursoId, profesorId);
+  // Notas de cierre de varios alumnos en una sola operación (todo o nada): la pantalla del profesor guarda el curso
+  // entero de una vez, con un único anuncio para el lote (antes era un pedido y una transacción por alumno).
+  async cargarNotasCierre(notas: CargarNotaCierreInput[], profesorId: string): Promise<NotaCierre[]> {
+    for (const cursoId of new Set(notas.map((n) => n.cursoId))) await this.verificarDuenoDelCurso(cursoId, profesorId);
 
-    const existente = await this.calificacionRepo.findNotaCierre(datos.alumnoId, datos.cursoId, datos.periodo);
-    const notaCierre: NotaCierre = {
-      id: existente?.id ?? randomUUID(),
-      alumnoId: datos.alumnoId,
-      cursoId: datos.cursoId,
-      periodo: datos.periodo,
-      nota: datos.nota,
-      observacion: datos.observacion,
-      estado: "borrador",
-      // Vuelve a ser borrador: cuando se publique de nuevo cuenta como una publicación nueva (avisa al padre).
-      publicadaEn: null,
-    };
     return this.unitOfWork.runInTransaction(async (tx) => {
-      const guardada = await this.calificacionRepo.guardarNotaCierre(notaCierre, tx);
-      await this.anuncios.publicar("cierre.cargado", { notaCierreId: guardada.id }, tx);
-      return guardada;
+      const guardadas: NotaCierre[] = [];
+      for (const datos of notas) {
+        const existente = await this.calificacionRepo.findNotaCierre(datos.alumnoId, datos.cursoId, datos.periodo, tx);
+        const notaCierre: NotaCierre = {
+          id: existente?.id ?? randomUUID(),
+          alumnoId: datos.alumnoId,
+          cursoId: datos.cursoId,
+          periodo: datos.periodo,
+          nota: datos.nota,
+          observacion: datos.observacion,
+          estado: "borrador",
+          // Vuelve a ser borrador: cuando se publique de nuevo cuenta como una publicación nueva (avisa al padre).
+          publicadaEn: null,
+        };
+        guardadas.push(await this.calificacionRepo.guardarNotaCierre(notaCierre, tx));
+      }
+      await this.anuncios.publicar("cierre.cargado", { notaCierreIds: guardadas.map((n) => n.id) }, tx);
+      return guardadas;
     });
   }
 
-  async publicarNotaCierre(notaCierreId: string, profesorId: string): Promise<NotaCierre> {
-    const notaCierre = await this.calificacionRepo.findNotaCierreById(notaCierreId);
-    if (!notaCierre) {
-      throw new EntityNotFoundError("NotaCierre", notaCierreId);
-    }
-    await this.verificarDuenoDelCurso(notaCierre.cursoId, profesorId);
-
+  // Publica varias notas de cierre en una sola operación (todo o nada), con un único anuncio para el lote.
+  async publicarNotasCierre(notaCierreIds: string[], profesorId: string): Promise<NotaCierre[]> {
     return this.unitOfWork.runInTransaction(async (tx) => {
-      const publicada = await this.calificacionRepo.guardarNotaCierre(
-        { ...notaCierre, estado: "publicada", publicadaEn: notaCierre.publicadaEn ?? new Date() },
-        tx,
-      );
-      await this.anuncios.publicar("cierre.publicado", { notaCierreId }, tx);
-      return publicada;
+      const publicadas: NotaCierre[] = [];
+      const cursosVerificados = new Set<string>();
+      for (const id of notaCierreIds) {
+        const notaCierre = await this.calificacionRepo.findNotaCierreById(id, tx);
+        if (!notaCierre) {
+          throw new EntityNotFoundError("NotaCierre", id);
+        }
+        if (!cursosVerificados.has(notaCierre.cursoId)) {
+          await this.verificarDuenoDelCurso(notaCierre.cursoId, profesorId);
+          cursosVerificados.add(notaCierre.cursoId);
+        }
+        publicadas.push(
+          await this.calificacionRepo.guardarNotaCierre(
+            { ...notaCierre, estado: "publicada", publicadaEn: notaCierre.publicadaEn ?? new Date() },
+            tx,
+          ),
+        );
+      }
+      await this.anuncios.publicar("cierre.publicado", { notaCierreIds }, tx);
+      return publicadas;
     });
   }
 

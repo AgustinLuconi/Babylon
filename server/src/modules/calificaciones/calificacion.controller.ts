@@ -3,7 +3,8 @@ import type { ProfesorService } from "../profesores/profesor.service";
 import type { PadreService } from "../padres/padre.service";
 import {
   cargarCalificacionesSchema,
-  cargarNotaCierreSchema,
+  cargarNotasCierreSchema,
+  publicarNotasCierreSchema,
   crearEvaluacionSchema,
 } from "./calificacion.schema";
 import type { CalificacionService, Solicitante } from "./calificacion.service";
@@ -71,17 +72,16 @@ export class CalificacionController {
     res.status(201).json(calificaciones);
   };
 
-  cargarNotaCierre = async (req: Request, res: Response) => {
-    const datos = cargarNotaCierreSchema.parse(req.body);
+  cargarNotasCierre = async (req: Request, res: Response) => {
+    const { notas } = cargarNotasCierreSchema.parse(req.body);
     const profesor = await this.profesorService.buscarPorUsuarioId(req.auth!.sub);
-    const notaCierre = await this.calificacionService.cargarNotaCierre(datos, profesor.id);
-    res.status(201).json(notaCierre);
+    res.status(201).json(await this.calificacionService.cargarNotasCierre(notas, profesor.id));
   };
 
-  publicarNotaCierre = async (req: Request, res: Response) => {
+  publicarNotasCierre = async (req: Request, res: Response) => {
+    const { ids } = publicarNotasCierreSchema.parse(req.body);
     const profesor = await this.profesorService.buscarPorUsuarioId(req.auth!.sub);
-    const notaCierre = await this.calificacionService.publicarNotaCierre(String(req.params.id), profesor.id);
-    res.status(200).json(notaCierre);
+    res.status(200).json(await this.calificacionService.publicarNotasCierre(ids, profesor.id));
   };
 
   listarCalificacionesPorAlumno = async (req: Request, res: Response) => {

@@ -27,9 +27,10 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
     await avisos.notasPublicadas(evaluacionId, alumnoIds, tx);
   });
   tablero.alPublicarse("cierre.cargado", sincronizar(["cierre_sin_publicar"]));
-  tablero.alPublicarse("cierre.publicado", async ({ notaCierreId }, tx) => {
+  // Un lote publicado sincroniza una sola vez y crea un aviso por nota.
+  tablero.alPublicarse("cierre.publicado", async ({ notaCierreIds }, tx) => {
     await avisos.sincronizar(["cierre_sin_publicar"], tx);
-    await avisos.cierrePublicado(notaCierreId, tx);
+    for (const id of notaCierreIds) await avisos.cierrePublicado(id, tx);
   });
   tablero.alPublicarse("observacion.creada", ({ observacionId }, tx) => avisos.observacionNueva(observacionId, tx));
 }
