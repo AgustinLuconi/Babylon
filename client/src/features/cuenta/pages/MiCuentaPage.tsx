@@ -3,6 +3,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ROL_LABELS } from "@/features/auth/types";
 import { CambiarContrasena } from "../components/CambiarContrasena";
 import { EmailSinVerificar } from "../components/EmailSinVerificar";
+import { PreferenciasNotificaciones } from "../components/PreferenciasNotificaciones";
 import { SesionesActivas } from "../components/SesionesActivas";
 
 export default function MiCuentaPage() {
@@ -29,6 +30,7 @@ export default function MiCuentaPage() {
         </dl>
       </Panel>
       <CambiarContrasena />
+      <PreferenciasNotificaciones />
       <SesionesActivas />
     </div>
   );

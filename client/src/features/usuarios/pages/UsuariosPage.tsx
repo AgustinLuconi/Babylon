@@ -25,6 +25,7 @@ import { useCambiarEstadoUsuario } from "../hooks/useCambiarEstadoUsuario";
 import { useCrearAdministrador } from "../hooks/useCrearAdministrador";
 import { useUsuarios } from "../hooks/useUsuarios";
 import type { CuentaUsuario, EstadoInvitacion } from "../types";
+import { Interruptor } from "@/core/components/ui/interruptor";
 
 const DESCRIPCION_ROL: Record<Rol, string> = {
   admin: "Acceso total al sistema, incluyendo configuración y datos sensibles.",
@@ -86,49 +87,6 @@ function generarPassword(): string {
   const caracteres = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   const azar = crypto.getRandomValues(new Uint32Array(12));
   return Array.from(azar, (n) => caracteres[n % caracteres.length]).join("");
-}
-
-function Interruptor({
-  activo,
-  onClick,
-  deshabilitado,
-  titulo,
-}: {
-  activo: boolean;
-  onClick: () => void;
-  deshabilitado?: boolean;
-  titulo?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={activo}
-      title={titulo}
-      disabled={deshabilitado}
-      onClick={onClick}
-      className="relative inline-flex items-center disabled:cursor-not-allowed disabled:opacity-60"
-      style={{
-        width: 30,
-        height: 18,
-        background: activo ? "var(--brand)" : "var(--border-strong)",
-        borderRadius: 999,
-        transition: "background 150ms ease",
-      }}
-    >
-      <span
-        className="absolute"
-        style={{
-          width: 12,
-          height: 12,
-          background: "#fff",
-          borderRadius: 999,
-          left: activo ? 15 : 3,
-          transition: "left 150ms ease",
-        }}
-      />
-    </button>
-  );
 }
 
 const PESTANAS = [
