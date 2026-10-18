@@ -171,6 +171,32 @@ Las entidades secundarias normalmente no tienen su propio `*.repository.ts` — 
 
 **Filtros en la dirección** (`client/src/core/hooks/useFiltrosDeUrl.ts`: `leer`/`escribir`, más `elegir` para validar): pestañas, filtros, página y selecciones viven en `?…`, así un enlace (el de un aviso) los trae puestos y recargar los conserva. Reglas: cambiar un filtro **reemplaza** la entrada del historial ("atrás" lleva a la pantalla anterior); un valor inválido o ajeno cae en el de por defecto (la dirección no da permisos); **nunca** van el texto de un buscador (nombres y DNI de menores) ni lo escrito sin guardar. Tanda 1 hecha: Alumnos (`ciclo`, `cuota`, `curso`, `documentacion`, `pagina`), Cuotas (`pestana`), Asistencia (`curso`, `fecha`), Calificaciones (`curso`, `vista`, `evaluacion`, `periodo`) y Mis hijos (`hijo`, con la memoria `ultimoHijoElegido` para que cambiar de pestaña del menú no pierda el hijo). Tanda 2 pendiente: Reportes, Cursos, Usuarios, Profesores, Observaciones, Chats y las pestañas del legajo.
 
+### Chat en vivo (subproyecto 3b)
+
+- **Bandeja compartida del instituto:** si cualquier cuenta de administración o secretaría lee una conversación, queda leída para todo el instituto.
+- **"Leído":** `Mensaje.vistoEn` guarda cuándo lo vio el otro lado (`null` = todavía no). La migración dejó vistos los mensajes que ya existían.
+  - `Lector` = `instituto` | `familia`. Leer marca solo los mensajes del otro lado: `rolEmisor` padre para el instituto; admin y secretario para la familia.
+- **Regla del "Visto"** (`features/chats/visto.ts`, pura):
+  - cada mensaje muestra solo su hora;
+  - "Visto · HH:MM" va únicamente debajo del **último** mensaje de la conversación, si es de quien mira y ya fue visto;
+  - cuando el otro responde, desaparece; reaparece cuando el otro lea el próximo mensaje propio.
+- **Marcar leído solo si alguien mira** (`useMarcarLeidoSiMira`). Se marca solo con la conversación en pantalla, la pestaña visible (`visibilitychange`) y algo del otro lado sin ver.
+  - Manda `hasta`, la fecha del último mensaje mostrado: uno que llegó en ese instante no queda leído sin verse.
+  - El instituto no abre ninguna conversación sola. En el celular, "volver" la cierra (sale de la dirección), así una conversación tapada por la lista nunca se marca.
+- **Anuncios** `chat.mensaje` y `chat.leido` (`chats/chat.eventos.ts`, con la cuenta del padre). Se publican dentro de la transacción; leer sin nada pendiente no anuncia.
+- **Avisos de estado:**
+  - `mensajes_familia` (staff, "N mensajes nuevos de <padre>") y `mensajes_instituto` (padre, "N mensajes nuevos del instituto");
+  - clave `mensajes:<chatId>`, recurso `{ tipo: "chat", chatId }`;
+  - el nivel = cantidad, así un mensaje más vuelve a "no leído";
+  - nunca le llegan a quien escribe.
+- **Señal en vivo `chat`** (`{ chatId }`, sin texto; `chats/chat.tiempoReal.ts`): sale al confirmar y va a todas las conexiones de admin/secretaría (`CanalEnVivo.enviarARoles`) y al padre de esa conversación. `<TiempoReal />` invalida `["chats"]` y `["mensajes", chatId]`.
+- **Número en el menú lateral** (`ContadorChats`, `NavItem.contador: "chats"`, `GET /api/chats/no-leidos`): conversaciones con algo sin leer para el instituto, mensajes sin leer para el padre.
+- **Pantalla Chats:**
+  - lista de resúmenes (`GET /api/chats`) ordenada por el último mensaje, con su número de no leídos;
+  - la conversación abierta vive en `?conversacion=` (un valor ajeno no abre nada);
+  - **"Nueva conversación"** busca padres por nombre, apellido o DNI (el texto no va a la dirección) y llama a `POST /api/chats`. `obtenerOCrear` resiste dos pedidos a la vez: la clave única de `Chat.padreId` hace que el segundo se quede con la del primero. A un padre sin cuenta activa se le aclara "Todavía no entró al sistema".
+- **Pendiente para más adelante:** adjuntos (junto con Documentación, hoy no hay almacenamiento de archivos), editar/borrar mensajes, avisos por email de mensajes sin leer.
+
 **Limitaciones conocidas:** dos cuentas en el mismo navegador no conviven bien: iniciar sesión sin "Mantener sesión iniciada" borra la sesión recordada de la otra cuenta (`sessionStore`, anterior a esta rama);  no hay calendario de feriados (una clase de feriado genera "asistencia sin tomar", que se puede marcar leído y se cierra sola a los 7 días); canal y límites en memoria (un solo servidor).
 
 ### Cuotas: generación automática, estados y valor global
@@ -262,9 +288,12 @@ A diferencia de `Padre` (`dni`, `telefono`, `vinculo`) y `Profesor` (`dni`, `tel
 | `GET /api/observaciones/alumnos/:alumnoId` | admin, secretario, profesor, padre | Listado — padre solo su propio hijo |
 | `POST /api/observaciones/categorias` | profesor | `CrearCategoriaPersonalizada` — validada por `verificarDuenoDelCurso` |
 | `GET /api/observaciones/cursos/:cursoId/categorias` | admin, secretario, profesor | Listado de categorías personalizadas de ese curso |
-| `GET /api/chats` | admin, secretario | Listado de todas las conversaciones |
-| `GET /api/chats/mio` | padre | Obtiene (o crea si es la primera vez) la conversación del padre autenticado |
-| `GET`/`POST /api/chats/:id/mensajes` | admin, secretario, padre | Leer/enviar — padre solo en su propia conversación; profesor sin acceso |
+| `GET /api/chats` | admin, secretario | Resumen por conversación (`padreNombre`, `hijos`, `ultimoMensaje { texto, fecha, delInstituto }`, `noLeidos`), por el último mensaje; las vacías al final |
+| `POST /api/chats` | admin, secretario | `{ padreId }` → abre (o crea) la conversación con esa familia, con `cuentaActiva`; 404 si el padre no existe |
+| `GET /api/chats/mio` | padre | Obtiene (o crea si es la primera vez) la conversación del padre autenticado, con `noLeidos` |
+| `GET /api/chats/no-leidos` | admin, secretario, padre | Número del menú: `{ conversaciones }` (instituto) o `{ mensajes }` (padre) |
+| `GET`/`POST /api/chats/:id/mensajes` | admin, secretario, padre | Leer (cada mensaje con `vistoEn`)/enviar (en una transacción con su anuncio) — padre solo en su propia conversación; profesor sin acceso |
+| `POST /api/chats/:id/leido` | admin, secretario, padre | `{ hasta? }` → 204: marca vistos los mensajes del otro lado hasta esa fecha; 403 con una conversación ajena; sin nada pendiente no hace nada |
 
 El rol se valida con `requireRole` a nivel de ruta; la propiedad sobre el recurso puntual (¿es tu curso?, ¿es tu hijo?) se valida dentro del service y devuelve `AuthorizationError` (403). El `errorHandler` también traduce `ZodError` (validación de body) a 400 automáticamente.
 
@@ -322,7 +351,7 @@ A pedido explícito del usuario ("quiero que el proyecto real sea igual que en e
 - **`CalificacionService.listarCalificacionesDeAlumno` ahora devuelve `CalificacionConEvaluacion`** (nota + `evaluacionNombre`/`evaluacionTipo`/`evaluacionFecha`/`evaluacionPeriodo`, resuelto en el service) en vez de la `Calificacion` pelada — la necesitaba tanto `ParentDashboardPage` como el tab "Académico" de `AlumnoDetailPage` (legajo de Admin) para mostrar qué evaluación es cada nota, no solo el número.
 - **Cuotas — Admin/Secretario reconstruida por completo**: tabs Vencidas/Pendientes/Cobradas/Todas con contadores reales, 4 KPIs (cobrado este mes, deuda total, pendientes, tasa de cobranza), modal de cobro multi-cuota con búsqueda de alumno. Nuevos endpoints `GET /api/cuotas/pagos` (todos los pagos, para el historial "pagada el · método" y el KPI mensual) y **`GET /api/cuotas/alumnos/:alumnoId` ahora también acepta rol `padre`** (antes admin/secretario únicamente — el padre no podía ver ni siquiera sus propias cuotas; mismo patrón `Solicitante`/`verificarAccesoAlAlumno` que ya usaban `asistencia`/`calificaciones`/`observaciones`).
 - **Cursos — Admin reconstruida por completo**: filtros (nombre/profesor, nivel, profesor), tabla con horarios y cupo real, modal de alta/edición compartido, toggle rápido de estado, vista "Ver alumnos" (nómina + cuota + asistencia, anidada en la misma página, sin ruta propia). Nuevos endpoints `PATCH /api/cursos/:id` (edición parcial, admin) y `GET /api/cursos/horarios` (todos los horarios, join client-side — antes los horarios se guardaban al crear un curso pero **nunca se leían de vuelta en ningún lado**, ni siquiera para el profesor).
-- **Chats — unificados a una sola pantalla master-detail por rol** (antes `ChatsAdminPage` listaba y `ChatAdminDetailPage` (ruta separada) mostraba la conversación): `ChatsAdminPage.tsx` ahora es un layout de dos paneles en una sola página (lista de conversaciones a la izquierda con último mensaje y nombre de los hijos, conversación a la derecha), igual que `StaffChat` del prototipo. `ChatPage.tsx` (padre) rediseñado con burbujas alineadas por emisor. Sin badge de no-leídos: no existe ningún campo "leído" en `Mensaje`, y fue una decisión consciente no fabricarlo.
+- **Chats — unificados a una sola pantalla master-detail por rol** (antes `ChatsAdminPage` listaba y `ChatAdminDetailPage` (ruta separada) mostraba la conversación): `ChatsAdminPage.tsx` ahora es un layout de dos paneles en una sola página (lista de conversaciones a la izquierda con último mensaje y nombre de los hijos, conversación a la derecha), igual que `StaffChat` del prototipo. `ChatPage.tsx` (padre) rediseñado con burbujas alineadas por emisor. Desde el subproyecto 3b existe `Mensaje.vistoEn`: la lista muestra los no leídos de cada conversación (ver "Chat en vivo").
 - **Bug recurrente encontrado dos veces — UTC vs. huso horario local**: el entorno corre en GMT-3; `new Date().toISOString().slice(0,10)` (o cualquier cómputo de "hoy" pasando por UTC) se corre un día hacia adelante en las últimas ~3 horas de cada día local. Apareció primero en `ReporteService` (una evaluación de "hoy" quedaba excluida de "Próximas evaluaciones", arreglado con `inicioDeHoyUtc()` — comparación en UTC consistente en ambos lados) y de nuevo en el client (`AsistenciaProfesorPage`/`CalificacionesProfesorPage` proponían "mañana" como fecha por defecto). Fix client-side centralizado en `core/lib/utils.ts` → `hoyLocalISO()` (arma el string `AAAA-MM-DD` a mano con `getFullYear()`/`getMonth()`/`getDate()` locales, nunca `toISOString()`) — **usar siempre esta función para "la fecha de hoy" en un `<input type="date">` o similar**, nunca `new Date().toISOString()`.
 
 ## Estado actual de implementación
