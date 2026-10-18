@@ -3,14 +3,20 @@ import { Send } from "lucide-react";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { ApiError } from "@/core/lib/apiClient";
+import { BurbujaMensaje } from "../components/BurbujaMensaje";
 import { useEnviarMensaje } from "../hooks/useEnviarMensaje";
 import { useMensajes } from "../hooks/useMensajes";
+import { useMarcarLeidoSiMira } from "../hooks/useMarcarLeidoSiMira";
 import { useMiChat } from "../hooks/useMiChat";
+import { vistoDelUltimo } from "../visto";
 
 export default function ChatPage() {
   const { data: chat } = useMiChat();
   const { data: mensajes } = useMensajes(chat?.id);
   const enviarMensaje = useEnviarMensaje(chat?.id);
+  const lista = mensajes ?? [];
+  const visto = vistoDelUltimo(lista, false);
+  useMarcarLeidoSiMira(chat?.id, lista, false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [texto, setTexto] = useState("");
@@ -37,31 +43,10 @@ export default function ChatPage() {
             Escribinos si necesitás consultar algo con administración.
           </p>
         )}
-        {mensajes?.map((m) => {
-          const mine = m.rolEmisor === "padre";
-          return (
-            <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-              <div
-                className="max-w-[78%] px-3 py-2.5"
-                style={{
-                  borderRadius: mine ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
-                  background: mine ? "var(--brand)" : "var(--bg-muted)",
-                  color: mine ? "#fff" : "var(--text)",
-                }}
-              >
-                {!mine && (
-                  <p className="mb-1 text-[10.5px] font-semibold text-muted-foreground">
-                    {m.rolEmisor === "admin" ? "Dirección" : "Secretaría"}
-                    {m.emisorNombre ? ` — ${m.emisorNombre}` : ""}
-                  </p>
-                )}
-                <p className="text-[13px] leading-relaxed">{m.texto}</p>
-                <p className="mt-1 text-right text-[10px]" style={{ opacity: mine ? 0.75 : 0.55 }}>
-                  {new Date(m.fecha).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}
-                </p>
-              </div>
-            </div>
-          );
+        {lista.map((m, i) => {
+          const mio = m.rolEmisor === "padre";
+          const etiqueta = mio ? undefined : `${m.rolEmisor === "admin" ? "Dirección" : "Secretaría"}${m.emisorNombre ? ` — ${m.emisorNombre}` : ""}`;
+          return <BurbujaMensaje key={m.id} mensaje={m} mio={mio} etiqueta={etiqueta} visto={i === lista.length - 1 ? visto : null} />;
         })}
       </div>
       <div className="flex items-center gap-2 px-4 py-3" style={{ borderTop: "1px solid var(--border-hex)" }}>
