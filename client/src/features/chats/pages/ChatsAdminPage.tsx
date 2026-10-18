@@ -34,7 +34,11 @@ export default function ChatsAdminPage() {
   const { data: mensajes } = useMensajes(selectedId);
   const lista = mensajes ?? [];
   const enviarMensaje = useEnviarMensaje(selectedId);
-  const [texto, setTexto] = useState("");
+  // El borrador es de una conversación: al cambiar a otra no se lleva (un mensaje escrito para una familia nunca debe
+  // terminar enviado a otra).
+  const [borrador, setBorrador] = useState({ chatId: selectedId, texto: "" });
+  const texto = borrador.chatId === selectedId ? borrador.texto : "";
+  const setTexto = (t: string) => setBorrador({ chatId: selectedId, texto: t });
   const visto = vistoDelUltimo(lista, true);
   // En el celular la lista y la conversación no entran lado a lado: con una conversación abierta se ve solo ella, y
   // "volver" la cierra (sale de la dirección). Así una conversación oculta detrás de la lista nunca se marca leída.

@@ -10,7 +10,12 @@ export function vistoDelUltimo(mensajes: Mensaje[], soyInstituto: boolean): stri
   return ultimo.vistoEn;
 }
 
+// Los mensajes del otro lado que quien mira todavía no vio.
+export function noLeidos(mensajes: Mensaje[], soyInstituto: boolean): Mensaje[] {
+  return mensajes.filter((m) => esDelInstituto(m) !== soyInstituto && m.vistoEn === null);
+}
+
 // ¿Hay mensajes del otro lado que quien mira todavía no vio?
 export function hayNoLeidos(mensajes: Mensaje[], soyInstituto: boolean): boolean {
-  return mensajes.some((m) => esDelInstituto(m) !== soyInstituto && m.vistoEn === null);
+  return noLeidos(mensajes, soyInstituto).length > 0;
 }

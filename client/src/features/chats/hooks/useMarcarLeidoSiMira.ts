@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Mensaje } from "../types";
-import { hayNoLeidos } from "../visto";
+import { noLeidos } from "../visto";
 import { useMarcarLeido } from "./useMarcarLeido";
 
 // Marca leída la conversación solo si está en pantalla (quien la usa la monta solo cuando se ve), la pestaña está
@@ -18,14 +18,18 @@ export function useMarcarLeidoSiMira(chatId: string | undefined, mensajes: Mensa
     return () => document.removeEventListener("visibilitychange", alCambiar);
   }, []);
 
-  const pendiente = hayNoLeidos(mensajes, soyInstituto);
+  // Cuáles hay sin ver (no cuántos): dos mensajes enviados casi a la vez pueden confirmarse en otro orden, y uno con
+  // fecha anterior al último aparece después sin que el último cambie. Tiene que marcarse igual.
+  const sinVer = noLeidos(mensajes, soyInstituto)
+    .map((m) => m.id)
+    .join(",");
   const hasta = mensajes.at(-1)?.fecha;
   useEffect(() => {
-    if (!chatId || !hasta || !pendiente || !visible) return;
-    const clave = `${chatId}|${hasta}`;
+    if (!chatId || !hasta || !sinVer || !visible) return;
+    const clave = `${chatId}|${hasta}|${sinVer}`;
     if (pedido.current === clave) return;
     pedido.current = clave;
-    // Si falla, se puede volver a intentar con la próxima carga de la lista.
+    // Si falla, se reintenta cuando cambie lo que hay en pantalla (un mensaje nuevo o volver a la pestaña).
     mutate(
       { chatId, hasta },
       {
@@ -34,5 +38,5 @@ export function useMarcarLeidoSiMira(chatId: string | undefined, mensajes: Mensa
         },
       },
     );
-  }, [chatId, hasta, pendiente, visible, mutate]);
+  }, [chatId, hasta, sinVer, visible, mutate]);
 }
