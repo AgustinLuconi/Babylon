@@ -33,4 +33,7 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
     for (const id of notaCierreIds) await avisos.cierrePublicado(id, tx);
   });
   tablero.alPublicarse("observacion.creada", ({ observacionId }, tx) => avisos.observacionNueva(observacionId, tx));
+  // Un mensaje nuevo o una conversación leída cambian los avisos de los dos lados.
+  tablero.alPublicarse("chat.mensaje", sincronizar(["mensajes_familia", "mensajes_instituto"]));
+  tablero.alPublicarse("chat.leido", sincronizar(["mensajes_familia", "mensajes_instituto"]));
 }
