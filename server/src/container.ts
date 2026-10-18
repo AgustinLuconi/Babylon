@@ -66,6 +66,7 @@ import { ObservacionService } from "./modules/observaciones/observacion.service"
 import { ObservacionController } from "./modules/observaciones/observacion.controller";
 
 import { PrismaChatRepository } from "./modules/chats/chat.repository.prisma";
+import { suscribirChatEnVivo } from "./modules/chats/chat.tiempoReal";
 import { ChatService } from "./modules/chats/chat.service";
 import { ChatController } from "./modules/chats/chat.controller";
 
@@ -136,7 +137,7 @@ const calificacionService = new CalificacionService(
   tablero,
 );
 const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository, unitOfWork, tablero);
-const chatService = new ChatService(chatRepository, usuarioRepository);
+const chatService = new ChatService(chatRepository, usuarioRepository, padreRepository, unitOfWork, tablero);
 const reporteService = new ReporteService(prisma, documentoRepository);
 const notificacionService = new NotificacionService(
   new PrismaNotificacionRepository(prisma),
@@ -148,6 +149,7 @@ const notificacionService = new NotificacionService(
 suscribirAvisos(tablero, notificacionService);
 // Sesiones cerradas por cualquier camino: después de confirmar, el canal corta las conexiones en vivo que ya no valen.
 tablero.alConfirmarse("sesiones.cerradas", ({ usuarioId, motivo }) => canalEnVivo.revisarSesiones(usuarioId, motivo));
+suscribirChatEnVivo(tablero, canalEnVivo);
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {

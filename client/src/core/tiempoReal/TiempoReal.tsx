@@ -26,6 +26,16 @@ export function TiempoReal() {
     const alSenal = (senal: SenalEnVivo) => {
       if (senal.tipo === "notificaciones" || senal.tipo === "listo") {
         void queryClient.invalidateQueries({ queryKey: ["notificaciones"] });
+        // Al (re)conectarse, lo del chat que llegó mientras la conexión estaba cortada no tuvo señal: se vuelve a pedir.
+        if (senal.tipo === "listo") {
+          void queryClient.invalidateQueries({ queryKey: ["chats"] });
+          void queryClient.invalidateQueries({ queryKey: ["mensajes"] });
+        }
+      } else if (senal.tipo === "chat") {
+        // Un mensaje nuevo o una lectura: la lista, el número del menú y esa conversación se vuelven a pedir.
+        const chatId = (senal.datos as { chatId?: unknown } | null)?.chatId;
+        void queryClient.invalidateQueries({ queryKey: ["chats"] });
+        if (typeof chatId === "string") void queryClient.invalidateQueries({ queryKey: ["mensajes", chatId] });
       } else if (senal.tipo === "sesion-cerrada") {
         irAlLogin(motivoParaElLogin(senal.datos));
       } else if (senal.tipo === "rechazo") {

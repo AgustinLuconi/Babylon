@@ -404,14 +404,19 @@ model Chat {
 }
 
 model Mensaje {
-  id        String   @id
+  id        String    @id
   chatId    String
   emisorId  String
   rolEmisor Rol
   texto     String
   fecha     DateTime
+  // Cuándo lo vio el otro lado (nulo = todavía no). La bandeja del instituto es compartida: lo marca cualquier cuenta
+  // de administración o secretaría que lee la conversación.
+  vistoEn   DateTime?
 
   chat Chat @relation(fields: [chatId], references: [id])
+
+  @@index([chatId, rolEmisor, vistoEn])
 }
 
 // Ajustes globales del instituto. Hay una única fila (id fijo "instituto").
@@ -467,6 +472,8 @@ enum TipoNotificacion {
   nota_publicada
   cierre_publicado
   observacion_nueva
+  mensajes_familia
+  mensajes_instituto
 }
 
 enum ClaseNotificacion {

@@ -52,6 +52,10 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         return this.cuotasDePadres(ahora, tx);
       case "documentacion_hijo":
         return this.documentacionDeHijos(tx);
+      case "mensajes_familia":
+        return this.mensajesDeFamilias(tx);
+      case "mensajes_instituto":
+        return this.mensajesDelInstituto(tx);
     }
   }
 
@@ -269,6 +273,57 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
           nivel: 0,
         }),
       );
+  }
+
+  // ── Chat ─────────────────────────────────────────────────────────────────
+  // Bandeja compartida: un aviso por conversación con mensajes de la familia sin ver, para cada cuenta del instituto.
+  private async mensajesDeFamilias(tx?: unknown): Promise<AvisoEsperado[]> {
+    const grupos = await this.db(tx).mensaje.groupBy({ by: ["chatId"], where: { rolEmisor: "padre", vistoEn: null }, _count: { _all: true } });
+    if (grupos.length === 0) return [];
+    const chats = await this.db(tx).chat.findMany({
+      where: { id: { in: grupos.map((g) => g.chatId) } },
+      select: { id: true, padre: { select: { nombre: true, apellido: true } } },
+    });
+    const nombre = new Map(chats.map((c) => [c.id, `${c.padre.nombre} ${c.padre.apellido}`]));
+    const staff = await this.staff(tx);
+    return grupos.flatMap((g) =>
+      staff.map((d) =>
+        aviso({
+          ...d,
+          tipo: "mensajes_familia",
+          clave: `mensajes:${g.chatId}`,
+          tono: "info",
+          texto: `${cantidad(g._count._all, "mensaje nuevo", "mensajes nuevos")} de ${nombre.get(g.chatId)}`,
+          recurso: { tipo: "chat", chatId: g.chatId },
+          nivel: g._count._all,
+        }),
+      ),
+    );
+  }
+
+  // Un aviso para el padre de cada conversación con mensajes del instituto sin ver (solo cuentas activas).
+  private async mensajesDelInstituto(tx?: unknown): Promise<AvisoEsperado[]> {
+    const cuentas = await this.cuentasDePadres(tx);
+    const grupos = await this.db(tx).mensaje.groupBy({
+      by: ["chatId"],
+      where: { rolEmisor: { in: ["admin", "secretario"] }, vistoEn: null, chat: { padreId: { in: [...cuentas.keys()] } } },
+      _count: { _all: true },
+    });
+    if (grupos.length === 0) return [];
+    const chats = await this.db(tx).chat.findMany({ where: { id: { in: grupos.map((g) => g.chatId) } }, select: { id: true, padreId: true } });
+    const padreDe = new Map(chats.map((c) => [c.id, c.padreId]));
+    return grupos.map((g) =>
+      aviso({
+        usuarioId: cuentas.get(padreDe.get(g.chatId) as string) as string,
+        rol: "padre",
+        tipo: "mensajes_instituto",
+        clave: `mensajes:${g.chatId}`,
+        tono: "info",
+        texto: `${cantidad(g._count._all, "mensaje nuevo", "mensajes nuevos")} del instituto`,
+        recurso: { tipo: "chat", chatId: g.chatId },
+        nivel: g._count._all,
+      }),
+    );
   }
 
   // ── Eventos (solo publicado, solo hijos activos, solo cuentas activas) ──────

@@ -70,6 +70,8 @@ export interface CanalEnVivo {
   // Registra la conexión de una sesión (si ya tenía una, la reemplaza). Devuelve cómo darla de baja.
   registrar(conexion: ConexionEnVivo): () => void;
   enviarA(usuarioId: string, rol: Rol, senal: SenalEnVivo): void;
+  // A todas las conexiones con alguno de esos roles (por ejemplo, la bandeja compartida del instituto).
+  enviarARoles(roles: Rol[], senal: SenalEnVivo): void;
   conectado(usuarioId: string, rol: Rol): boolean;
   // Vuelve a validar las conexiones de la cuenta y corta, avisando el motivo, las de sesiones que ya no valen.
   revisarSesiones(usuarioId: string, motivo: MotivoCierre): Promise<void>;

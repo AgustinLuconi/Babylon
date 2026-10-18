@@ -8,7 +8,9 @@ export type TipoEstado =
   | "notas_sin_publicar"
   | "cierre_sin_publicar"
   | "cuota"
-  | "documentacion_hijo";
+  | "documentacion_hijo"
+  | "mensajes_familia"
+  | "mensajes_instituto";
 export type TipoEvento = "nota_publicada" | "cierre_publicado" | "observacion_nueva";
 export type TipoNotificacion = TipoEstado | TipoEvento;
 export type ClaseNotificacion = "estado" | "evento";
@@ -24,7 +26,8 @@ export type RecursoAviso =
   | { tipo: "cuota"; alumnoId: string; cuotaId: string }
   | { tipo: "documentacion"; alumnoId: string }
   | { tipo: "calificaciones"; alumnoId: string }
-  | { tipo: "hijo"; alumnoId: string };
+  | { tipo: "hijo"; alumnoId: string }
+  | { tipo: "chat"; chatId: string };
 
 export interface Destinatario {
   usuarioId: string;

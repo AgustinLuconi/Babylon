@@ -9,7 +9,9 @@ export type TipoNotificacion =
   | "documentacion_hijo"
   | "nota_publicada"
   | "cierre_publicado"
-  | "observacion_nueva";
+  | "observacion_nueva"
+  | "mensajes_familia"
+  | "mensajes_instituto";
 
 export type TonoNotificacion = "danger" | "warning" | "info";
 
@@ -23,7 +25,8 @@ export type RecursoAviso =
   | { tipo: "cuota"; alumnoId: string; cuotaId: string }
   | { tipo: "documentacion"; alumnoId: string }
   | { tipo: "calificaciones"; alumnoId: string }
-  | { tipo: "hijo"; alumnoId: string };
+  | { tipo: "hijo"; alumnoId: string }
+  | { tipo: "chat"; chatId: string };
 
 export interface Aviso {
   id: string;

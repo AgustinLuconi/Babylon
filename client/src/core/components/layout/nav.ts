@@ -22,6 +22,8 @@ export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  // Número a mostrar al lado (mensajes sin leer).
+  contador?: "chats";
 }
 
 export interface NavGroup {
@@ -46,7 +48,7 @@ const NAV_ADMIN: NavGroup[] = [
       { to: "/reportes", label: "Reportes", icon: BarChart3 },
     ],
   },
-  { group: "Comunicación", items: [{ to: "/chats", label: "Chats", icon: MessageCircle }] },
+  { group: "Comunicación", items: [{ to: "/chats", label: "Chats", icon: MessageCircle, contador: "chats" }] },
   {
     group: "Sistema",
     items: [
@@ -63,7 +65,7 @@ const NAV_SECRETARIO: NavGroup[] = [
     items: [
       { to: "/alumnos", label: "Alumnos", icon: Users },
       { to: "/cuotas", label: "Cuotas", icon: Receipt },
-      { to: "/chats", label: "Chats", icon: MessageCircle },
+      { to: "/chats", label: "Chats", icon: MessageCircle, contador: "chats" },
     ],
   },
 ];
@@ -89,7 +91,7 @@ const NAV_PADRE: NavGroup[] = [
       { to: "/mis-hijos/asistencia", label: "Asistencia", icon: CalendarCheck },
       { to: "/mis-hijos/cuotas", label: "Cuotas", icon: Receipt },
       { to: "/mis-hijos/documentacion", label: "Documentación", icon: FolderCheck },
-      { to: "/chat", label: "Mensajes", icon: MessageCircle },
+      { to: "/chat", label: "Mensajes", icon: MessageCircle, contador: "chats" },
     ],
   },
 ];

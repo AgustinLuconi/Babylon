@@ -34,7 +34,8 @@ async function borrar() {
   await prisma.calificacion.deleteMany(w);
   await prisma.notaCierre.deleteMany(w);
   await prisma.evaluacion.deleteMany(w);
-  await prisma.pago.deleteMany(w);
+  // También los pagos registrados desde la app sobre cuotas de prueba (tienen un id al azar): si no, la cuota no se borra.
+  await prisma.pago.deleteMany({ where: { OR: [{ id: { startsWith: P } }, { cuotaId: { startsWith: P } }] } });
   await prisma.cuota.deleteMany(w);
   await prisma.asistencia.deleteMany(w);
   await prisma.inscripcion.deleteMany(w);
@@ -269,11 +270,13 @@ async function crear() {
     await prisma.chat.create({ data: { id: `${P}chat-${n}`, padreId: `${P}padre-${n}`, creadoEn: utc(2026, 9, 10) } });
     for (const [k, [rol, quien, texto]] of msgs.entries()) {
       msgN++;
+      const fecha = new Date(Date.UTC(2026, 8, 14 + n, 13 + k, 5 * k));
       await prisma.mensaje.create({
         data: {
           id: `${P}msg-${msgN}`, chatId: `${P}chat-${n}`, rolEmisor: rol, texto,
           emisorId: quien === "sec" ? secretario.id : quien === "adm" ? admin.id : `${P}usuario-${n}`,
-          fecha: new Date(Date.UTC(2026, 8, 14 + n, 13 + k, 5 * k)),
+          // Conversaciones ya leídas por los dos lados: no aparecen como "mensajes nuevos".
+          fecha, vistoEn: fecha,
         },
       });
     }

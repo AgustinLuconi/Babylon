@@ -11,6 +11,7 @@ import { AREA_POR_ROL, navPorRol } from "./nav";
 import { obtenerTituloPagina } from "./pageTitles";
 import { GlobalSearch } from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
+import { ContadorChats } from "./ContadorChats";
 import { TiempoReal } from "@/core/tiempoReal/TiempoReal";
 
 function BabylonLogo({ dark = false }: { dark?: boolean }) {
@@ -72,6 +73,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <item.icon size={15} strokeWidth={1.6} />
                 <span className="flex-1">{item.label}</span>
+                {item.contador === "chats" && <ContadorChats />}
               </NavLink>
             ))}
           </div>

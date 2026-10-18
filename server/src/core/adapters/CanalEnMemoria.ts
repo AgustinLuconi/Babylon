@@ -22,6 +22,10 @@ export class CanalEnMemoria implements CanalEnVivo {
     for (const c of this.porSesion.values()) if (c.usuarioId === usuarioId && c.rol === rol) c.enviar(senal);
   }
 
+  enviarARoles(roles: Rol[], senal: SenalEnVivo): void {
+    for (const c of this.porSesion.values()) if (roles.includes(c.rol)) c.enviar(senal);
+  }
+
   conectado(usuarioId: string, rol: Rol): boolean {
     for (const c of this.porSesion.values()) if (c.usuarioId === usuarioId && c.rol === rol) return true;
     return false;
