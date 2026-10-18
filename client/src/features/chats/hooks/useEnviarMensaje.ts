@@ -8,6 +8,7 @@ export function useEnviarMensaje(chatId: string | undefined) {
     mutationFn: (texto: string) => chatService.enviarMensaje(chatId as string, { texto }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mensajes", chatId] });
+      void queryClient.invalidateQueries({ queryKey: ["chats"] });
     },
   });
 }

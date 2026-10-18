@@ -3,7 +3,7 @@ import { chatService } from "../chatService";
 
 export function useChats() {
   return useQuery({
-    queryKey: ["chats", "todos"],
-    queryFn: chatService.listarTodos,
+    queryKey: ["chats", "resumenes"],
+    queryFn: chatService.listarResumenes,
   });
 }

@@ -41,8 +41,8 @@ export default function ChatsAdminPage() {
 
   const mensajesQueries = useQueries({
     queries: (chats ?? []).map((c) => ({
-      queryKey: ["mensajes", c.id],
-      queryFn: () => chatService.listarMensajes(c.id),
+      queryKey: ["mensajes", c.chatId],
+      queryFn: () => chatService.listarMensajes(c.chatId),
     })),
   });
 
@@ -63,7 +63,7 @@ export default function ChatsAdminPage() {
   }, [chats, mensajesQueries, nombresPorPadre, hijosPorPadre]);
 
   useEffect(() => {
-    if (!selectedId && threads.length > 0) setSelectedId(threads[0].chat.id);
+    if (!selectedId && threads.length > 0) setSelectedId(threads[0].chat.chatId);
   }, [threads, selectedId]);
 
   const { data: mensajes } = useMensajes(selectedId);
@@ -79,7 +79,7 @@ export default function ChatsAdminPage() {
     enviarMensaje.mutate(texto.trim(), { onSuccess: () => setTexto("") });
   };
 
-  const threadSeleccionado = threads.find((t) => t.chat.id === selectedId);
+  const threadSeleccionado = threads.find((t) => t.chat.chatId === selectedId);
 
   return (
     <div className="card-hl flex overflow-hidden" style={{ height: "calc(100vh - 168px)", minHeight: 460 }}>
@@ -94,15 +94,15 @@ export default function ChatsAdminPage() {
         <div className="flex-1 overflow-y-auto">
           {threads.map((t) => (
             <div
-              key={t.chat.id}
+              key={t.chat.chatId}
               onClick={() => {
-                setSelectedId(t.chat.id);
+                setSelectedId(t.chat.chatId);
                 setVistaMobil("chat");
               }}
               className="flex cursor-pointer items-start gap-2.5 px-4 py-3"
               style={{
                 borderBottom: "1px solid var(--border-hex)",
-                background: selectedId === t.chat.id ? "var(--bg-subtle)" : "transparent",
+                background: selectedId === t.chat.chatId ? "var(--bg-subtle)" : "transparent",
               }}
             >
               <Avatar name={t.nombrePadre} size="sm" />
