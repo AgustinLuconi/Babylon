@@ -60,6 +60,7 @@ export class ChatService {
       rolEmisor,
       texto,
       fecha: new Date(),
+      vistoEn: null,
     };
     return this.chatRepo.agregarMensaje(mensaje);
   }

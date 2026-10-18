@@ -16,6 +16,8 @@ export const TIPOS: Record<TipoNotificacion, { grupo: Grupo; clase: ClaseNotific
   nota_publicada: { grupo: "padre", clase: "evento", etiqueta: "Notas nuevas" },
   cierre_publicado: { grupo: "padre", clase: "evento", etiqueta: "Notas de cierre publicadas" },
   observacion_nueva: { grupo: "padre", clase: "evento", etiqueta: "Observaciones nuevas" },
+  mensajes_familia: { grupo: "staff", clase: "estado", etiqueta: "Mensajes nuevos de familias" },
+  mensajes_instituto: { grupo: "padre", clase: "estado", etiqueta: "Mensajes nuevos del instituto" },
 };
 
 const todos = Object.keys(TIPOS) as TipoNotificacion[];
