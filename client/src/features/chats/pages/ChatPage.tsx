@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { ApiError } from "@/core/lib/apiClient";
 import { BurbujaMensaje } from "../components/BurbujaMensaje";
+import { VerAnteriores } from "../components/VerAnteriores";
+import { useDesplazamientoDelChat } from "../hooks/useDesplazamientoDelChat";
 import { useEnviarMensaje } from "../hooks/useEnviarMensaje";
 import { useMensajes } from "../hooks/useMensajes";
 import { useMarcarLeidoSiMira } from "../hooks/useMarcarLeidoSiMira";
@@ -12,18 +14,13 @@ import { vistoDelUltimo } from "../visto";
 
 export default function ChatPage() {
   const { data: chat } = useMiChat();
-  const { data: mensajes } = useMensajes(chat?.id);
+  const { mensajes: lista, listo, hayAnteriores, cargarAnteriores, cargandoAnteriores } = useMensajes(chat?.id);
   const enviarMensaje = useEnviarMensaje(chat?.id);
-  const lista = mensajes ?? [];
   const visto = vistoDelUltimo(lista, false);
-  useMarcarLeidoSiMira(chat?.id, lista, false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  useMarcarLeidoSiMira({ chatId: chat?.id, mensajes: lista, soyInstituto: false, hayAnteriores, totalSinVer: chat?.noLeidos ?? 0 });
+  const scrollRef = useDesplazamientoDelChat(lista);
 
   const [texto, setTexto] = useState("");
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [mensajes?.length]);
 
   const onEnviar = () => {
     if (!texto.trim()) return;
@@ -38,7 +35,8 @@ export default function ChatPage() {
         <p className="mt-1 text-[11.5px] text-muted-foreground">Secretaría y dirección del instituto</p>
       </div>
       <div ref={scrollRef} className="flex-1 space-y-2.5 overflow-y-auto px-4 py-4" style={{ background: "var(--bg-subtle)" }}>
-        {mensajes?.length === 0 && (
+        <VerAnteriores hay={hayAnteriores} cargando={cargandoAnteriores} onCargar={cargarAnteriores} />
+        {listo && lista.length === 0 && (
           <p className="py-8 text-center text-[12.5px] text-muted-foreground">
             Escribinos si necesitás consultar algo con administración.
           </p>

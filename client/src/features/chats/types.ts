@@ -12,8 +12,18 @@ export interface ChatConNoLeidos extends Chat {
 }
 
 // Lo que devuelve "Nueva conversación": si el padre todavía no tiene cuenta activa, va a verla cuando entre.
+// Si el padre puede leer la conversación: con cuenta activa sí; sin cuenta o con la invitación pendiente, cuando entre;
+// con la cuenta desactivada no puede entrar al sistema hasta que se reactive.
+export type EstadoCuentaPadre = "activa" | "pendiente" | "inactiva" | "sin-cuenta";
+
 export interface ConversacionIniciada extends Chat {
-  cuentaActiva: boolean;
+  estadoCuenta: EstadoCuentaPadre;
+}
+
+// Una página de la conversación (el más reciente al final) y el marcador para pedir la anterior (null = no hay más).
+export interface MensajesPaginados {
+  mensajes: Mensaje[];
+  anteriores: string | null;
 }
 
 // Una conversación vista desde la lista del instituto.

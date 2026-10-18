@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { PadreService } from "../padres/padre.service";
-import { enviarMensajeSchema, iniciarConversacionSchema, marcarLeidoSchema } from "./chat.schema";
+import { enviarMensajeSchema, iniciarConversacionSchema, marcarLeidoSchema, paginaDeMensajesSchema } from "./chat.schema";
 import type { ChatService } from "./chat.service";
 import type { Lector, RolEmisorMensaje } from "./mensaje.entity";
 
@@ -44,7 +44,8 @@ export class ChatController {
 
   listarMensajes = async (req: Request, res: Response) => {
     const padreId = await this.resolverPadreIdSiCorresponde(req);
-    const mensajes = await this.chatService.listarMensajes(String(req.params.id), padreId);
+    const { antesDe } = paginaDeMensajesSchema.parse(req.query);
+    const mensajes = await this.chatService.listarMensajes(String(req.params.id), padreId, antesDe);
     res.status(200).json(mensajes);
   };
 
@@ -60,9 +61,11 @@ export class ChatController {
 
   marcarLeido = async (req: Request, res: Response) => {
     // Sin cuerpo, Express 5 deja `req.body` en undefined.
-    const { hasta } = marcarLeidoSchema.parse(req.body ?? {});
+    const { ids, antesDe } = marcarLeidoSchema.parse(req.body ?? {});
+    // Sin nada, se marca todo; con algo, solo lo que estaba en pantalla.
+    const alcance = ids || antesDe ? { ids: ids ?? [], antesDe } : undefined;
     const padreId = await this.resolverPadreIdSiCorresponde(req);
-    await this.chatService.marcarLeido(String(req.params.id), this.lector(req), padreId, hasta);
+    await this.chatService.marcarLeido(String(req.params.id), this.lector(req), padreId, alcance);
     res.status(204).end();
   };
 }

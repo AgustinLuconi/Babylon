@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ChevronLeft, MessageSquarePlus, Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -7,10 +7,13 @@ import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { ApiError } from "@/core/lib/apiClient";
 import { NuevaConversacion } from "../components/NuevaConversacion";
 import { BurbujaMensaje } from "../components/BurbujaMensaje";
+import { VerAnteriores } from "../components/VerAnteriores";
+import { useDesplazamientoDelChat } from "../hooks/useDesplazamientoDelChat";
 import { useChats } from "../hooks/useChats";
 import { useEnviarMensaje } from "../hooks/useEnviarMensaje";
 import { useMarcarLeidoSiMira } from "../hooks/useMarcarLeidoSiMira";
 import { useMensajes } from "../hooks/useMensajes";
+import type { EstadoCuentaPadre } from "../types";
 import { vistoDelUltimo } from "../visto";
 
 const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
@@ -28,11 +31,10 @@ export default function ChatsAdminPage() {
   const abrir = (chatId: string | null) => escribir({ conversacion: chatId });
 
   const [nueva, setNueva] = useState(false);
-  const [sinCuenta, setSinCuenta] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // Si la familia de una conversación recién abierta con "Nueva conversación" todavía no puede leerla.
+  const [cuenta, setCuenta] = useState<{ chatId: string; estado: EstadoCuentaPadre } | null>(null);
 
-  const { data: mensajes } = useMensajes(selectedId);
-  const lista = mensajes ?? [];
+  const { mensajes: lista, listo, hayAnteriores, cargarAnteriores, cargandoAnteriores } = useMensajes(selectedId);
   const enviarMensaje = useEnviarMensaje(selectedId);
   // El borrador es de una conversación: al cambiar a otra no se lleva (un mensaje escrito para una familia nunca debe
   // terminar enviado a otra).
@@ -42,11 +44,9 @@ export default function ChatsAdminPage() {
   const visto = vistoDelUltimo(lista, true);
   // En el celular la lista y la conversación no entran lado a lado: con una conversación abierta se ve solo ella, y
   // "volver" la cierra (sale de la dirección). Así una conversación oculta detrás de la lista nunca se marca leída.
-  useMarcarLeidoSiMira(selectedId, lista, true);
+  useMarcarLeidoSiMira({ chatId: selectedId, mensajes: lista, soyInstituto: true, hayAnteriores, totalSinVer: seleccionada?.noLeidos ?? 0 });
+  const scrollRef = useDesplazamientoDelChat(lista);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [lista.length, selectedId]);
 
   const onEnviar = () => {
     if (!texto.trim()) return;
@@ -77,7 +77,7 @@ export default function ChatsAdminPage() {
               data-conversacion={r.chatId}
               onClick={() => {
                 abrir(r.chatId);
-                setSinCuenta(null);
+                setCuenta(null);
               }}
               className="flex cursor-pointer items-start gap-2.5 px-4 py-3"
               style={{ borderBottom: "1px solid var(--border-hex)", background: selectedId === r.chatId ? "var(--bg-subtle)" : "transparent" }}
@@ -122,13 +122,16 @@ export default function ChatsAdminPage() {
               <p className="truncate text-[11px] text-muted-foreground">{seleccionada.hijos.join(" · ") || "—"}</p>
             </div>
           </div>
-          {sinCuenta === seleccionada.chatId && (
+          {cuenta?.chatId === seleccionada.chatId && cuenta.estado !== "activa" && (
             <p className="px-4 py-2 text-[12px]" style={{ background: "var(--warning-soft)", borderBottom: "1px solid var(--border-hex)" }}>
-              Todavía no entró al sistema: va a ver la conversación cuando entre.
+              {cuenta.estado === "inactiva"
+                ? "La cuenta está desactivada: no puede entrar al sistema, así que no va a ver la conversación hasta que se reactive."
+                : "Todavía no entró al sistema: va a ver la conversación cuando entre."}
             </p>
           )}
           <div ref={scrollRef} className="flex-1 space-y-2.5 overflow-y-auto px-4 py-4" style={{ background: "var(--bg-subtle)" }}>
-            {lista.length === 0 && <p className="py-8 text-center text-[12.5px] text-muted-foreground">Todavía no hay mensajes con esta familia.</p>}
+            <VerAnteriores hay={hayAnteriores} cargando={cargandoAnteriores} onCargar={cargarAnteriores} />
+            {listo && lista.length === 0 && <p className="py-8 text-center text-[12.5px] text-muted-foreground">Todavía no hay mensajes con esta familia.</p>}
             {lista.map((m, i) => {
               const mio = m.rolEmisor !== "padre";
               return (
@@ -177,7 +180,7 @@ export default function ChatsAdminPage() {
           onAbierta={(c) => {
             setNueva(false);
             abrir(c.id);
-            setSinCuenta(c.cuentaActiva ? null : c.id);
+            setCuenta({ chatId: c.id, estado: c.estadoCuenta });
           }}
         />
       )}

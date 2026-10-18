@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
 import type { ChatRepository } from "./chat.repository";
 import type { Chat, ResumenChat } from "./chat.entity";
-import type { Lector, Mensaje, RolEmisorMensaje } from "./mensaje.entity";
+import type { AlcanceLectura, Lector, Mensaje, PaginaDeMensajes, RolEmisorMensaje } from "./mensaje.entity";
 
 // El schema de Prisma reutiliza el enum Rol (admin/secretario/profesor/padre)
 // para Mensaje.rolEmisor por simplicidad — un profesor nunca manda mensajes
@@ -61,14 +61,25 @@ export class PrismaChatRepository implements ChatRepository {
     return aMensaje(fila);
   }
 
-  async findMensajesByChatId(chatId: string, tx?: unknown): Promise<Mensaje[]> {
-    const filas = await this.client(tx).mensaje.findMany({ where: { chatId }, orderBy: { fecha: "asc" } });
+  async findPaginaDeMensajes(chatId: string, { antesDe, limite }: PaginaDeMensajes, tx?: unknown): Promise<Mensaje[]> {
+    // Marcador por valor (fecha + id): aunque lleguen mensajes nuevos entre página y página, no se repite ni se saltea.
+    const anteriores: Prisma.MensajeWhereInput = antesDe
+      ? { OR: [{ fecha: { lt: antesDe.fecha } }, { fecha: antesDe.fecha, id: { lt: antesDe.id } }] }
+      : {};
+    const filas = await this.client(tx).mensaje.findMany({
+      where: { chatId, ...anteriores },
+      orderBy: [{ fecha: "desc" }, { id: "desc" }],
+      take: limite,
+    });
     return filas.map(aMensaje);
   }
 
-  async marcarVistos(chatId: string, lector: Lector, ahora: Date, hasta?: Date, tx?: unknown): Promise<number> {
+  async marcarVistos(chatId: string, lector: Lector, ahora: Date, alcance?: AlcanceLectura, tx?: unknown): Promise<number> {
+    const enPantalla: Prisma.MensajeWhereInput = alcance
+      ? { OR: [{ id: { in: alcance.ids } }, ...(alcance.antesDe ? [{ fecha: { lt: alcance.antesDe } }] : [])] }
+      : {};
     const { count } = await this.client(tx).mensaje.updateMany({
-      where: { chatId, vistoEn: null, ...delOtroLado(lector), ...(hasta ? { fecha: { lte: hasta } } : {}) },
+      where: { chatId, vistoEn: null, ...delOtroLado(lector), ...enPantalla },
       data: { vistoEn: ahora },
     });
     return count;

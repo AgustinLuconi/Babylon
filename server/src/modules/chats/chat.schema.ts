@@ -5,7 +5,12 @@ export const enviarMensajeSchema = z.object({
 });
 
 export const iniciarConversacionSchema = z.object({ padreId: z.string().min(1) });
-// `hasta`: la hora del último mensaje que quien lee tenía en pantalla (lo que llegó después no se marca).
-export const marcarLeidoSchema = z.object({ hasta: z.coerce.date().optional() });
+// Lo que quien lee tenía en pantalla: los ids de los mensajes y, si hay páginas anteriores sin cargar, la fecha del más
+// viejo cargado (`antesDe`). Sin nada, se marca todo.
+export const marcarLeidoSchema = z.object({
+  ids: z.array(z.string().min(1)).max(1000).optional(),
+  antesDe: z.coerce.date().optional(),
+});
+export const paginaDeMensajesSchema = z.object({ antesDe: z.string().min(1).optional() });
 
 export type EnviarMensajeInput = z.infer<typeof enviarMensajeSchema>;

@@ -13,4 +13,5 @@ export function suscribirChatEnVivo(tablero: TableroDeAnuncios<EventosDelSistema
   };
   tablero.alConfirmarse("chat.mensaje", avisar);
   tablero.alConfirmarse("chat.leido", avisar);
+  tablero.alConfirmarse("chat.creada", ({ chatId }) => canal.enviarARoles(["admin", "secretario"], { tipo: "chat", datos: { chatId } }));
 }
