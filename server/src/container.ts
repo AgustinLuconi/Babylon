@@ -136,7 +136,7 @@ const calificacionService = new CalificacionService(
   tablero,
 );
 const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository, unitOfWork, tablero);
-const chatService = new ChatService(chatRepository, usuarioRepository);
+const chatService = new ChatService(chatRepository, usuarioRepository, padreRepository, unitOfWork, tablero);
 const reporteService = new ReporteService(prisma, documentoRepository);
 const notificacionService = new NotificacionService(
   new PrismaNotificacionRepository(prisma),
