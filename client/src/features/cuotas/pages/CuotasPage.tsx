@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { DollarSign, Search, X, Check } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
@@ -135,6 +136,7 @@ export default function CuotasPage() {
     setModalOpen(true);
   };
 
+  const filasCuotas = useListaConSalidas(filtradas, (c) => c.id, ["cuotas", "alumnos"]);
   const resultadosBusquedaAlumno = useMemo(() => {
     const termino = normalizarTexto(payBusqueda.trim());
     if (!termino) return [];
@@ -235,13 +237,13 @@ export default function CuotasPage() {
                 </td>
               </tr>
             )}
-            {filtradas.map((c) => {
+            {filasCuotas.map(({ item: c, estado }) => {
               const alumno = alumnosPorId.get(c.alumnoId);
               const curso = alumno?.cursoId ? cursosPorId.get(alumno.cursoId) : undefined;
               const pago = pagoPorCuotaId.get(c.id);
               if (!alumno) return null;
               return (
-                <tr key={c.id}>
+                <tr key={c.id} className={claseDeFila(estado)}>
                   <td>
                     <div className="flex items-center gap-2.5">
                       <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="xs" />
@@ -299,11 +301,11 @@ export default function CuotasPage() {
         {filtradas.length === 0 && (
           <p className="card-hl py-10 text-center text-sm text-muted-foreground">No hay cuotas que coincidan.</p>
         )}
-        {filtradas.map((c) => {
+        {filasCuotas.map(({ item: c, estado }) => {
           const alumno = alumnosPorId.get(c.alumnoId);
           if (!alumno) return null;
           return (
-            <div key={c.id} className="card-hl p-4">
+            <div key={c.id} className={`card-hl p-4 ${claseDeFila(estado)}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="md" />

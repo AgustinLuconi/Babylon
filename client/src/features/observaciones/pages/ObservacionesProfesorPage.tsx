@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
@@ -79,6 +80,7 @@ export default function ObservacionesProfesorPage() {
 
   const alumnoSeleccionado = alumnos?.find((a) => a.id === alumnoId);
   const visibles = catFilter === "all" ? observaciones : observaciones?.filter((o) => o.categoria === catFilter);
+  const filasObservaciones = useListaConSalidas(visibles ?? [], (o) => o.id, ["observaciones"]);
 
   return (
     <div className="space-y-4">
@@ -225,10 +227,10 @@ export default function ObservacionesProfesorPage() {
           <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {isError && <p className="text-sm text-destructive">No se pudieron cargar las observaciones.</p>}
-            {visibles?.map((o) => {
+            {filasObservaciones.map(({ item: o, estado }) => {
               const cat = nombresPorCategoria.get(o.categoria);
               return (
-                <div key={o.id} className="card-hl p-4">
+                <div key={o.id} className={`card-hl p-4 ${claseDeFila(estado)}`}>
                   <div className="flex items-start gap-3">
                     <Avatar name={alumnoSeleccionado ? `${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}` : "?"} size="sm" />
                     <div className="min-w-0 flex-1">

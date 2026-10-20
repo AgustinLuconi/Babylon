@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Plus, Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
@@ -97,6 +98,7 @@ export default function CalificacionesProfesorPage() {
 function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
   const { data: evaluaciones } = useEvaluacionesPorCurso(cursoId);
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
+  const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
   const crearEvaluacion = useCrearEvaluacion();
   const publicarEvaluacion = usePublicarEvaluacion();
 
@@ -263,13 +265,13 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
           </div>
 
           <Panel title="Notas por alumno">
-            {alumnos?.map((alumno, i, arr) => {
+            {filasNomina.map(({ item: alumno, estado: estadoFila }, i, arr) => {
               const nota = notas[alumno.id] ?? "";
               const tieneNota = nota.trim() !== "";
               const notaNum = Number(nota);
               const tone = evalObj.escala === "numerica" ? (tieneNota && !Number.isNaN(notaNum) ? colorNota(notaNum) : "var(--text-faint)") : "var(--text)";
               return (
-                <div key={alumno.id} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
+                <div key={alumno.id} className={claseDeFila(estadoFila)} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
                   <div className="flex items-center gap-3 px-5 py-3">
                     <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="sm" />
                     <p className="min-w-0 flex-1 truncate text-[13px] font-medium">
@@ -417,6 +419,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
   const periodo: PeriodoAcademico = leer("periodo") === "noviembre" ? "noviembre" : "julio";
   const setPeriodo = (p: PeriodoAcademico) => escribir({ periodo: p === "julio" ? null : p });
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
+  const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
   const { data: notasExistentes } = useNotasCierrePorCurso(cursoId, periodo);
   const cargarNotasCierre = useCargarNotasCierre();
   const publicarNotasCierre = usePublicarNotasCierre();
@@ -485,12 +488,12 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
       </div>
 
       <Panel title={`Notas de cierre — ${PERIODO_LABELS[periodo]}`} action={<Badge variant={todasPublicadas ? "success" : "warning"}>{todasPublicadas ? "Publicadas" : "Borrador"}</Badge>}>
-        {alumnos?.map((alumno, i, arr) => {
+        {filasNomina.map(({ item: alumno, estado: estadoFila }, i, arr) => {
           const nota = notas[alumno.id] ?? "";
           const notaNum = Number(nota);
           const tone = nota.trim() && !Number.isNaN(notaNum) ? colorNota(notaNum) : "var(--text-faint)";
           return (
-            <div key={alumno.id} className="px-5 py-3.5" style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
+            <div key={alumno.id} className={`px-5 py-3.5 ${claseDeFila(estadoFila)}`} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
               <div className="flex flex-wrap items-center gap-3">
                 <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="sm" />
                 <div className="min-w-0 flex-1" style={{ minWidth: 140 }}>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCheck, Info } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
@@ -96,6 +97,7 @@ export default function AsistenciaProfesorPage() {
   const setFecha = (nueva: string) => escribir({ fecha: nueva });
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
+  const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
   const tomarAsistencia = useTomarAsistencia();
 
   const [estados, setEstados] = useState<Record<string, EstadoAsistencia>>({});
@@ -302,12 +304,12 @@ export default function AsistenciaProfesorPage() {
       </Button>
 
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-        {alumnos?.map((alumno) => {
+        {filasNomina.map(({ item: alumno, estado: estadoFila }) => {
           const estado = estadoEfectivo(alumno.id);
           const ausencias = ausenciasDelMes.get(alumno.id) ?? 0;
           const hasAlert = ausencias >= 3;
           return (
-            <div key={alumno.id} className="card-hl overflow-hidden" style={{ borderColor: hasAlert ? "var(--danger)" : undefined }}>
+            <div key={alumno.id} className={`card-hl overflow-hidden ${claseDeFila(estadoFila)}`} style={{ borderColor: hasAlert ? "var(--danger)" : undefined }}>
               <div className="p-4">
                 <div className="mb-3 flex items-center gap-3">
                   <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="md" tone={estado === "presente" ? "brand" : "neutral"} />

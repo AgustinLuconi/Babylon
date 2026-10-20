@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -142,6 +143,7 @@ export default function CursosAdminPage() {
       return matchTexto && matchNivel && matchProfesor && matchCiclo;
     });
   }, [cursos, busqueda, filtroNivel, filtroProfesor, filtroCiclo, cicloActivo, nombresPorProfesor]);
+  const filasCursos = useListaConSalidas(filtrados, (c) => c.id, ["cursos", "alumnos", "profesores"]);
 
   const abrirNuevo = () => {
     reset({ nombre: "", profesorId: "", aula: "", cupo: 20, horarios: [{ diaSemana: "lunes", horaInicio: "18:00", horaFin: "19:30" }] });
@@ -259,11 +261,11 @@ export default function CursosAdminPage() {
                 </td>
               </tr>
             )}
-            {filtrados.map((curso) => {
+            {filasCursos.map(({ item: curso, estado }) => {
               const horariosDelCurso = horariosPorCurso.get(curso.id) ?? [];
               const count = alumnosPorCurso.get(curso.id) ?? 0;
               return (
-                <tr key={curso.id}>
+                <tr key={curso.id} className={claseDeFila(estado)}>
                   <td className="font-medium">{curso.nombre}</td>
                   <td>
                     <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{NIVEL_LABELS[curso.nivel]}</span>

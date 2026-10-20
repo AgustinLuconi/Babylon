@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Resaltable } from "@/core/components/ui/resaltable";
 import { DollarSign, Search } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -59,7 +60,7 @@ export default function SecretarioDashboard() {
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--danger-dot)" }} />
               </div>
               <div className="num-display mt-2.5" style={{ fontSize: 26, color: "var(--danger)" }}>
-                {formatMonto(totalVencido)}
+                <Resaltable valor={totalVencido}>{formatMonto(totalVencido)}</Resaltable>
               </div>
               <div className="mt-2 text-[12px] text-muted-foreground">
                 {cantidadVencidas} cuota{cantidadVencidas !== 1 ? "s" : ""} · {resumen.cuotasVencidasTotal.alumnos} alumnos
@@ -72,7 +73,7 @@ export default function SecretarioDashboard() {
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--brand-dot)" }} />
               </div>
               <div className="num-display mt-2.5" style={{ fontSize: 26 }}>
-                {formatMonto(resumen.cobradoHoyMonto)}
+                <Resaltable valor={resumen.cobradoHoyMonto}>{formatMonto(resumen.cobradoHoyMonto)}</Resaltable>
               </div>
               <div className="mt-2 text-[12px] text-muted-foreground">
                 {resumen.cobradoHoyCount} pago{resumen.cobradoHoyCount !== 1 ? "s" : ""} registrado
@@ -90,7 +91,7 @@ export default function SecretarioDashboard() {
                 <span className="h-2 w-2 rounded-full" style={{ background: "var(--warning-dot)" }} />
               </div>
               <div className="num-display mt-2.5" style={{ fontSize: 26 }}>
-                {resumen.documentacionPendienteCount}
+                <Resaltable valor={resumen.documentacionPendienteCount}>{resumen.documentacionPendienteCount}</Resaltable>
               </div>
               <div className="mt-2 text-[12px] text-muted-foreground">alumnos con autorización de imagen pendiente</div>
             </button>

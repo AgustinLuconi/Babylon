@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { Mail, RotateCw, X } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
@@ -97,6 +98,7 @@ export function PendientesTab() {
         (!termino || normalizarTexto(`${f.nombre} ${f.email ?? ""}`).includes(termino)),
     );
   }, [filas, busqueda, rol, etiqueta]);
+  const filasVisibles = useListaConSalidas(visibles, (f) => f.clave, ["usuarios", "padres", "profesores"]);
 
   const seleccionadas = visibles.filter((f) => seleccion.has(f.clave));
   const paraInvitar = seleccionadas.filter(sePuedeInvitar);
@@ -244,10 +246,10 @@ export function PendientesTab() {
                 </td>
               </tr>
             )}
-            {visibles.map((f) => {
+            {filasVisibles.map(({ item: f, estado }) => {
               const textoDetalle = detalle(f);
               return (
-                <tr key={f.clave}>
+                <tr key={f.clave} className={claseDeFila(estado)}>
                   <td>
                     <input type="checkbox" aria-label={`Seleccionar a ${f.nombre}`} checked={seleccion.has(f.clave)} onChange={() => alternar(f.clave)} />
                   </td>
