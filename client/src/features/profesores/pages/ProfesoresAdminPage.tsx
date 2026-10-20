@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -64,8 +65,9 @@ export default function ProfesoresAdminPage() {
     handleSubmit,
     reset,
     setError,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ProfesorForm>({ resolver: zodResolver(profesorSchema) });
+  useSinGuardar(!!modal && isDirty);
 
   const cicloActivo = ciclos?.find((c) => c.activo);
 
@@ -310,6 +312,7 @@ export default function ProfesoresAdminPage() {
 
       {modal && (
         <Modal
+          sinGuardar={isDirty}
           title={modal.mode === "new" ? "Nuevo profesor" : "Editar profesor"}
           onClose={() => setModal(null)}
           footer={

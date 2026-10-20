@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { descartarCambiosSinGuardar, useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -86,6 +87,7 @@ export default function InscribirAlumnoPage() {
 
   const alumnoForm = useForm<AlumnoForm>({ resolver: zodResolver(alumnoSchema), defaultValues: { ciudad: "San Luis" } });
   const padreForm = useForm<NuevoPadreForm>({ resolver: zodResolver(nuevoPadreSchema) });
+  useSinGuardar(alumnoForm.formState.isDirty || padreForm.formState.isDirty);
 
   const padresFiltrados = useMemo(() => {
     if (!padres) return [];
@@ -169,6 +171,8 @@ export default function InscribirAlumnoPage() {
       padreId,
       cursoId,
     });
+    // Ya se guardó: esta salida no pregunta.
+    descartarCambiosSinGuardar();
     navigate("/alumnos", aviso ? { state: { aviso } } : undefined);
   };
 

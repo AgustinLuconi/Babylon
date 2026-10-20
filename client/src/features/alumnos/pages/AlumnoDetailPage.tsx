@@ -40,6 +40,7 @@ import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
 const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
@@ -242,28 +243,36 @@ export default function AlumnoDetailPage() {
   const [formPadre, setFormPadre] = useState({
     nombre: "", apellido: "", direccion: "", telefono: "", email: "", vinculo: "padre" as VinculoPadre,
   });
+  // Cómo estaba el formulario al abrirse: distinto de eso es "sin guardar".
+  const [inicialEdicion, setInicialEdicion] = useState("");
   const abrirEditar = () => {
     if (!alumno) return;
-    setFormAlumno({
+    const datosAlumno = {
       nombre: alumno.nombre,
       apellido: alumno.apellido,
       direccion: alumno.direccion ?? "",
       telefono: alumno.telefono ?? "",
       email: alumno.email ?? "",
       observacionesMedicas: alumno.observacionesMedicas ?? "",
-    });
-    if (padre) {
-      setFormPadre({
-        nombre: padre.nombre,
-        apellido: padre.apellido,
-        direccion: padre.direccion ?? "",
-        telefono: padre.telefono ?? "",
-        email: padre.email ?? "",
-        vinculo: padre.vinculo,
-      });
-    }
+    };
+    const datosPadre = padre
+      ? {
+          nombre: padre.nombre,
+          apellido: padre.apellido,
+          direccion: padre.direccion ?? "",
+          telefono: padre.telefono ?? "",
+          email: padre.email ?? "",
+          vinculo: padre.vinculo,
+        }
+      : formPadre;
+    setFormAlumno(datosAlumno);
+    setFormPadre(datosPadre);
+    setInicialEdicion(JSON.stringify({ datosAlumno, datosPadre }));
     setModalEditar(true);
   };
+  const edicionSinGuardar = modalEditar && JSON.stringify({ datosAlumno: formAlumno, datosPadre: formPadre }) !== inicialEdicion;
+  const observacionSinGuardar = modalObs && obsTexto.trim() !== "";
+  useSinGuardar(edicionSinGuardar || observacionSinGuardar);
   const guardandoEdicion = actualizarAlumno.isPending || actualizarPadre.isPending;
   const errorEdicion = actualizarAlumno.error ?? actualizarPadre.error;
   const onGuardarEdicion = async () => {
@@ -779,6 +788,7 @@ export default function AlumnoDetailPage() {
       {modalObs && (
         <Modal
           title="Nueva observación"
+          sinGuardar={observacionSinGuardar}
           onClose={() => setModalObs(false)}
           footer={
             <>
@@ -836,6 +846,7 @@ export default function AlumnoDetailPage() {
       {modalEditar && (
         <Modal
           title="Editar datos"
+          sinGuardar={edicionSinGuardar}
           onClose={() => setModalEditar(false)}
           footer={
             <>

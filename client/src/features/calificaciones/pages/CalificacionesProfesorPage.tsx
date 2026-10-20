@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Plus, Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
@@ -28,6 +29,19 @@ import {
   type TipoEvaluacion,
 } from "../types";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
+
+// ¿Hay algo tipeado distinto de lo que ya está guardado?
+function difiereDeLoGuardado(
+  notas: Record<string, string>,
+  observaciones: Record<string, string>,
+  guardadas: { alumnoId: string; nota: string; observacion?: string | null }[],
+): boolean {
+  const porAlumno = new Map(guardadas.map((g) => [g.alumnoId, g]));
+  const ids = new Set([...Object.keys(notas), ...Object.keys(observaciones), ...porAlumno.keys()]);
+  return [...ids].some(
+    (id) => (notas[id] ?? "") !== (porAlumno.get(id)?.nota ?? "") || (observaciones[id] ?? "") !== (porAlumno.get(id)?.observacion ?? ""),
+  );
+}
 
 function colorNota(nota: number): string {
   if (nota >= 7) return "var(--brand)";
@@ -127,6 +141,8 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
     escala: "numerica" as EscalaEvaluacion,
     fecha: hoyLocalISO(),
   });
+  const nuevaEvaluacionSinGuardar = showNewEval && newForm.nombre.trim() !== "";
+  useSinGuardar(difiereDeLoGuardado(notas, observaciones, calificacionesExistentes ?? []) || nuevaEvaluacionSinGuardar);
 
   const notasNumericas = evalObj?.escala === "numerica" ? Object.values(notas).map(Number).filter((n) => !Number.isNaN(n)) : [];
   const promedio = notasNumericas.length ? (notasNumericas.reduce((a, n) => a + n, 0) / notasNumericas.length).toFixed(1) : "—";
@@ -334,6 +350,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
 
       {showNewEval && (
         <Modal
+          sinGuardar={nuevaEvaluacionSinGuardar}
           title="Nueva evaluación"
           onClose={() => setShowNewEval(false)}
           footer={
@@ -407,6 +424,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
 
   const [notas, setNotas] = useState<Record<string, string>>({});
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  useSinGuardar(difiereDeLoGuardado(notas, observaciones, notasExistentes ?? []));
 
   useEffect(() => {
     const nuevoNotas: Record<string, string> = {};

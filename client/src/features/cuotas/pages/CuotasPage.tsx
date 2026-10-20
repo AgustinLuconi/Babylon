@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { DollarSign, Search, X, Check } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
 import { Avatar } from "@/core/components/ui/avatar";
@@ -59,6 +60,8 @@ export default function CuotasPage() {
   const [metodo, setMetodo] = useState<MetodoPago>("efectivo");
   const [fechaPago, setFechaPago] = useState(hoyLocalISO());
   const [notas, setNotas] = useState("");
+  const pagoSinGuardar = modalOpen && (payAlumnoId !== null || cuotaIdsSeleccionadas.length > 0 || notas.trim() !== "");
+  useSinGuardar(pagoSinGuardar);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -333,6 +336,7 @@ export default function CuotasPage() {
 
       {modalOpen && (
         <Modal
+          sinGuardar={pagoSinGuardar}
           title="Registrar pago"
           onClose={() => setModalOpen(false)}
           footer={

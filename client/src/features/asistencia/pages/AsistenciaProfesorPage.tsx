@@ -16,6 +16,7 @@ import { asistenciaService } from "../asistenciaService";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
 const DIAS_ORDEN: DiaSemana[] = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
 
@@ -150,6 +151,17 @@ export default function AsistenciaProfesorPage() {
   const minutosEfectivo = (alumnoId: string): number | undefined =>
     minutos[alumnoId] ?? registroExistente(alumnoId)?.minutosRetraso;
   const motivoEfectivo = (alumnoId: string): string => motivos[alumnoId] ?? registroExistente(alumnoId)?.motivo ?? "";
+  // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo).
+  useSinGuardar(
+    (alumnos ?? []).some((a) => {
+      const guardado = registroExistente(a.id);
+      return (
+        (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
+        (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
+        (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? ""))
+      );
+    }),
+  );
 
   const sesionCompleta = (d: Date) => {
     const iso = fechaLocalISO(d);
@@ -323,6 +335,7 @@ export default function AsistenciaProfesorPage() {
                       <button
                         key={st.id}
                         onClick={() => setEstado(alumno.id, st.id)}
+                        aria-pressed={active}
                         className="flex items-center justify-center gap-1.5 rounded text-[12.5px] font-medium transition-all"
                         style={{
                           minHeight: 44,

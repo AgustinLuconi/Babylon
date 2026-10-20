@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueries } from "@tanstack/react-query";
@@ -93,8 +94,9 @@ export default function CursosAdminPage() {
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<CursoFormInput, unknown, CursoForm>({ resolver: zodResolver(cursoSchema), defaultValues: { horarios: [] } });
+  useSinGuardar(!!modal && isDirty);
 
   const { fields, append, remove } = useFieldArray({ control, name: "horarios" });
 
@@ -317,6 +319,7 @@ export default function CursosAdminPage() {
 
       {modal && (
         <Modal
+          sinGuardar={isDirty}
           title={modal.mode === "new" ? "Nuevo curso" : "Editar curso"}
           onClose={() => setModal(null)}
           footer={

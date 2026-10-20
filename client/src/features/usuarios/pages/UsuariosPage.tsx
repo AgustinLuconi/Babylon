@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -137,8 +138,9 @@ export default function UsuariosPage() {
     setValue,
     watch,
     clearErrors,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<CuentaForm>({ resolver: zodResolver(cuentaSchema), defaultValues: VALORES_INICIALES });
+  useSinGuardar(mostrarModal && isDirty);
 
   const rol = watch("rol");
   const password = watch("password");
@@ -333,6 +335,7 @@ export default function UsuariosPage() {
 
       {mostrarModal && (
         <Modal
+          sinGuardar={isDirty}
           title="Crear usuario"
           onClose={() => setMostrarModal(false)}
           footer={

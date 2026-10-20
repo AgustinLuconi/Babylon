@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Moon, Plus, Sun } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
@@ -27,6 +28,9 @@ export default function ConfiguracionPage() {
   useEffect(() => {
     if (configuracion?.valorCuota != null) setValorCuota(String(configuracion.valorCuota));
   }, [configuracion?.valorCuota]);
+
+  const valorGuardado = configuracion?.valorCuota != null ? String(configuracion.valorCuota) : "";
+  useSinGuardar(valorCuota !== valorGuardado || nuevoAnio.trim() !== "");
 
   const valorNumerico = Number(valorCuota);
   const valorValido = valorCuota.trim() !== "" && Number.isFinite(valorNumerico) && valorNumerico > 0;

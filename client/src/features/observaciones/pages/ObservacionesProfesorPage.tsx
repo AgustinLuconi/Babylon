@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -58,6 +59,7 @@ export default function ObservacionesProfesorPage() {
   }, [categoriasPersonalizadas]);
 
   const [texto, setTexto] = useState("");
+  useSinGuardar(texto.trim() !== "");
   const [categoria, setCategoria] = useState<string>("academico");
   const [catFilter, setCatFilter] = useState("all");
   const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState("");

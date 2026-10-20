@@ -3,6 +3,7 @@ import { Send } from "lucide-react";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { ApiError } from "@/core/lib/apiClient";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { BurbujaMensaje } from "../components/BurbujaMensaje";
 import { VerAnteriores } from "../components/VerAnteriores";
 import { useDesplazamientoDelChat } from "../hooks/useDesplazamientoDelChat";
@@ -21,6 +22,7 @@ export default function ChatPage() {
   const scrollRef = useDesplazamientoDelChat(lista);
 
   const [texto, setTexto] = useState("");
+  useSinGuardar(texto.trim() !== "");
 
   const onEnviar = () => {
     if (!texto.trim()) return;
