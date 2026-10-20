@@ -9,6 +9,7 @@ import type { Evaluacion } from "./evaluacion.entity";
 import type { Calificacion } from "./calificacion.entity";
 import type { NotaCierre } from "./notaCierre.entity";
 import type { CargarCalificacionesInput, CargarNotaCierreInput, CrearEvaluacionInput } from "./calificacion.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosCalificaciones } from "./calificacion.eventos";
 
 export interface Solicitante {
@@ -29,7 +30,7 @@ export class CalificacionService {
     private readonly cursoRepo: CursoRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosCalificaciones> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosCalificaciones & EventosCambios> = sinAnuncios(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -85,6 +86,7 @@ export class CalificacionService {
     return this.unitOfWork.runInTransaction(async (tx) => {
       const creada = await this.calificacionRepo.crearEvaluacion(evaluacion, tx);
       await this.anuncios.publicar("evaluacion.creada", { evaluacionId: creada.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "evaluaciones", accion: "alta", ids: { cursoIds: [creada.cursoId], evaluacionIds: [creada.id] } }, tx);
       return creada;
     });
   }
@@ -103,6 +105,11 @@ export class CalificacionService {
         tx,
       );
       await this.anuncios.publicar("evaluacion.publicada", { evaluacionId }, tx);
+      await this.anuncios.publicar(
+        "datos.cambiaron",
+        { dato: "evaluaciones", accion: "publicacion", ids: { cursoIds: [evaluacion.cursoId], evaluacionIds: [evaluacionId] } },
+        tx,
+      );
       return publicada;
     });
   }
@@ -141,6 +148,17 @@ export class CalificacionService {
         calificaciones.push(await this.calificacionRepo.guardarCalificacion(calificacion, tx));
       }
       await this.anuncios.publicar("calificaciones.cargadas", { evaluacionId, alumnoIds: datos.notas.map((n) => n.alumnoId) }, tx);
+      // Las familias se enteran solo si la evaluación ya está publicada.
+      await this.anuncios.publicar(
+        "datos.cambiaron",
+        {
+          dato: "calificaciones",
+          accion: "carga",
+          ids: { cursoIds: [evaluacion.cursoId], evaluacionIds: [evaluacionId], alumnoIds: datos.notas.map((n) => n.alumnoId) },
+          visibleParaFamilias: evaluacion.estado === "publicada",
+        },
+        tx,
+      );
       return calificaciones;
     });
   }
@@ -168,6 +186,11 @@ export class CalificacionService {
         guardadas.push(await this.calificacionRepo.guardarNotaCierre(notaCierre, tx));
       }
       await this.anuncios.publicar("cierre.cargado", { notaCierreIds: guardadas.map((n) => n.id) }, tx);
+      await this.anuncios.publicar(
+        "datos.cambiaron",
+        { dato: "notas-cierre", accion: "carga", ids: { cursoIds: [...new Set(guardadas.map((n) => n.cursoId))], alumnoIds: guardadas.map((n) => n.alumnoId) } },
+        tx,
+      );
       return guardadas;
     });
   }
@@ -194,6 +217,11 @@ export class CalificacionService {
         );
       }
       await this.anuncios.publicar("cierre.publicado", { notaCierreIds }, tx);
+      await this.anuncios.publicar(
+        "datos.cambiaron",
+        { dato: "notas-cierre", accion: "publicacion", ids: { cursoIds: [...new Set(publicadas.map((n) => n.cursoId))], alumnoIds: publicadas.map((n) => n.alumnoId) } },
+        tx,
+      );
       return publicadas;
     });
   }

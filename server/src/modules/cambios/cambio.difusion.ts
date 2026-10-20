@@ -18,6 +18,11 @@ export function suscribirDifusionDeCambios(
     const autor = autorActual();
     alConfirmar(tx, () => difundir(cambio, autor));
   });
+  // Toda sesión cerrada (por cualquier camino) cambia la lista de sesiones de Mi cuenta de esa cuenta.
+  tablero.alPublicarse("sesiones.cerradas", async ({ usuarioId }, tx) => {
+    const autor = autorActual();
+    alConfirmar(tx, () => difundir({ dato: "sesiones", accion: "cierre", ids: { usuarioIds: [usuarioId] } }, autor));
+  });
 
   async function difundir(cambio: CambioDeDatos, autor: ReturnType<typeof autorActual>): Promise<void> {
     const { roles, cuentas } = await destinatarios.resolver(cambio);

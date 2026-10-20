@@ -8,6 +8,7 @@ import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { ObservacionRepository } from "./observacion.repository";
 import { CATEGORIAS_PREDEFINIDAS, type CategoriaPersonalizada, type Observacion } from "./observacion.entity";
 import type { CrearCategoriaPersonalizadaInput, CrearObservacionInput } from "./observacion.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosObservaciones } from "./observacion.eventos";
 
 export interface Solicitante {
@@ -26,7 +27,7 @@ export class ObservacionService {
     private readonly cursoRepo: CursoRepository,
     private readonly usuarioRepo: UsuarioRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosObservaciones> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosObservaciones & EventosCambios> = sinAnuncios(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -65,6 +66,7 @@ export class ObservacionService {
     return this.unitOfWork.runInTransaction(async (tx) => {
       const creada = await this.observacionRepo.create(observacion, tx);
       await this.anuncios.publicar("observacion.creada", { observacionId: creada.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "observaciones", accion: "alta", ids: { alumnoIds: [creada.alumnoId], observacionIds: [creada.id] } }, tx);
       return creada;
     });
   }
@@ -107,7 +109,11 @@ export class ObservacionService {
       profesorId,
       nombre: datos.nombre,
     };
-    return this.observacionRepo.crearCategoriaPersonalizada(categoria);
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      const creada = await this.observacionRepo.crearCategoriaPersonalizada(categoria, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "categorias", accion: "alta", ids: { cursoIds: [creada.cursoId] } }, tx);
+      return creada;
+    });
   }
 
   async listarCategoriasPersonalizadas(cursoId: string, profesorId?: string): Promise<CategoriaPersonalizada[]> {

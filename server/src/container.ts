@@ -118,7 +118,7 @@ const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
 const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork, invitacionService, tablero);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork, invitacionService, tablero);
 const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, cicloRepository, configuracionRepository, unitOfWork, tablero);
-const configuracionService = new ConfiguracionService(configuracionRepository);
+const configuracionService = new ConfiguracionService(configuracionRepository, tablero);
 const alumnoService = new AlumnoService(
   alumnoRepository,
   cursoRepository,

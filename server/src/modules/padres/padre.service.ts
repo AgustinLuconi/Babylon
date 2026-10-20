@@ -9,6 +9,7 @@ import type { Usuario } from "../usuarios/usuario.entity";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
 import type { ActualizarPadreInput, CrearPadreInput, CrearPadreSinCuentaInput } from "./padre.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 
 export type PadreCreado = Padre & { invitacion: EstadoInvitacion | null };
@@ -19,7 +20,7 @@ export class PadreService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly invitaciones: InvitacionService,
-    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
   async listarPadres(): Promise<Padre[]> {
@@ -81,6 +82,8 @@ export class PadreService {
       const creado = await this.padreRepo.create(padre, tx);
       // Con contraseña la cuenta nace activa: ya le corresponden avisos (con invitación, cuando la active).
       if (!cuenta) await this.anuncios.publicar("cuenta.cambio", { usuarioId }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "alta", ids: { padreIds: [creado.id] } }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuarioId] } }, tx);
       return { padre: creado, cuenta };
     });
 
@@ -105,7 +108,9 @@ export class PadreService {
       telefono: datos.telefono,
       vinculo: datos.vinculo,
     };
-    return this.padreRepo.create(padre);
+    const creado = await this.padreRepo.create(padre);
+    await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "alta", ids: { padreIds: [creado.id] } });
+    return creado;
   }
 
   async actualizarPadre(id: string, datos: ActualizarPadreInput): Promise<Padre> {
@@ -124,7 +129,11 @@ export class PadreService {
       vinculo: datos.vinculo ?? actual.vinculo,
     };
     const cambiaEmail = datos.email !== undefined && datos.email !== actual.email;
-    if (!cambiaEmail || !actual.usuarioId) return this.padreRepo.update(id, actualizado);
+    if (!cambiaEmail || !actual.usuarioId) {
+      const guardado = await this.padreRepo.update(id, actualizado);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [id] } });
+      return guardado;
+    }
 
     // Con una invitación todavía sin aceptar, corregir el email de la ficha corrige el de la cuenta y anula la invitación
     // que se mandó a la dirección anterior (queda "vencida" hasta reenviarla a la nueva). Una cuenta ya activa conserva su
@@ -140,7 +149,9 @@ export class PadreService {
         await this.usuarioRepo.actualizarParcial(usuario.id, { email: emailNuevo }, tx);
         await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", new Date(), tx);
       }
-      return this.padreRepo.update(id, actualizado, tx);
+      const guardado = await this.padreRepo.update(id, actualizado, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [id] } }, tx);
+      return guardado;
     });
   }
 }
