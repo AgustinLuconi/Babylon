@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
@@ -775,7 +776,7 @@ export default function AlumnoDetailPage() {
                 <Avatar name={observacion.emisorNombre} size="sm" tone="brand" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[12.5px] font-semibold">{observacion.emisorNombre}</span>
+                    <span className="text-[12.5px] font-semibold">{etiquetaDeAutor(observacion.emisorNombre, observacion.emisorRol)}</span>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary">{nombresPorCategoria.get(observacion.categoria) ?? observacion.categoria}</Badge>
                       <span className="tnum text-[11.5px] text-muted-foreground">{formatFecha(observacion.fecha)}</span>

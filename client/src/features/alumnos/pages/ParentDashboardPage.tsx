@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { Resaltable } from "@/core/components/ui/resaltable";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -356,7 +357,7 @@ export default function ParentDashboardPage() {
                         {CATEGORIA_LABELS[o.categoria as CategoriaObservacionPredefinida] ?? "Nota"}
                       </span>
                       <p className="text-[13px] leading-relaxed">{o.texto}</p>
-                      <p className="mt-2 text-[11.5px] text-muted-foreground">— {o.emisorNombre}</p>
+                      <p className="mt-2 text-[11.5px] text-muted-foreground">— {etiquetaDeAutor(o.emisorNombre, o.emisorRol)}</p>
                     </div>
                   ))}
                 </div>

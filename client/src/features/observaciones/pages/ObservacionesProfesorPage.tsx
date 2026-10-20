@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Send } from "lucide-react";
@@ -232,7 +233,7 @@ export default function ObservacionesProfesorPage() {
               return (
                 <div key={o.id} className={`card-hl p-4 ${claseDeFila(estado)}`}>
                   <div className="flex items-start gap-3">
-                    <Avatar name={alumnoSeleccionado ? `${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}` : "?"} size="sm" />
+                    <Avatar name={o.emisorNombre} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span
@@ -244,6 +245,7 @@ export default function ObservacionesProfesorPage() {
                         <span className="tnum shrink-0 text-[11.5px] text-muted-foreground">{formatFecha(o.fecha)}</span>
                       </div>
                       <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{o.texto}</p>
+                      <p className="mt-2 text-[11.5px] text-muted-foreground">{etiquetaDeAutor(o.emisorNombre, o.emisorRol)}</p>
                     </div>
                   </div>
                 </div>
