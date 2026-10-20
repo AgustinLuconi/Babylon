@@ -75,6 +75,9 @@ export class AlumnoService {
       if (curso.profesorId !== profesorId) {
         throw new AuthorizationError("Un profesor solo puede ver la nómina de sus propios cursos");
       }
+      // La nómina con la que el profesor trabaja (asistencia, notas, observaciones): solo alumnos activos. Un alumno
+      // dado de baja deja de aparecer; administración y secretaría siguen viendo el curso completo.
+      return (await this.alumnoRepo.findByCursoId(cursoId)).filter((a) => a.estado === "activo");
     }
 
     return this.alumnoRepo.findByCursoId(cursoId);

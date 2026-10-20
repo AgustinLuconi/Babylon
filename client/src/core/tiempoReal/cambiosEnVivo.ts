@@ -5,6 +5,7 @@ import { create } from "zustand";
 // ajeno, recién llegado, de lo que la persona hizo ella misma o de la primera carga de la pantalla.
 export interface CambioAjeno {
   en: number;
+  accion: string;
   por: { usuarioId: string; nombre: string; rol: string } | null;
   ids: Record<string, string[] | undefined>;
 }

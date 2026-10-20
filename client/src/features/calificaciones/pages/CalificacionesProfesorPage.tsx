@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Plus, Send } from "lucide-react";
@@ -30,6 +30,51 @@ import {
   type TipoEvaluacion,
 } from "../types";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
+import { AvisosDeNomina } from "@/features/cursos/components/AvisosDeNomina";
+import { useAvisosDeNomina } from "@/features/cursos/hooks/useAvisosDeNomina";
+import { useCursoPerdido } from "@/features/cursos/hooks/useCursoPerdido";
+
+// Lo tipeado por alumno, precargado con lo guardado. Al cambiar de evaluación o período (el `contexto`) se recarga
+// entero; cuando la lista de lo guardado se vuelve a pedir (una actualización en vivo, una reconexión), solo se completan
+// los alumnos que el profesor no tocó: lo que tipeó nunca se pisa.
+function useNotasTipeadas(guardadas: { alumnoId: string; nota: string; observacion?: string | null }[] | undefined, contexto: string | undefined) {
+  const [notas, setNotas] = useState<Record<string, string>>({});
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  const tocados = useRef(new Set<string>());
+  const contextoCargado = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const nuevoContexto = contextoCargado.current !== contexto;
+    contextoCargado.current = contexto;
+    if (nuevoContexto) tocados.current = new Set();
+    const guardadoNotas: Record<string, string> = {};
+    const guardadoObs: Record<string, string> = {};
+    for (const g of guardadas ?? []) {
+      guardadoNotas[g.alumnoId] = g.nota;
+      if (g.observacion) guardadoObs[g.alumnoId] = g.observacion;
+    }
+    const conservarLoTipeado = (actual: Record<string, string>, guardado: Record<string, string>) => {
+      const resultado = { ...guardado };
+      for (const id of tocados.current) {
+        if (id in actual) resultado[id] = actual[id];
+        else delete resultado[id];
+      }
+      return resultado;
+    };
+    setNotas((actual) => (nuevoContexto ? guardadoNotas : conservarLoTipeado(actual, guardadoNotas)));
+    setObservaciones((actual) => (nuevoContexto ? guardadoObs : conservarLoTipeado(actual, guardadoObs)));
+  }, [guardadas, contexto]);
+
+  const tipearNota = (alumnoId: string, valor: string) => {
+    tocados.current.add(alumnoId);
+    setNotas((actual) => ({ ...actual, [alumnoId]: valor }));
+  };
+  const tipearObservacion = (alumnoId: string, valor: string) => {
+    tocados.current.add(alumnoId);
+    setObservaciones((actual) => ({ ...actual, [alumnoId]: valor }));
+  };
+  return { notas, observaciones, tipearNota, tipearObservacion };
+}
 
 // ¿Hay algo tipeado distinto de lo que ya está guardado?
 function difiereDeLoGuardado(
@@ -55,8 +100,13 @@ export default function CalificacionesProfesorPage() {
   // Curso, vista, evaluación y período en la dirección: los avisos del profesor abren exactamente lo que señalan.
   const { leer, escribir } = useFiltrosDeUrl();
   const cursoPedido = leer("curso");
-  const cursoId = cursos?.some((c) => c.id === cursoPedido) ? (cursoPedido as string) : cursos?.[0]?.id;
+  const candidato = cursos?.some((c) => c.id === cursoPedido) ? (cursoPedido as string) : cursos?.[0]?.id;
+  // Si el curso abierto deja de estar a cargo del profesor, la pantalla se queda en él (con lo tipeado) y avisa.
+  const cursoPerdido = useCursoPerdido(cursoPedido, candidato, cursos);
+  const cursoId = cursoPerdido ?? candidato;
   const view: "evals" | "cierre" = leer("vista") === "cierre" ? "cierre" : "evals";
+  const { data: nomina } = useAlumnosDelCurso(cursoId);
+  const { avisos, cerrar } = useAvisosDeNomina(cursoId, nomina);
 
   return (
     <div className="space-y-5">
@@ -90,12 +140,19 @@ export default function CalificacionesProfesorPage() {
         </div>
       </div>
 
-      {cursoId && (view === "evals" ? <SeccionEvaluaciones cursoId={cursoId} /> : <SeccionNotasCierre cursoId={cursoId} />)}
+      <AvisosDeNomina avisos={avisos} onCerrar={cerrar} cursoPerdido={!!cursoPerdido} />
+      {cursoId &&
+        (view === "evals" ? (
+          <SeccionEvaluaciones cursoId={cursoId} soloLectura={!!cursoPerdido} />
+        ) : (
+          <SeccionNotasCierre cursoId={cursoId} soloLectura={!!cursoPerdido} />
+        ))}
     </div>
   );
 }
 
-function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
+// `soloLectura`: el curso ya no está a cargo del profesor (no se puede guardar ni publicar).
+function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLectura: boolean }) {
   const { data: evaluaciones } = useEvaluacionesPorCurso(cursoId);
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
   const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
@@ -122,19 +179,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
   const { data: calificacionesExistentes } = useCalificacionesDeEvaluacion(selectedEvalId);
   const cargarCalificaciones = useCargarCalificaciones(selectedEvalId ?? "");
 
-  const [notas, setNotas] = useState<Record<string, string>>({});
-  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const nuevoNotas: Record<string, string> = {};
-    const nuevoObs: Record<string, string> = {};
-    for (const c of calificacionesExistentes ?? []) {
-      nuevoNotas[c.alumnoId] = c.nota;
-      if (c.observacion) nuevoObs[c.alumnoId] = c.observacion;
-    }
-    setNotas(nuevoNotas);
-    setObservaciones(nuevoObs);
-  }, [calificacionesExistentes, selectedEvalId]);
+  const { notas, observaciones, tipearNota, tipearObservacion } = useNotasTipeadas(calificacionesExistentes, selectedEvalId);
 
   const [newForm, setNewForm] = useState({
     nombre: "",
@@ -218,6 +263,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
           ))}
           <button
             onClick={() => setShowNewEval(true)}
+            disabled={soloLectura}
             className="flex items-center gap-1 rounded px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground"
             style={{ border: "1px dashed var(--border-strong)" }}
           >
@@ -271,7 +317,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
               const notaNum = Number(nota);
               const tone = evalObj.escala === "numerica" ? (tieneNota && !Number.isNaN(notaNum) ? colorNota(notaNum) : "var(--text-faint)") : "var(--text)";
               return (
-                <div key={alumno.id} className={claseDeFila(estadoFila)} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
+                <div key={alumno.id} data-alumno={alumno.id} className={claseDeFila(estadoFila)} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
                   <div className="flex items-center gap-3 px-5 py-3">
                     <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="sm" />
                     <p className="min-w-0 flex-1 truncate text-[13px] font-medium">
@@ -285,7 +331,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                           max={10}
                           step={0.5}
                           value={nota}
-                          onChange={(e) => setNotas((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
+                          onChange={(e) => tipearNota(alumno.id, e.target.value)}
                           placeholder="–"
                           className="tnum h-8 w-16 text-center font-semibold"
                           style={{ color: tone, borderColor: tieneNota ? tone : undefined }}
@@ -295,7 +341,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                     ) : (
                       <Select
                         value={nota}
-                        onChange={(e) => setNotas((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
+                        onChange={(e) => tipearNota(alumno.id, e.target.value)}
                         className="h-8 w-32 text-[12.5px]"
                       >
                         <option value="">—</option>
@@ -309,7 +355,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
                   <div className="px-5 pb-3">
                     <Input
                       value={observaciones[alumno.id] ?? ""}
-                      onChange={(e) => setObservaciones((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
+                      onChange={(e) => tipearObservacion(alumno.id, e.target.value)}
                       placeholder={`Observación al padre (opcional, máx ${MAX_OBSERVACION_NOTA} car.)`}
                       maxLength={MAX_OBSERVACION_NOTA}
                       className="text-[12px] text-muted-foreground"
@@ -321,14 +367,14 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
           </Panel>
 
           <div className="flex gap-2">
-            <Button className="flex-1" disabled={cargarCalificaciones.isPending} onClick={onGuardar}>
+            <Button className="flex-1" disabled={cargarCalificaciones.isPending || soloLectura} onClick={onGuardar}>
               {cargarCalificaciones.isPending ? "Guardando…" : "Guardar notas"}
             </Button>
             {evalObj.estado === "borrador" && (
               <Button
                 variant="outline"
                 className="flex-1"
-                disabled={publicarEvaluacion.isPending}
+                disabled={publicarEvaluacion.isPending || soloLectura}
                 onClick={() => publicarEvaluacion.mutate(evalObj.id)}
               >
                 <Send className="mr-1.5" size={14} /> Publicar notas
@@ -414,7 +460,7 @@ function SeccionEvaluaciones({ cursoId }: { cursoId: string }) {
   );
 }
 
-function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
+function SeccionNotasCierre({ cursoId, soloLectura }: { cursoId: string; soloLectura: boolean }) {
   const { leer, escribir } = useFiltrosDeUrl();
   const periodo: PeriodoAcademico = leer("periodo") === "noviembre" ? "noviembre" : "julio";
   const setPeriodo = (p: PeriodoAcademico) => escribir({ periodo: p === "julio" ? null : p });
@@ -425,20 +471,9 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
   const publicarNotasCierre = usePublicarNotasCierre();
   const [confirmar, setConfirmar] = useState(false);
 
-  const [notas, setNotas] = useState<Record<string, string>>({});
-  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  const { notas, observaciones, tipearNota, tipearObservacion } = useNotasTipeadas(notasExistentes, `${cursoId}|${periodo}`);
   useSinGuardar(difiereDeLoGuardado(notas, observaciones, notasExistentes ?? []));
 
-  useEffect(() => {
-    const nuevoNotas: Record<string, string> = {};
-    const nuevoObs: Record<string, string> = {};
-    for (const n of notasExistentes ?? []) {
-      nuevoNotas[n.alumnoId] = n.nota;
-      if (n.observacion) nuevoObs[n.alumnoId] = n.observacion;
-    }
-    setNotas(nuevoNotas);
-    setObservaciones(nuevoObs);
-  }, [notasExistentes, periodo]);
 
   const todasPublicadas = (alumnos?.length ?? 0) > 0 && (notasExistentes?.length ?? 0) === alumnos?.length && (notasExistentes ?? []).every((n) => n.estado === "publicada");
 
@@ -493,7 +528,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
           const notaNum = Number(nota);
           const tone = nota.trim() && !Number.isNaN(notaNum) ? colorNota(notaNum) : "var(--text-faint)";
           return (
-            <div key={alumno.id} className={`px-5 py-3.5 ${claseDeFila(estadoFila)}`} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
+            <div key={alumno.id} data-alumno={alumno.id} className={`px-5 py-3.5 ${claseDeFila(estadoFila)}`} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
               <div className="flex flex-wrap items-center gap-3">
                 <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="sm" />
                 <div className="min-w-0 flex-1" style={{ minWidth: 140 }}>
@@ -510,7 +545,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
                     step={0.5}
                     value={nota}
                     disabled={todasPublicadas}
-                    onChange={(e) => setNotas((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
+                    onChange={(e) => tipearNota(alumno.id, e.target.value)}
                     placeholder="–"
                     className="tnum h-8 w-16 text-center font-semibold"
                     style={{ color: tone, borderColor: nota.trim() ? tone : undefined, opacity: todasPublicadas ? 0.7 : 1 }}
@@ -521,7 +556,7 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
                 <Input
                   value={observaciones[alumno.id] ?? ""}
                   disabled={todasPublicadas}
-                  onChange={(e) => setObservaciones((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
+                  onChange={(e) => tipearObservacion(alumno.id, e.target.value)}
                   placeholder="Observación de cierre (opcional)"
                   className="h-8 text-[12.5px]"
                   style={{ opacity: todasPublicadas ? 0.7 : 1 }}
@@ -535,12 +570,12 @@ function SeccionNotasCierre({ cursoId }: { cursoId: string }) {
 
       {!todasPublicadas ? (
         <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" disabled={cargarNotasCierre.isPending} onClick={onGuardar}>
+          <Button variant="outline" className="flex-1" disabled={cargarNotasCierre.isPending || soloLectura} onClick={onGuardar}>
             {cargarNotasCierre.isPending ? "Guardando…" : "Guardar borrador"}
           </Button>
           <Button
             className="flex-1"
-            disabled={completas < (alumnos?.length ?? 0) || completas === 0}
+            disabled={completas < (alumnos?.length ?? 0) || completas === 0 || soloLectura}
             onClick={() => setConfirmar(true)}
           >
             <Send className="mr-1.5" size={14} /> Publicar notas de cierre ({completas}/{alumnos?.length ?? 0})

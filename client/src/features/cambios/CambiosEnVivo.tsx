@@ -39,7 +39,7 @@ export function CambiosEnVivo() {
       programar();
       const propio = cambio.por !== null && cambio.por.usuarioId === useSessionStore.getState().usuario?.id;
       if (!propio) {
-        registrarCambioAjeno(cambio.dato, { por: cambio.por, ids: cambio.ids });
+        registrarCambioAjeno(cambio.dato, { accion: cambio.accion, por: cambio.por, ids: cambio.ids });
         mostrarMensajeDeCambio(cambio);
       }
     });
