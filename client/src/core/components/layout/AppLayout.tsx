@@ -14,6 +14,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ContadorChats } from "./ContadorChats";
 import { TiempoReal } from "@/core/tiempoReal/TiempoReal";
 import { ProteccionSinGuardar } from "@/core/sinGuardar/ProteccionSinGuardar";
+import { VersionNueva } from "@/core/version/VersionNueva";
 import { CambiosEnVivo } from "@/features/cambios/CambiosEnVivo";
 import { MensajesDeCambios } from "@/features/cambios/MensajesDeCambios";
 
@@ -189,6 +190,7 @@ export function AppLayout() {
           </div>
         </header>
 
+        <VersionNueva />
         <main className="flex-1 overflow-x-hidden overflow-y-auto" style={{ background: "var(--bg-subtle)" }}>
           <div className="px-4 py-5 md:px-7 md:py-7">
             <Outlet />
