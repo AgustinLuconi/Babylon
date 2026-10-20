@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { ejecutarComo } from "../autoria";
 import { config } from "../config";
 import type { Rol, ValidadorDeSesion } from "../ports";
 
@@ -58,7 +59,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
 
   req.auth = { sub: payload.sub, rol: payload.rol, sesionId: payload.sid, expiraEn: payload.exp ? new Date(payload.exp * 1000) : null };
-  next();
+  // Todo lo que corre a partir de acá sabe quién hizo el pedido (core/autoria.ts).
+  ejecutarComo({ usuarioId: payload.sub, rol: payload.rol }, next);
 }
 
 export function requireRole(...rolesPermitidos: Rol[]) {

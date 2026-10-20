@@ -67,6 +67,8 @@ import { ObservacionController } from "./modules/observaciones/observacion.contr
 
 import { PrismaChatRepository } from "./modules/chats/chat.repository.prisma";
 import { suscribirChatEnVivo } from "./modules/chats/chat.tiempoReal";
+import { PrismaDestinatariosDeCambios } from "./modules/cambios/cambio.destinatarios.prisma";
+import { suscribirDifusionDeCambios } from "./modules/cambios/cambio.difusion";
 import { ChatService } from "./modules/chats/chat.service";
 import { ChatController } from "./modules/chats/chat.controller";
 
@@ -150,6 +152,7 @@ suscribirAvisos(tablero, notificacionService);
 // Sesiones cerradas por cualquier camino: después de confirmar, el canal corta las conexiones en vivo que ya no valen.
 tablero.alConfirmarse("sesiones.cerradas", ({ usuarioId, motivo }) => canalEnVivo.revisarSesiones(usuarioId, motivo));
 suscribirChatEnVivo(tablero, canalEnVivo);
+suscribirDifusionDeCambios(tablero, canalEnVivo, new PrismaDestinatariosDeCambios(prisma), async (id) => (await usuarioRepository.findById(id))?.nombre ?? "");
 
 // --- Composition root: lo único que server.ts necesita para montar rutas ---
 export const container = {
