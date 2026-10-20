@@ -14,6 +14,8 @@ import { NotificationBell } from "./NotificationBell";
 import { ContadorChats } from "./ContadorChats";
 import { TiempoReal } from "@/core/tiempoReal/TiempoReal";
 import { ProteccionSinGuardar } from "@/core/sinGuardar/ProteccionSinGuardar";
+import { CambiosEnVivo } from "@/features/cambios/CambiosEnVivo";
+import { MensajesDeCambios } from "@/features/cambios/MensajesDeCambios";
 
 function BabylonLogo({ dark = false }: { dark?: boolean }) {
   return (
@@ -130,6 +132,8 @@ export function AppLayout() {
     <div className="flex min-h-screen" style={{ background: "var(--bg-subtle)" }}>
       <TiempoReal />
       <ProteccionSinGuardar />
+      <CambiosEnVivo />
+      <MensajesDeCambios />
       <aside className="fixed left-0 top-0 z-30 hidden h-screen w-[244px] shrink-0 md:flex">
         <SidebarContent />
       </aside>
