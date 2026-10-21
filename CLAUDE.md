@@ -209,13 +209,13 @@ Las entidades secundarias normalmente no tienen su propio `*.repository.ts` — 
   - Las sesiones no se publican servicio por servicio: el módulo se suscribe a `sesiones.cerradas`.
   - `CuotaRepository.marcarVencidas` devuelve las cuotas marcadas (no la cantidad), para avisar a sus familias.
 - **Destinatarios** (`cambio.destinatarios.prisma.ts`, lectura cruzada sobre Prisma, solo cuentas activas). Regla de oro: **una señal nunca le dice a alguien algo que la API no le dejaría leer.**
-  - Administración y secretaría reciben casi todo; `usuarios` solo el administrador; `ciclos`, todos.
+  - Administración y secretaría reciben casi todo (por rol, con los ids completos); `usuarios` y `profesores` solo el administrador (`GET /api/profesores` es solo suyo); `ciclos`: activar uno le llega a todos, un ciclo nuevo solo a administración, secretaría y profesores.
   - El profesor recibe lo de sus cursos (en una reasignación, el anterior y el nuevo).
-  - El padre recibe lo de sus hijos. **Nada en borrador le llega a las familias:** evaluaciones solo al publicarse, notas solo de evaluaciones publicadas, notas de cierre solo al publicarse.
+  - El padre recibe lo de sus hijos. Cada familia y cada profesor reciben los **ids recortados a lo suyo** (`recortar`: ni ids de otras familias ni cantidades del instituto). **Nada en borrador le llega a las familias:** evaluaciones solo al publicarse, notas solo de evaluaciones publicadas, notas de cierre solo al publicarse.
 - **Señal `cambio`** (`cambio.difusion.ts`): sale **después de confirmar** con `{ dato, accion, ids, por: { usuarioId, nombre, rol } | null }`. El autor se toma al publicar (dentro del pedido), no al confirmar.
 - **En el navegador** (`features/cambios/`):
   - `core/tiempoReal/senales.ts` reparte las señales sin que core/ conozca a los features.
-  - `<CambiosEnVivo />` traduce cada `cambio` en las consultas a volver a pedir (`claves.ts`; TanStack solo recarga las que están en pantalla). Espera 300 ms sin señales, así un lote de cobros es una sola recarga.
+  - `<CambiosEnVivo />` traduce cada `cambio` en las consultas a volver a pedir (`claves.ts`; TanStack solo recarga las que están en pantalla). Espera 300 ms sin señales, así un lote de cobros es una sola recarga, pero nunca más de 2 s desde la primera (`programador.ts`): con señales que no paran, la pantalla igual se pone al día.
   - Al reconectarse (un `listo` que no es el primero) vuelve a pedir todo lo que está en pantalla.
   - Los cambios ajenos quedan en `core/tiempoReal/cambiosEnVivo.ts` (para el resaltado y los avisos de nómina).
   - `<MensajesDeCambios />` arma el texto con los nombres de la caché (`nombres.ts`, `mensajes.ts`): abajo a la derecha, 5 s, hasta 3. Junta los iguales que llegan dentro de 1 s. No se le muestra a quien hizo el cambio.
