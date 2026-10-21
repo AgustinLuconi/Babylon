@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Moon, Plus, Sun } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
@@ -25,11 +25,17 @@ export default function ConfiguracionPage() {
   const [valorCuota, setValorCuota] = useState("");
   const [cuotaGuardada, setCuotaGuardada] = useState(false);
 
-  useEffect(() => {
-    if (configuracion?.valorCuota != null) setValorCuota(String(configuracion.valorCuota));
-  }, [configuracion?.valorCuota]);
-
   const valorGuardado = configuracion?.valorCuota != null ? String(configuracion.valorCuota) : "";
+  // Si otra persona cambia el valor, el campo se pone al día solo mientras siga mostrando el valor guardado anterior:
+  // lo que se está escribiendo nunca se pisa.
+  const ultimoGuardado = useRef("");
+  useEffect(() => {
+    // El anterior se copia antes: la función de setValorCuota corre recién en el próximo render.
+    const anterior = ultimoGuardado.current;
+    ultimoGuardado.current = valorGuardado;
+    setValorCuota((actual) => (actual === anterior ? valorGuardado : actual));
+  }, [valorGuardado]);
+
   useSinGuardar(valorCuota !== valorGuardado || nuevoAnio.trim() !== "");
 
   const valorNumerico = Number(valorCuota);
