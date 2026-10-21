@@ -76,15 +76,17 @@ function useNotasTipeadas(guardadas: { alumnoId: string; nota: string; observaci
   return { notas, observaciones, tipearNota, tipearObservacion };
 }
 
-// ¿Hay algo tipeado distinto de lo que ya está guardado?
+// ¿Hay algo tipeado distinto de lo que ya está guardado, para los alumnos que siguen en la nómina? Lo tipeado para un
+// alumno que se fue no cuenta: ya no se ve ni se puede guardar.
 function difiereDeLoGuardado(
   notas: Record<string, string>,
   observaciones: Record<string, string>,
   guardadas: { alumnoId: string; nota: string; observacion?: string | null }[],
+  nomina: { id: string }[] | undefined,
 ): boolean {
   const porAlumno = new Map(guardadas.map((g) => [g.alumnoId, g]));
-  const ids = new Set([...Object.keys(notas), ...Object.keys(observaciones), ...porAlumno.keys()]);
-  return [...ids].some(
+  const ids = (nomina ?? []).map((a) => a.id);
+  return ids.some(
     (id) => (notas[id] ?? "") !== (porAlumno.get(id)?.nota ?? "") || (observaciones[id] ?? "") !== (porAlumno.get(id)?.observacion ?? ""),
   );
 }
@@ -189,7 +191,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
     fecha: hoyLocalISO(),
   });
   const nuevaEvaluacionSinGuardar = showNewEval && newForm.nombre.trim() !== "";
-  useSinGuardar(difiereDeLoGuardado(notas, observaciones, calificacionesExistentes ?? []) || nuevaEvaluacionSinGuardar);
+  useSinGuardar(difiereDeLoGuardado(notas, observaciones, calificacionesExistentes ?? [], alumnos) || nuevaEvaluacionSinGuardar);
 
   const notasNumericas = evalObj?.escala === "numerica" ? Object.values(notas).map(Number).filter((n) => !Number.isNaN(n)) : [];
   const promedio = notasNumericas.length ? (notasNumericas.reduce((a, n) => a + n, 0) / notasNumericas.length).toFixed(1) : "—";
@@ -472,10 +474,12 @@ function SeccionNotasCierre({ cursoId, soloLectura }: { cursoId: string; soloLec
   const [confirmar, setConfirmar] = useState(false);
 
   const { notas, observaciones, tipearNota, tipearObservacion } = useNotasTipeadas(notasExistentes, `${cursoId}|${periodo}`);
-  useSinGuardar(difiereDeLoGuardado(notas, observaciones, notasExistentes ?? []));
+  useSinGuardar(difiereDeLoGuardado(notas, observaciones, notasExistentes ?? [], alumnos));
 
 
-  const todasPublicadas = (alumnos?.length ?? 0) > 0 && (notasExistentes?.length ?? 0) === alumnos?.length && (notasExistentes ?? []).every((n) => n.estado === "publicada");
+  // Sobre la nómina actual: una baja no vuelve borrador las notas ya publicadas de los demás.
+  const todasPublicadas =
+    (alumnos?.length ?? 0) > 0 && (alumnos ?? []).every((a) => (notasExistentes ?? []).some((n) => n.alumnoId === a.id && n.estado === "publicada"));
 
   const completas = alumnos?.filter((a) => notas[a.id]?.trim()).length ?? 0;
 
