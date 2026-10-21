@@ -32,9 +32,10 @@ export function suscribirDifusionDeCambios(
       ids: cambio.ids,
       por: autor ? { usuarioId: autor.usuarioId, nombre: await buscarNombre(autor.usuarioId), rol: autor.rol } : null,
     };
-    const senal = { tipo: "cambio", datos };
-    if (roles.length > 0) canal.enviarARoles(roles, senal);
-    // Una cuenta de un rol que ya recibió por rol (una sesión de padre o profesor en `roles`) no se repite.
-    for (const c of cuentas) if (!roles.includes(c.rol)) canal.enviarA(c.usuarioId, c.rol, senal);
+    if (roles.length > 0) canal.enviarARoles(roles, { tipo: "cambio", datos });
+    // Cada familia y cada profesor, con sus ids recortados. Un rol que ya recibió por rol no se repite.
+    for (const c of cuentas) {
+      if (!roles.includes(c.rol)) canal.enviarA(c.usuarioId, c.rol, { tipo: "cambio", datos: { ...datos, ids: c.ids } });
+    }
   }
 }

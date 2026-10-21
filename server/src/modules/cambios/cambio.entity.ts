@@ -69,7 +69,9 @@ export interface SenalCambio extends Omit<CambioDeDatos, "visibleParaFamilias"> 
   por: PorQuien | null;
 }
 
+// Administración y secretaría (por rol) reciben los ids completos; cada cuenta de familia o de profesor recibe los suyos,
+// recortados a lo que le corresponde (nunca ids de otras familias ni de cursos ajenos).
 export interface Destinatarios {
   roles: Rol[];
-  cuentas: { usuarioId: string; rol: Rol }[];
+  cuentas: { usuarioId: string; rol: Rol; ids: IdsDeCambio }[];
 }
