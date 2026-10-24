@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -64,8 +66,9 @@ export default function ProfesoresAdminPage() {
     handleSubmit,
     reset,
     setError,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ProfesorForm>({ resolver: zodResolver(profesorSchema) });
+  useSinGuardar(!!modal && isDirty);
 
   const cicloActivo = ciclos?.find((c) => c.activo);
 
@@ -100,6 +103,7 @@ export default function ProfesoresAdminPage() {
       normalizarTexto(`${p.nombre} ${p.apellido ?? ""} ${p.dni ?? ""} ${p.email ?? ""}`).includes(termino),
     );
   }, [profesores, busqueda]);
+  const filasProfesores = useListaConSalidas(profesoresFiltrados, (p) => p.id, ["profesores", "cursos"]);
 
   const abrirNuevo = () => {
     reset({ nombre: "", apellido: "", dni: "", telefono: "", email: "", password: "" });
@@ -218,8 +222,8 @@ export default function ProfesoresAdminPage() {
                 </td>
               </tr>
             )}
-            {profesoresFiltrados.map((profesor) => (
-              <tr key={profesor.id} style={{ opacity: profesor.estado === "inactivo" ? 0.55 : 1 }}>
+            {filasProfesores.map(({ item: profesor, estado }) => (
+              <tr key={profesor.id} className={claseDeFila(estado)} style={{ opacity: profesor.estado === "inactivo" ? 0.55 : 1 }}>
                 <td>
                   <div className="flex items-center gap-2.5">
                     <Avatar name={nombreCompleto(profesor)} size="xs" tone="brand" />
@@ -275,10 +279,10 @@ export default function ProfesoresAdminPage() {
 
       {/* Mobile */}
       <div className="space-y-2.5 md:hidden">
-        {profesoresFiltrados.map((profesor) => (
+        {filasProfesores.map(({ item: profesor, estado }) => (
           <div
             key={profesor.id}
-            className="card-hl p-4"
+            className={`card-hl p-4 ${claseDeFila(estado)}`}
             style={{ opacity: profesor.estado === "inactivo" ? 0.55 : 1 }}
           >
             <div className="flex items-center gap-3">
@@ -310,6 +314,7 @@ export default function ProfesoresAdminPage() {
 
       {modal && (
         <Modal
+          sinGuardar={isDirty}
           title={modal.mode === "new" ? "Nuevo profesor" : "Editar profesor"}
           onClose={() => setModal(null)}
           footer={

@@ -5,6 +5,7 @@ import { sidDelToken } from "@/core/lib/token";
 import { useSessionStore } from "@/core/store/sessionStore";
 import { avisarCierreLocal, iniciarTiempoReal } from "./coordinador";
 import type { SenalEnVivo } from "./lectorSse";
+import { emitirSenal } from "./senales";
 
 const MOTIVOS_CON_MENSAJE = ["cerrada-por-el-usuario", "cerrada-desde-otro-dispositivo", "contrasena-cambiada", "cuenta-desactivada"];
 
@@ -24,6 +25,7 @@ export function TiempoReal() {
     const sid = token ? sidDelToken(token) : null;
     if (!token || !sid) return;
     const alSenal = (senal: SenalEnVivo) => {
+      emitirSenal(senal);
       if (senal.tipo === "notificaciones" || senal.tipo === "listo") {
         void queryClient.invalidateQueries({ queryKey: ["notificaciones"] });
         // Al (re)conectarse, lo del chat que llegó mientras la conexión estaba cortada no tuvo señal: se vuelve a pedir.

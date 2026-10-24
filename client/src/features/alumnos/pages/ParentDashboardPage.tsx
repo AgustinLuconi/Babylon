@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { etiquetaDeAutor } from "@/features/observaciones/autor";
+import { Resaltable } from "@/core/components/ui/resaltable";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, Check, ChevronLeft, ChevronRight, Eye, FileSignature, FileText, Upload } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
@@ -194,6 +197,15 @@ export default function ParentDashboardPage() {
     );
   };
 
+  // Lo que cambia por algo que hizo otra persona se resalta un momento.
+  const filasNotas = useListaConSalidas(calificaciones ?? [], (c) => c.id, ["calificaciones", "evaluaciones"]);
+  const filasAsistencia = useListaConSalidas(
+    [...registrosDelMes].sort((a, b) => b.fecha.localeCompare(a.fecha)),
+    (a) => a.id,
+    ["asistencia"],
+  );
+  const filasCuotas = useListaConSalidas(cuotas ?? [], (c) => c.id, ["cuotas"]);
+
   if (!hijos) {
     return <p className="text-muted-foreground">Cargando…</p>;
   }
@@ -252,14 +264,18 @@ export default function ParentDashboardPage() {
           <div>
             <p className="eyebrow">Promedio</p>
             <p className="num-display tnum mt-1.5" style={{ fontSize: 22 }}>
-              {promedio ?? "—"}
+              <Resaltable valor={promedio} datos={["calificaciones", "evaluaciones"]}>
+                {promedio ?? "—"}
+              </Resaltable>
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">/ 10</p>
           </div>
           <div className="border-l pl-3.5" style={{ borderColor: "var(--border-hex)" }}>
             <p className="eyebrow">Asistencia</p>
             <p className="num-display tnum mt-1.5" style={{ fontSize: 22 }}>
-              {asistenciaPct !== null ? `${asistenciaPct}%` : "—"}
+              <Resaltable valor={asistenciaPct} datos={["asistencia"]}>
+                {asistenciaPct !== null ? `${asistenciaPct}%` : "—"}
+              </Resaltable>
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               {presentes + tardanzas}/{totalMarcado} clases
@@ -274,7 +290,9 @@ export default function ParentDashboardPage() {
                 color: cuotaActual ? { pagada: "var(--brand)", pendiente: "var(--warning)", vencida: "var(--danger)" }[cuotaActual.estado] : "var(--text)",
               }}
             >
-              {cuotaActual ? CUOTA_LABELS[cuotaActual.estado] : "—"}
+              <Resaltable valor={cuotaActual?.estado} datos={["cuotas"]}>
+                {cuotaActual ? CUOTA_LABELS[cuotaActual.estado] : "—"}
+              </Resaltable>
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">estado</p>
           </div>
@@ -339,7 +357,7 @@ export default function ParentDashboardPage() {
                         {CATEGORIA_LABELS[o.categoria as CategoriaObservacionPredefinida] ?? "Nota"}
                       </span>
                       <p className="text-[13px] leading-relaxed">{o.texto}</p>
-                      <p className="mt-2 text-[11.5px] text-muted-foreground">— {o.emisorNombre}</p>
+                      <p className="mt-2 text-[11.5px] text-muted-foreground">— {etiquetaDeAutor(o.emisorNombre, o.emisorRol)}</p>
                     </div>
                   ))}
                 </div>
@@ -392,11 +410,11 @@ export default function ParentDashboardPage() {
             {(!calificaciones || calificaciones.length === 0) && (
               <p className="px-5 py-6 text-center text-sm text-muted-foreground">Todavía no hay notas publicadas.</p>
             )}
-            {calificaciones?.map((c, i, arr) => {
+            {filasNotas.map(({ item: c, estado }, i, arr) => {
               const nota = Number.parseFloat(c.nota);
               const tone = Number.isNaN(nota) ? "var(--text)" : nota >= 7 ? "var(--brand)" : nota >= 5 ? "var(--warning)" : "var(--danger)";
               return (
-                <div key={c.id} className="px-5 py-4" style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
+                <div key={c.id} className={`px-5 py-4 ${claseDeFila(estado)}`} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
                   <div className="flex items-start gap-3">
                     <div
                       className="flex shrink-0 items-center justify-center rounded font-semibold tnum"
@@ -511,15 +529,12 @@ export default function ParentDashboardPage() {
                   Todavía no hay registros de asistencia para este mes.
                 </p>
               )}
-              {registrosDelMes
-                .slice()
-                .sort((a, b) => b.fecha.localeCompare(a.fecha))
-                .map((a, i, arr) => {
+              {filasAsistencia.map(({ item: a, estado }, i, arr) => {
                   const [anio, mes, dia] = a.fecha.slice(0, 10).split("-");
                   return (
                     <div
                       key={a.id}
-                      className="flex items-center justify-between px-5 py-3"
+                      className={`flex items-center justify-between px-5 py-3 ${claseDeFila(estado)}`}
                       style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                     >
                       <span className="text-[13px]">
@@ -544,8 +559,8 @@ export default function ParentDashboardPage() {
       {tab === "fees" && (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {(!cuotas || cuotas.length === 0) && <p className="text-sm text-muted-foreground">Todavía no hay cuotas cargadas.</p>}
-          {cuotas?.map((c) => (
-            <div key={c.id} className="card-hl p-4">
+          {filasCuotas.map(({ item: c, estado }) => (
+            <div key={c.id} className={`card-hl p-4 ${claseDeFila(estado)}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[13.5px] font-medium capitalize">

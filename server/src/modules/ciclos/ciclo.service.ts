@@ -5,13 +5,14 @@ import { sinAnuncios } from "../../core/eventos";
 import type { CicloRepository } from "./ciclo.repository";
 import type { Ciclo } from "./ciclo.entity";
 import type { CrearCicloInput } from "./ciclo.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosCiclos } from "./ciclo.eventos";
 
 export class CicloService {
   constructor(
     private readonly cicloRepo: CicloRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosCiclos> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosCiclos & EventosCambios> = sinAnuncios(),
   ) {}
 
   async listarCiclos(): Promise<Ciclo[]> {
@@ -33,7 +34,9 @@ export class CicloService {
     }
 
     const ciclo: Ciclo = { id: randomUUID(), anio: datos.anio, activo: false };
-    return this.cicloRepo.create(ciclo);
+    const creado = await this.cicloRepo.create(ciclo);
+    await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "alta", ids: { cicloIds: [creado.id] } });
+    return creado;
   }
 
   // Un solo ciclo puede estar activo a la vez (define a qué ciclo se asocian
@@ -48,6 +51,8 @@ export class CicloService {
       await this.cicloRepo.desactivarTodos(tx);
       const activo = await this.cicloRepo.update(id, { ...ciclo, activo: true }, tx);
       await this.anuncios.publicar("ciclo.activado", { cicloId: id }, tx);
+      // Cambia todo lo que muestran las pantallas: todas vuelven a pedir sus datos.
+      await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "activacion", ids: { cicloIds: [id] } }, tx);
       return activo;
     });
   }

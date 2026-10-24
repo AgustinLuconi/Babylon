@@ -10,6 +10,7 @@ import type { Usuario } from "../usuarios/usuario.entity";
 import type { ProfesorRepository } from "./profesor.repository";
 import type { Profesor } from "./profesor.entity";
 import type { ActualizarProfesorInput, CrearProfesorInput, CrearProfesorSinCuentaInput } from "./profesor.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 
 export type ProfesorCreado = Profesor & { invitacion: EstadoInvitacion | null };
@@ -21,7 +22,7 @@ export class ProfesorService {
     private readonly sesionRepo: SesionRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly invitaciones: InvitacionService,
-    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
   async listarProfesores(): Promise<Profesor[]> {
@@ -82,6 +83,8 @@ export class ProfesorService {
       };
       const creado = await this.profesorRepo.create(profesor, tx);
       if (!cuenta) await this.anuncios.publicar("cuenta.cambio", { usuarioId }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "alta", ids: { profesorIds: [creado.id] } }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuarioId] } }, tx);
       return { profesor: creado, cuenta };
     });
 
@@ -99,7 +102,9 @@ export class ProfesorService {
       telefono: datos.telefono,
       estado: "activo",
     };
-    return this.profesorRepo.create(profesor);
+    const creado = await this.profesorRepo.create(profesor);
+    await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "alta", ids: { profesorIds: [creado.id] } });
+    return creado;
   }
 
   // Si el profesor tiene cuenta de acceso, el login (nombre, email, estado)
@@ -173,11 +178,16 @@ export class ProfesorService {
               await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
               await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cuenta-desactivada" }, tx);
             }
-            if (actualizado.estado !== profesor.estado) await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+            if (actualizado.estado !== profesor.estado) {
+              await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+              await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "estado", ids: { usuarioIds: [usuario.id] } }, tx);
+            }
           }
         }
       }
-      return this.profesorRepo.update(id, actualizado, tx);
+      const guardado = await this.profesorRepo.update(id, actualizado, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [id] } }, tx);
+      return guardado;
     });
   }
 }

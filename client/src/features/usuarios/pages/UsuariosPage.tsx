@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -98,6 +100,7 @@ type IdPestana = (typeof PESTANAS)[number][0];
 export default function UsuariosPage() {
   const { usuario: sesion } = useAuth();
   const { data: cuentas, isLoading } = useUsuarios();
+  const filasCuentas = useListaConSalidas(cuentas ?? [], (c) => c.id, ["usuarios"]);
   const cambiarEstado = useCambiarEstadoUsuario();
   const crearAdministrador = useCrearAdministrador();
   const crearSecretario = useCrearSecretario();
@@ -137,8 +140,9 @@ export default function UsuariosPage() {
     setValue,
     watch,
     clearErrors,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<CuentaForm>({ resolver: zodResolver(cuentaSchema), defaultValues: VALORES_INICIALES });
+  useSinGuardar(mostrarModal && isDirty);
 
   const rol = watch("rol");
   const password = watch("password");
@@ -263,8 +267,8 @@ export default function UsuariosPage() {
                 </td>
               </tr>
             )}
-            {(cuentas ?? []).map((cuenta) => (
-              <tr key={cuenta.id} style={{ opacity: cuenta.estado === "inactivo" ? 0.5 : 1 }}>
+            {filasCuentas.map(({ item: cuenta, estado }) => (
+              <tr key={cuenta.id} className={claseDeFila(estado)} style={{ opacity: cuenta.estado === "inactivo" ? 0.5 : 1 }}>
                 <td>
                   <div className="flex items-center gap-2.5">
                     <Avatar name={cuenta.nombre} size="xs" />
@@ -300,8 +304,8 @@ export default function UsuariosPage() {
 
       {/* Mobile */}
       <div className="space-y-2.5 md:hidden">
-        {(cuentas ?? []).map((cuenta) => (
-          <div key={cuenta.id} className="card-hl p-4" style={{ opacity: cuenta.estado === "inactivo" ? 0.5 : 1 }}>
+        {filasCuentas.map(({ item: cuenta, estado }) => (
+          <div key={cuenta.id} className={`card-hl p-4 ${claseDeFila(estado)}`} style={{ opacity: cuenta.estado === "inactivo" ? 0.5 : 1 }}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <Avatar name={cuenta.nombre} size="md" />
@@ -333,6 +337,7 @@ export default function UsuariosPage() {
 
       {mostrarModal && (
         <Modal
+          sinGuardar={isDirty}
           title="Crear usuario"
           onClose={() => setMostrarModal(false)}
           footer={

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCheck, Info } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
@@ -16,6 +17,10 @@ import { asistenciaService } from "../asistenciaService";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
+import { AvisosDeNomina } from "@/features/cursos/components/AvisosDeNomina";
+import { useAvisosDeNomina } from "@/features/cursos/hooks/useAvisosDeNomina";
+import { useCursoPerdido } from "@/features/cursos/hooks/useCursoPerdido";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
 const DIAS_ORDEN: DiaSemana[] = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
 
@@ -78,7 +83,10 @@ export default function AsistenciaProfesorPage() {
   const { leer, escribir } = useFiltrosDeUrl();
   const cursoPedido = leer("curso");
   const cursoEsPropio = !!cursos?.some((c) => c.id === cursoPedido);
-  const cursoId = cursoEsPropio ? (cursoPedido as string) : cursos?.[0]?.id;
+  const candidato = cursoEsPropio ? (cursoPedido as string) : cursos?.[0]?.id;
+  // Si el curso abierto deja de estar a cargo del profesor, la pantalla se queda en él (con lo marcado) y avisa.
+  const cursoPerdido = useCursoPerdido(cursoPedido, candidato, cursos);
+  const cursoId = cursoPerdido ?? candidato;
   const setCursoId = (id: string) => escribir({ curso: id, fecha: null });
 
   const horariosDelCurso = useMemo(() => (horarios ?? []).filter((h) => h.cursoId === cursoId), [horarios, cursoId]);
@@ -95,6 +103,8 @@ export default function AsistenciaProfesorPage() {
   const setFecha = (nueva: string) => escribir({ fecha: nueva });
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
+  const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
+  const { avisos, cerrar } = useAvisosDeNomina(cursoId, alumnos);
   const tomarAsistencia = useTomarAsistencia();
 
   const [estados, setEstados] = useState<Record<string, EstadoAsistencia>>({});
@@ -150,6 +160,17 @@ export default function AsistenciaProfesorPage() {
   const minutosEfectivo = (alumnoId: string): number | undefined =>
     minutos[alumnoId] ?? registroExistente(alumnoId)?.minutosRetraso;
   const motivoEfectivo = (alumnoId: string): string => motivos[alumnoId] ?? registroExistente(alumnoId)?.motivo ?? "";
+  // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo).
+  useSinGuardar(
+    (alumnos ?? []).some((a) => {
+      const guardado = registroExistente(a.id);
+      return (
+        (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
+        (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
+        (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? ""))
+      );
+    }),
+  );
 
   const sesionCompleta = (d: Date) => {
     const iso = fechaLocalISO(d);
@@ -196,6 +217,7 @@ export default function AsistenciaProfesorPage() {
 
   return (
     <div className="space-y-4 pb-24">
+      <AvisosDeNomina avisos={avisos} onCerrar={cerrar} cursoPerdido={!!cursoPerdido} />
       <div className="card-hl p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -290,12 +312,12 @@ export default function AsistenciaProfesorPage() {
       </Button>
 
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-        {alumnos?.map((alumno) => {
+        {filasNomina.map(({ item: alumno, estado: estadoFila }) => {
           const estado = estadoEfectivo(alumno.id);
           const ausencias = ausenciasDelMes.get(alumno.id) ?? 0;
           const hasAlert = ausencias >= 3;
           return (
-            <div key={alumno.id} className="card-hl overflow-hidden" style={{ borderColor: hasAlert ? "var(--danger)" : undefined }}>
+            <div key={alumno.id} data-alumno={alumno.id} className={`card-hl overflow-hidden ${claseDeFila(estadoFila)}`} style={{ borderColor: hasAlert ? "var(--danger)" : undefined }}>
               <div className="p-4">
                 <div className="mb-3 flex items-center gap-3">
                   <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="md" tone={estado === "presente" ? "brand" : "neutral"} />
@@ -323,6 +345,7 @@ export default function AsistenciaProfesorPage() {
                       <button
                         key={st.id}
                         onClick={() => setEstado(alumno.id, st.id)}
+                        aria-pressed={active}
                         className="flex items-center justify-center gap-1.5 rounded text-[12.5px] font-medium transition-all"
                         style={{
                           minHeight: 44,
@@ -386,7 +409,7 @@ export default function AsistenciaProfesorPage() {
           ) : (
             <Button
               className="w-full justify-center"
-              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId}
+              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido}
               onClick={onGuardar}
             >
               {tomarAsistencia.isPending

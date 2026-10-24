@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import { limiteTiempoReal } from "./middlewares/limitesDePedidos";
 import type { CanalEnVivo, MotivoCierre, SenalEnVivo, ValidadorDeSesion } from "./ports";
+import { VERSION_SERVIDOR } from "./version";
 
 const LATIDO_MS = 25 * 1000;
 const REVALIDAR_MS = 5 * 60 * 1000;
@@ -48,7 +49,7 @@ export function tiempoRealRoutes(canal: CanalEnVivo, validar: ValidadorDeSesion)
     };
 
     quitar = canal.registrar({ sesionId, usuarioId, rol, enviar, cerrar });
-    enviar({ tipo: "listo" });
+    enviar({ tipo: "listo", datos: { version: VERSION_SERVIDOR } });
     latido = setInterval(() => {
       if (abierta) res.write(": latido\n\n");
     }, LATIDO_MS);

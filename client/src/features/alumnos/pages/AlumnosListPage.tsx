@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, Pencil, UserPlus } from "lucide-react";
 import { Input } from "@/core/components/ui/input";
@@ -123,6 +124,7 @@ export default function AlumnosListPage() {
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
   const paginados = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
+  const filasAlumnos = useListaConSalidas(paginados, (a) => a.id, ["alumnos", "cuotas", "documentos"]);
 
 
   const paginacion = filtrados.length > 0 && (
@@ -261,12 +263,12 @@ export default function AlumnosListPage() {
               </TableCell>
             </TableRow>
           )}
-          {paginados.map((alumno) => {
+          {filasAlumnos.map(({ item: alumno, estado }) => {
             const padre = alumno.padreId ? padresPorId.get(alumno.padreId) : undefined;
             const curso = alumno.cursoId ? cursosPorId.get(alumno.cursoId) : undefined;
             const estadoCuota = estadoCuotaPorAlumno.get(alumno.id);
             return (
-              <TableRow key={alumno.id}>
+              <TableRow key={alumno.id} className={claseDeFila(estado)}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
                     <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="xs" />
@@ -339,12 +341,12 @@ export default function AlumnosListPage() {
         {!isLoading && !isError && paginados.length === 0 && (
           <p className="card-hl py-10 text-center text-sm text-muted-foreground">No hay alumnos que coincidan con la búsqueda.</p>
         )}
-        {paginados.map((alumno) => {
+        {filasAlumnos.map(({ item: alumno, estado }) => {
           const padre = alumno.padreId ? padresPorId.get(alumno.padreId) : undefined;
           const curso = alumno.cursoId ? cursosPorId.get(alumno.cursoId) : undefined;
           const estadoCuota = estadoCuotaPorAlumno.get(alumno.id);
           return (
-            <div key={alumno.id} data-tarjeta-alumno className="card-hl p-4">
+            <div key={alumno.id} data-tarjeta-alumno className={`card-hl p-4 ${claseDeFila(estado)}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="md" />

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { etiquetaDeAutor } from "@/features/observaciones/autor";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Avatar } from "@/core/components/ui/avatar";
@@ -23,7 +25,7 @@ import { NIVEL_GRUPO, NIVEL_LABELS } from "@/features/cursos/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
 import { useCuotasPorAlumno } from "@/features/cuotas/hooks/useCuotasPorAlumno";
 import { useRegistrarPago } from "@/features/cuotas/hooks/useRegistrarPago";
-import { estadoMasUrgente, METODO_PAGO_LABELS, type Cuota, type EstadoCuota, type MetodoPago } from "@/features/cuotas/types";
+import { estadoMasUrgente, METODO_PAGO_LABELS, type EstadoCuota, type MetodoPago } from "@/features/cuotas/types";
 import { useDocumentosPorAlumno } from "@/features/documentos/hooks/useDocumentosPorAlumno";
 import { useMarcarAutorizacionManual } from "@/features/documentos/hooks/useMarcarAutorizacionManual";
 import { useMarcarCargado } from "@/features/documentos/hooks/useMarcarCargado";
@@ -40,6 +42,7 @@ import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
 const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
@@ -114,6 +117,7 @@ export default function AlumnoDetailPage() {
     () => (calificaciones ?? []).filter((c) => c.evaluacionPeriodo === periodo),
     [calificaciones, periodo],
   );
+  const filasNotas = useListaConSalidas(evalsDelPeriodo, (c) => c.id, ["calificaciones", "evaluaciones"]);
   const promedioPeriodo = useMemo(() => {
     const notas = evalsDelPeriodo.map((c) => Number(c.nota)).filter((n) => !Number.isNaN(n));
     return notas.length > 0 ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1) : "—";
@@ -170,6 +174,7 @@ export default function AlumnoDetailPage() {
 
   // Cuotas
   const { data: cuotas, isLoading: cargandoCuotas } = useCuotasPorAlumno(alumnoId ?? null);
+  const filasCuotas = useListaConSalidas(cuotas ?? [], (c) => c.id, ["cuotas"]);
   const [cuotaIdsSeleccionadas, setCuotaIdsSeleccionadas] = useState<string[]>([]);
   const [metodo, setMetodo] = useState<MetodoPago>("efectivo");
   const registrarPago = useRegistrarPago();
@@ -197,6 +202,7 @@ export default function AlumnoDetailPage() {
     () => (obsFiltro === "all" ? observaciones : observaciones?.filter((o) => o.categoria === obsFiltro)),
     [observaciones, obsFiltro],
   );
+  const filasObservaciones = useListaConSalidas(observacionesVisibles ?? [], (o) => o.id, ["observaciones"]);
   const [modalObs, setModalObs] = useState(false);
   const [obsCategoria, setObsCategoria] = useState<string>("academico");
   const [obsTexto, setObsTexto] = useState("");
@@ -242,28 +248,36 @@ export default function AlumnoDetailPage() {
   const [formPadre, setFormPadre] = useState({
     nombre: "", apellido: "", direccion: "", telefono: "", email: "", vinculo: "padre" as VinculoPadre,
   });
+  // Cómo estaba el formulario al abrirse: distinto de eso es "sin guardar".
+  const [inicialEdicion, setInicialEdicion] = useState("");
   const abrirEditar = () => {
     if (!alumno) return;
-    setFormAlumno({
+    const datosAlumno = {
       nombre: alumno.nombre,
       apellido: alumno.apellido,
       direccion: alumno.direccion ?? "",
       telefono: alumno.telefono ?? "",
       email: alumno.email ?? "",
       observacionesMedicas: alumno.observacionesMedicas ?? "",
-    });
-    if (padre) {
-      setFormPadre({
-        nombre: padre.nombre,
-        apellido: padre.apellido,
-        direccion: padre.direccion ?? "",
-        telefono: padre.telefono ?? "",
-        email: padre.email ?? "",
-        vinculo: padre.vinculo,
-      });
-    }
+    };
+    const datosPadre = padre
+      ? {
+          nombre: padre.nombre,
+          apellido: padre.apellido,
+          direccion: padre.direccion ?? "",
+          telefono: padre.telefono ?? "",
+          email: padre.email ?? "",
+          vinculo: padre.vinculo,
+        }
+      : formPadre;
+    setFormAlumno(datosAlumno);
+    setFormPadre(datosPadre);
+    setInicialEdicion(JSON.stringify({ datosAlumno, datosPadre }));
     setModalEditar(true);
   };
+  const edicionSinGuardar = modalEditar && JSON.stringify({ datosAlumno: formAlumno, datosPadre: formPadre }) !== inicialEdicion;
+  const observacionSinGuardar = modalObs && obsTexto.trim() !== "";
+  useSinGuardar(edicionSinGuardar || observacionSinGuardar);
   const guardandoEdicion = actualizarAlumno.isPending || actualizarPadre.isPending;
   const errorEdicion = actualizarAlumno.error ?? actualizarPadre.error;
   const onGuardarEdicion = async () => {
@@ -533,14 +547,14 @@ export default function AlumnoDetailPage() {
               }
             >
               <div>
-                {evalsDelPeriodo.map((c, i) => {
+                {filasNotas.map(({ item: c, estado }, i) => {
                   const notaNum = Number(c.nota);
                   const tone = Number.isNaN(notaNum) ? "var(--text)" : notaNum >= 7 ? "var(--brand)" : notaNum >= 5 ? "var(--warning)" : "var(--danger)";
                   return (
                     <div
                       key={c.id}
-                      className="flex items-start gap-3 px-5 py-3.5"
-                      style={{ borderBottom: i < evalsDelPeriodo.length - 1 ? "1px solid var(--border-hex)" : "none" }}
+                      className={`flex items-start gap-3 px-5 py-3.5 ${claseDeFila(estado)}`}
+                      style={{ borderBottom: i < filasNotas.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                     >
                       <div className="tnum flex h-10 w-10 shrink-0 items-center justify-center rounded font-semibold" style={{ background: "var(--bg-muted)", color: tone, fontSize: 15 }}>
                         {c.nota}
@@ -674,8 +688,8 @@ export default function AlumnoDetailPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {cuotas?.map((cuota: Cuota) => (
-                  <TableRow key={cuota.id}>
+                {filasCuotas.map(({ item: cuota, estado }) => (
+                  <TableRow key={cuota.id} className={claseDeFila(estado)}>
                     <TableCell>
                       <input
                         type="checkbox"
@@ -756,13 +770,13 @@ export default function AlumnoDetailPage() {
               <CardContent className="p-6 text-center text-[12.5px] text-muted-foreground">Sin observaciones en esta categoría.</CardContent>
             </Card>
           )}
-          {observacionesVisibles?.map((observacion) => (
-            <Card key={observacion.id}>
+          {filasObservaciones.map(({ item: observacion, estado }) => (
+            <Card key={observacion.id} className={claseDeFila(estado)}>
               <CardContent className="flex items-start gap-3 p-4">
                 <Avatar name={observacion.emisorNombre} size="sm" tone="brand" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[12.5px] font-semibold">{observacion.emisorNombre}</span>
+                    <span className="text-[12.5px] font-semibold">{etiquetaDeAutor(observacion.emisorNombre, observacion.emisorRol)}</span>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary">{nombresPorCategoria.get(observacion.categoria) ?? observacion.categoria}</Badge>
                       <span className="tnum text-[11.5px] text-muted-foreground">{formatFecha(observacion.fecha)}</span>
@@ -779,6 +793,7 @@ export default function AlumnoDetailPage() {
       {modalObs && (
         <Modal
           title="Nueva observación"
+          sinGuardar={observacionSinGuardar}
           onClose={() => setModalObs(false)}
           footer={
             <>
@@ -836,6 +851,7 @@ export default function AlumnoDetailPage() {
       {modalEditar && (
         <Modal
           title="Editar datos"
+          sinGuardar={edicionSinGuardar}
           onClose={() => setModalEditar(false)}
           footer={
             <>

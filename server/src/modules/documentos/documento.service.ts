@@ -5,6 +5,7 @@ import type { Publicador, UnitOfWork } from "../../core/ports";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "./documento.repository";
 import type { Documento, TipoDocumento } from "./documento.entity";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosDocumentos } from "./documento.eventos";
 import type { AutorizarImagenInput } from "./documento.schema";
 
@@ -13,15 +14,20 @@ export class DocumentoService {
     private readonly documentoRepo: DocumentoRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosDocumentos> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosDocumentos & EventosCambios> = sinAnuncios(),
   ) {}
 
   // Toda escritura de un documento va en una transacción que anuncia el cambio (los avisos de documentación se
   // guardan junto con ella).
-  private guardar(alumnoId: string, escribir: (tx: unknown) => Promise<Documento>): Promise<Documento> {
+  private guardar(
+    alumnoId: string,
+    accion: "carga" | "autorizacion" | "manual" | "revocacion",
+    escribir: (tx: unknown) => Promise<Documento>,
+  ): Promise<Documento> {
     return this.unitOfWork.runInTransaction(async (tx) => {
       const documento = await escribir(tx);
       await this.anuncios.publicar("documentos.cambiaron", { alumnoId }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "documentos", accion, ids: { alumnoIds: [alumnoId] } }, tx);
       return documento;
     });
   }
@@ -66,7 +72,7 @@ export class DocumentoService {
     const ahora = new Date();
 
     if (existente) {
-      return this.guardar(alumnoId, (tx) =>
+      return this.guardar(alumnoId, "carga", (tx) =>
         this.documentoRepo.update(
           existente.id,
           {
@@ -86,7 +92,7 @@ export class DocumentoService {
       estado: "cargado",
       fechaCarga: ahora,
     };
-    return this.guardar(alumnoId, (tx) => this.documentoRepo.create(documento, tx));
+    return this.guardar(alumnoId, "carga", (tx) => this.documentoRepo.create(documento, tx));
   }
 
   async obtenerAutorizacionImagen(alumnoId: string, padreId?: string): Promise<Documento | null> {
@@ -118,7 +124,7 @@ export class DocumentoService {
     const ahora = new Date();
 
     if (existente) {
-      return this.guardar(datos.alumnoId, (tx) =>
+      return this.guardar(datos.alumnoId, "autorizacion", (tx) =>
         this.documentoRepo.update(
           existente.id,
           {
@@ -143,7 +149,7 @@ export class DocumentoService {
       tipoAutorizacion: "digital",
     };
 
-    return this.guardar(datos.alumnoId, (tx) => this.documentoRepo.create(documento, tx));
+    return this.guardar(datos.alumnoId, "autorizacion", (tx) => this.documentoRepo.create(documento, tx));
   }
 
   // Solo Admin/Secretario: cubre el caso de una autorización firmada en papel
@@ -161,7 +167,7 @@ export class DocumentoService {
 
     const ahora = new Date();
     if (existente) {
-      return this.guardar(alumnoId, (tx) =>
+      return this.guardar(alumnoId, "manual", (tx) =>
         this.documentoRepo.update(
           existente.id,
           {
@@ -185,7 +191,7 @@ export class DocumentoService {
       fechaAutorizacion: ahora,
       tipoAutorizacion: "manual",
     };
-    return this.guardar(alumnoId, (tx) => this.documentoRepo.create(documento, tx));
+    return this.guardar(alumnoId, "manual", (tx) => this.documentoRepo.create(documento, tx));
   }
 
   // Solo Admin/Secretario: revierte una autorización ya aceptada (ej. el
@@ -197,7 +203,7 @@ export class DocumentoService {
       throw new ValidationError("Este alumno no tiene una autorización de imagen vigente para revocar");
     }
 
-    return this.guardar(alumnoId, (tx) =>
+    return this.guardar(alumnoId, "revocacion", (tx) =>
       this.documentoRepo.update(
         existente.id,
         {

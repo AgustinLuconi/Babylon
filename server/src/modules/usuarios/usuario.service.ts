@@ -22,6 +22,7 @@ import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "./usuario.eventos";
 import type {
   CambiarContrasenaInput,
@@ -94,7 +95,7 @@ export class UsuarioService {
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
     private readonly invitaciones: InvitacionService,
-    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
   async autenticar(
@@ -159,6 +160,8 @@ export class UsuarioService {
         },
         tx,
       );
+      // La lista de sesiones de Mi cuenta (en cualquier dispositivo de esa cuenta) suma la nueva.
+      await this.anuncios.publicar("datos.cambiaron", { dato: "sesiones", accion: "inicio", ids: { usuarioIds: [usuario.id] } }, tx);
     });
 
     return {
@@ -193,9 +196,11 @@ export class UsuarioService {
 
     if (!datos.password) {
       // Sin contraseña: cuenta pendiente e invitación por email (enviada después de confirmar la transacción).
-      const cuenta = await this.unitOfWork.runInTransaction((tx) =>
-        this.invitaciones.prepararCuentaPendiente({ nombre: datos.nombre, email: datos.email, roles: [rol] }, ahora, tx),
-      );
+      const cuenta = await this.unitOfWork.runInTransaction(async (tx) => {
+        const preparada = await this.invitaciones.prepararCuentaPendiente({ nombre: datos.nombre, email: datos.email, roles: [rol] }, ahora, tx);
+        await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [preparada.usuario.id] } }, tx);
+        return preparada;
+      });
       const enviada = await this.invitaciones.enviarInvitacion(cuenta);
       const { passwordHash: _passwordHash, ...sinPassword } = cuenta.usuario;
       return { ...sinPassword, invitacion: enviada ? "enviada" : "no-enviada" };
@@ -215,6 +220,7 @@ export class UsuarioService {
     await this.unitOfWork.runInTransaction(async (tx) => {
       await this.usuarioRepo.create(usuario, tx);
       await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuario.id] } }, tx);
     });
 
     const { passwordHash: _passwordHash, ...sinPassword } = usuario;
@@ -256,6 +262,7 @@ export class UsuarioService {
         await this.profesorRepo.update(profesor.id, { ...profesor, estado }, tx);
       }
       await this.anuncios.publicar("cuenta.cambio", { usuarioId: id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "estado", ids: { usuarioIds: [id] } }, tx);
       return resultado;
     });
 

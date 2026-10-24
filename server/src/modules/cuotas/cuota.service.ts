@@ -12,6 +12,7 @@ import type { Pago } from "./pago.entity";
 import type { RegistrarPagoInput } from "./cuota.schema";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
 import { esMesLectivo, PORCENTAJE_DESCUENTO_HERMANOS, vencimientoDelMes } from "./cuota.calendario";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosCuotas } from "./cuota.eventos";
 
 export interface Solicitante {
@@ -30,7 +31,7 @@ export class CuotaService {
     private readonly cicloRepo: CicloRepository,
     private readonly configuracionRepo: ConfiguracionRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosCuotas> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosCuotas & EventosCambios> = sinAnuncios(),
   ) {}
 
   // Cada cuota pagada incluye la fecha en que se registró el pago ("Pagada el ..."
@@ -91,6 +92,9 @@ export class CuotaService {
       }
 
       await this.anuncios.publicar("cuotas.cambiaron", { motivo: "pago" }, tx);
+      const cuotas = await Promise.all(datos.cuotaIds.map((id) => this.cuotaRepo.findById(id, tx)));
+      const alumnoIds = [...new Set(cuotas.map((c) => c?.alumnoId).filter((a): a is string => !!a))];
+      await this.anuncios.publicar("datos.cambiaron", { dato: "cuotas", accion: "cobro", ids: { alumnoIds, cuotaIds: datos.cuotaIds } }, tx);
       return pagosRegistrados;
     });
   }
@@ -150,15 +154,21 @@ export class CuotaService {
       const inscripciones = await this.cicloRepo.findInscripcionesByCicloId(ctx.ciclo.id, tx);
       const alumnoIds = [...new Set(inscripciones.map((i) => i.alumnoId))].filter((id) => !conCuota.has(id));
 
-      let creadas = 0;
+      const creadas: Cuota[] = [];
       for (const alumnoId of alumnoIds) {
         const alumno = await this.alumnoRepo.findById(alumnoId, tx);
         if (!alumno || alumno.estado !== "activo") continue;
-        await this.cuotaRepo.create(this.nuevaCuota(alumno, ctx), tx);
-        creadas++;
+        creadas.push(await this.cuotaRepo.create(this.nuevaCuota(alumno, ctx), tx));
       }
-      if (creadas > 0) await this.anuncios.publicar("cuotas.cambiaron", { motivo: "generacion" }, tx);
-      return creadas;
+      if (creadas.length > 0) {
+        await this.anuncios.publicar("cuotas.cambiaron", { motivo: "generacion" }, tx);
+        await this.anuncios.publicar(
+          "datos.cambiaron",
+          { dato: "cuotas", accion: "generacion", ids: { alumnoIds: creadas.map((c) => c.alumnoId), cuotaIds: creadas.map((c) => c.id) } },
+          tx,
+        );
+      }
+      return creadas.length;
     });
   }
 
@@ -166,8 +176,15 @@ export class CuotaService {
   async marcarVencidas(hoy: Date = new Date()): Promise<number> {
     return this.unitOfWork.runInTransaction(async (tx) => {
       const vencidas = await this.cuotaRepo.marcarVencidas(inicioDeHoyUtc(hoy), tx);
-      if (vencidas > 0) await this.anuncios.publicar("cuotas.cambiaron", { motivo: "vencimiento" }, tx);
-      return vencidas;
+      if (vencidas.length > 0) {
+        await this.anuncios.publicar("cuotas.cambiaron", { motivo: "vencimiento" }, tx);
+        await this.anuncios.publicar(
+          "datos.cambiaron",
+          { dato: "cuotas", accion: "vencimiento", ids: { alumnoIds: [...new Set(vencidas.map((c) => c.alumnoId))], cuotaIds: vencidas.map((c) => c.id) } },
+          tx,
+        );
+      }
+      return vencidas.length;
     });
   }
 

@@ -5,6 +5,7 @@ import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { ApiError } from "@/core/lib/apiClient";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { NuevaConversacion } from "../components/NuevaConversacion";
 import { BurbujaMensaje } from "../components/BurbujaMensaje";
 import { VerAnteriores } from "../components/VerAnteriores";
@@ -41,6 +42,7 @@ export default function ChatsAdminPage() {
   const [borrador, setBorrador] = useState({ chatId: selectedId, texto: "" });
   const texto = borrador.chatId === selectedId ? borrador.texto : "";
   const setTexto = (t: string) => setBorrador({ chatId: selectedId, texto: t });
+  useSinGuardar(texto.trim() !== "");
   const visto = vistoDelUltimo(lista, true);
   // En el celular la lista y la conversación no entran lado a lado: con una conversación abierta se ve solo ella, y
   // "volver" la cierra (sale de la dirección). Así una conversación oculta detrás de la lista nunca se marca leída.

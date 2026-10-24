@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -27,8 +28,9 @@ export function CambiarContrasena() {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<Formulario>({ resolver: zodResolver(schema) });
+  useSinGuardar(isDirty);
   const cambiar = useCambiarContrasena();
   const [aviso, setAviso] = useState<string | null>(null);
 

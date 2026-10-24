@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route } from "react-router-dom";
 import { AppLayout } from "@/core/components/layout/AppLayout";
 import LoginPage from "@/features/auth/pages/LoginPage";
 import OlvideContrasenaPage from "@/features/auth/pages/OlvideContrasenaPage";
@@ -26,9 +26,9 @@ import ReportesPage from "@/features/dashboard/pages/ReportesPage";
 import ConfiguracionPage from "@/features/dashboard/pages/ConfiguracionPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
-export function AppRoutes() {
-  return (
-    <Routes>
+// El árbol de rutas, para el router de datos (App.tsx): `useBlocker` (cambios sin guardar) solo funciona con él.
+export const rutas = (
+    <>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/olvide-contrasena" element={<OlvideContrasenaPage />} />
       <Route path="/restablecer-contrasena" element={<RestablecerContrasenaPage />} />
@@ -76,6 +76,5 @@ export function AppRoutes() {
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
-  );
-}
+    </>
+);

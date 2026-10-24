@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { etiquetaDeAutor } from "@/features/observaciones/autor";
+import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
+import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
@@ -58,6 +61,7 @@ export default function ObservacionesProfesorPage() {
   }, [categoriasPersonalizadas]);
 
   const [texto, setTexto] = useState("");
+  useSinGuardar(texto.trim() !== "");
   const [categoria, setCategoria] = useState<string>("academico");
   const [catFilter, setCatFilter] = useState("all");
   const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState("");
@@ -77,6 +81,7 @@ export default function ObservacionesProfesorPage() {
 
   const alumnoSeleccionado = alumnos?.find((a) => a.id === alumnoId);
   const visibles = catFilter === "all" ? observaciones : observaciones?.filter((o) => o.categoria === catFilter);
+  const filasObservaciones = useListaConSalidas(visibles ?? [], (o) => o.id, ["observaciones"]);
 
   return (
     <div className="space-y-4">
@@ -223,12 +228,12 @@ export default function ObservacionesProfesorPage() {
           <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {isError && <p className="text-sm text-destructive">No se pudieron cargar las observaciones.</p>}
-            {visibles?.map((o) => {
+            {filasObservaciones.map(({ item: o, estado }) => {
               const cat = nombresPorCategoria.get(o.categoria);
               return (
-                <div key={o.id} className="card-hl p-4">
+                <div key={o.id} className={`card-hl p-4 ${claseDeFila(estado)}`}>
                   <div className="flex items-start gap-3">
-                    <Avatar name={alumnoSeleccionado ? `${alumnoSeleccionado.nombre} ${alumnoSeleccionado.apellido}` : "?"} size="sm" />
+                    <Avatar name={o.emisorNombre} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span
@@ -240,6 +245,7 @@ export default function ObservacionesProfesorPage() {
                         <span className="tnum shrink-0 text-[11.5px] text-muted-foreground">{formatFecha(o.fecha)}</span>
                       </div>
                       <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">{o.texto}</p>
+                      <p className="mt-2 text-[11.5px] text-muted-foreground">{etiquetaDeAutor(o.emisorNombre, o.emisorRol)}</p>
                     </div>
                   </div>
                 </div>

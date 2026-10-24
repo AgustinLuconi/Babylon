@@ -12,6 +12,7 @@ import { correoInvitacion } from "./correoInvitacion";
 import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
 import type { Usuario } from "./usuario.entity";
 import type { UsuarioRepository } from "./usuario.repository";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "./usuario.eventos";
 
 // Una cuenta pendiente no tiene contraseña utilizable: se guarda el hash de un valor al azar que nadie conoce.
@@ -87,7 +88,7 @@ export class InvitacionService {
     private readonly profesorRepo: ProfesorRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly mailer: Mailer,
-    private readonly anuncios: Publicador<EventosUsuarios> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
   // Dentro de la transacción de quien da el alta: crea la cuenta pendiente y su enlace. El correo se manda después,
@@ -132,6 +133,8 @@ export class InvitacionService {
     // De a una persona: cada una en su propia transacción, y su correo recién después de confirmarla.
     for (const id of padreIds) resultados.push(await this.informar(id, await this.prepararInvitacion("padre", id, ahora)));
     for (const id of profesorIds) resultados.push(await this.informar(id, await this.prepararInvitacion("profesor", id, ahora)));
+    // Cada persona ya se confirmó en su propia transacción: la pestaña Pendientes y la tabla de Cuentas se actualizan.
+    await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "invitacion", ids: { padreIds, profesorIds } });
     return resultados;
   }
 
@@ -141,6 +144,7 @@ export class InvitacionService {
     }
     const resultados: ResultadoEnvio[] = [];
     for (const id of usuarioIds) resultados.push(await this.informar(id, await this.renovarInvitacion(id, ahora, false)));
+    await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "invitacion", ids: { usuarioIds } });
     return resultados;
   }
 
@@ -153,6 +157,7 @@ export class InvitacionService {
       if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
       if (usuario.estado !== "pendiente") throw new ConflictError("La cuenta ya fue activada");
       await this.usuarioRepo.delete(usuarioId, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "invitacion", ids: { usuarioIds: [usuarioId] } }, tx);
     });
   }
 
@@ -231,6 +236,7 @@ export class InvitacionService {
       await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, estado: "activo", emailVerificadoEn: ahora }, tx);
       await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", ahora, tx);
       await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "estado", ids: { usuarioIds: [usuario.id] } }, tx);
     });
   }
 

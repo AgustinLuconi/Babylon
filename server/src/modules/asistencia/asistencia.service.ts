@@ -7,6 +7,7 @@ import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { AsistenciaRepository } from "./asistencia.repository";
 import type { Asistencia } from "./asistencia.entity";
 import type { RegistrarAsistenciaMasivaInput } from "./asistencia.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosAsistencia } from "./asistencia.eventos";
 
 export interface Solicitante {
@@ -20,7 +21,7 @@ export class AsistenciaService {
     private readonly cursoRepo: CursoRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosAsistencia> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosAsistencia & EventosCambios> = sinAnuncios(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -77,6 +78,11 @@ export class AsistenciaService {
       }
 
       await this.anuncios.publicar("asistencia.registrada", { cursoId: datos.cursoId }, tx);
+      await this.anuncios.publicar(
+        "datos.cambiaron",
+        { dato: "asistencia", accion: "registro", ids: { cursoIds: [datos.cursoId], alumnoIds: datos.registros.map((r) => r.alumnoId) } },
+        tx,
+      );
       return asistencias;
     });
   }

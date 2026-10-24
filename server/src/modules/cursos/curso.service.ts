@@ -8,6 +8,7 @@ import type { CursoRepository } from "./curso.repository";
 import type { Curso } from "./curso.entity";
 import type { Horario } from "./horario.entity";
 import type { ActualizarCursoInput, CrearCursoInput } from "./curso.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosCursos } from "./curso.eventos";
 
 export class CursoService {
@@ -16,7 +17,7 @@ export class CursoService {
     private readonly profesorRepo: ProfesorRepository,
     private readonly cicloRepo: CicloRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosCursos> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosCursos & EventosCambios> = sinAnuncios(),
   ) {}
 
   async listarCursos(): Promise<Curso[]> {
@@ -66,6 +67,7 @@ export class CursoService {
         await this.cursoRepo.agregarHorario({ id: randomUUID(), cursoId: curso.id, ...horario }, tx);
       }
       await this.anuncios.publicar("cursos.cambiaron", { cursoId: curso.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "cursos", accion: "alta", ids: { cursoIds: [curso.id], profesorIds: [curso.profesorId] } }, tx);
       return curso;
     });
   }
@@ -106,6 +108,9 @@ export class CursoService {
       }
 
       await this.anuncios.publicar("cursos.cambiaron", { cursoId: id }, tx);
+      // El profesor anterior y el nuevo: al anterior le desaparece el curso.
+      const profesorIds = [...new Set([actual.profesorId, actualizado.profesorId])];
+      await this.anuncios.publicar("datos.cambiaron", { dato: "cursos", accion: "edicion", ids: { cursoIds: [id], profesorIds } }, tx);
       return actualizado;
     });
   }

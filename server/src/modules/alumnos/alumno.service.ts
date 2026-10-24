@@ -9,6 +9,7 @@ import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { AlumnoRepository } from "./alumno.repository";
 import type { Alumno } from "./alumno.entity";
 import type { ActualizarAlumnoInput, NuevoAlumnoInput } from "./alumno.schema";
+import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosAlumnos } from "./alumno.eventos";
 
 export interface HijoConCurso extends Alumno {
@@ -25,7 +26,7 @@ export class AlumnoService {
     private readonly cicloRepo: CicloRepository,
     private readonly cuotaService: CuotaService,
     private readonly unitOfWork: UnitOfWork,
-    private readonly anuncios: Publicador<EventosAlumnos> = sinAnuncios(),
+    private readonly anuncios: Publicador<EventosAlumnos & EventosCambios> = sinAnuncios(),
   ) {}
 
   async listarAlumnos(): Promise<Alumno[]> {
@@ -74,6 +75,9 @@ export class AlumnoService {
       if (curso.profesorId !== profesorId) {
         throw new AuthorizationError("Un profesor solo puede ver la nómina de sus propios cursos");
       }
+      // La nómina con la que el profesor trabaja (asistencia, notas, observaciones): solo alumnos activos. Un alumno
+      // dado de baja deja de aparecer; administración y secretaría siguen viendo el curso completo.
+      return (await this.alumnoRepo.findByCursoId(cursoId)).filter((a) => a.estado === "activo");
     }
 
     return this.alumnoRepo.findByCursoId(cursoId);
@@ -135,6 +139,11 @@ export class AlumnoService {
       // es lectivo); las de los meses siguientes las genera la tarea periódica.
       await this.cuotaService.generarCuotaInicial(creado, new Date(), tx);
       await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: creado.id }, tx);
+      await this.anuncios.publicar(
+        "datos.cambiaron",
+        { dato: "alumnos", accion: "inscripcion", ids: { alumnoIds: [creado.id], cursoIds: creado.cursoId ? [creado.cursoId] : [] } },
+        tx,
+      );
       return creado;
     });
   }
@@ -186,6 +195,17 @@ export class AlumnoService {
       }
 
       await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: id }, tx);
+      // Los dos cursos (el de antes y el de ahora): al profesor del curso anterior también le cambia la nómina.
+      const cursoIds = [...new Set([actual.cursoId, resultado.cursoId].filter((c): c is string => !!c))];
+      const accion =
+        datos.estado && datos.estado !== actual.estado
+          ? datos.estado === "activo"
+            ? "reactivacion"
+            : "baja"
+          : datos.cursoId && datos.cursoId !== actual.cursoId
+            ? "cambio-curso"
+            : "edicion";
+      await this.anuncios.publicar("datos.cambiaron", { dato: "alumnos", accion, ids: { alumnoIds: [id], cursoIds } }, tx);
       return resultado;
     });
   }

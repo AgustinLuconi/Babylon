@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useResaltado } from "@/core/hooks/useResaltado";
 
 export type TonoDelta = "positive" | "negative" | "neutral";
 
@@ -19,6 +20,8 @@ const COLOR_DELTA: Record<TonoDelta, string> = {
 
 export function KpiCard({ label, value, sub, delta, deltaTone = "positive", onClick }: KpiCardProps) {
   const Tag = onClick ? "button" : "div";
+  // Se ilumina un momento cuando el número cambia por algo que hizo otra persona.
+  const resaltado = useResaltado(value);
   return (
     <Tag
       onClick={onClick}
@@ -26,7 +29,7 @@ export function KpiCard({ label, value, sub, delta, deltaTone = "positive", onCl
       style={{ padding: "18px 18px 16px" }}
     >
       <div className="eyebrow">{label}</div>
-      <div className="num-display mt-2.5" style={{ fontSize: 30, lineHeight: "1", color: "var(--text)" }}>
+      <div className={`num-display mt-2.5 ${resaltado ? "cambio-resaltado" : ""}`} style={{ fontSize: 30, lineHeight: "1", color: "var(--text)" }}>
         {value}
       </div>
       {(delta || sub) && (
