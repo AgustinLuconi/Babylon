@@ -88,12 +88,17 @@ Cambios al modelo (todas las columnas nuevas o relajadas admiten vacío para que
 **Alumno adulto**
 - Se marca "es responsable de sí mismo". Mínimo: nombre, apellido, curso y su celular.
 - El sistema crea su ficha de responsable con sus mismos datos (nombre, apellido, DNI, celular, email) y el vínculo `propio`; no se cargan dos veces.
-- Si ya existe una ficha de responsable con ese DNI (por ejemplo una mamá que ya figura por su hijo), se **reutiliza** esa ficha en vez de crear otra. Con un DNI desconocido se crea una ficha nueva.
+- Si ya existe una ficha de responsable con ese DNI (por ejemplo una mamá que ya figura por su hijo), se **reutiliza** esa ficha en vez de crear otra, y **la ficha existente manda**: la pantalla muestra la ficha encontrada y avisa que se usarán sus datos; el nombre y el apellido del alumno salen de la ficha; el celular o el email que se hayan escrito solo completan lo que la ficha no tenía, nunca pisan lo que ya tiene. *(Mi llamada.)*
+- Con un DNI desconocido se crea una ficha nueva. No hay búsqueda automática por nombre: sigue valiendo buscar antes de crear, como hoy (ver "Limitaciones conocidas"). *(Mi llamada.)*
 - Si la fecha de nacimiento está cargada y la persona es menor de 18, no puede ser responsable de sí misma. Sin fecha, se permite. *(Mi llamada.)*
 
-**Una persona, un nombre.** Cuando el vínculo es `propio`, el nombre, el apellido y el DNI del alumno y de su ficha de responsable son los mismos: cambiarlos en una ficha los cambia en la otra, dentro de la misma transacción. El celular y el email son del responsable. *(Mi llamada.)*
+**Una persona, un nombre.** Cuando el vínculo es `propio`, el nombre, el apellido y el DNI del alumno y de su ficha de responsable son los mismos: cambiarlos en una ficha los cambia en la otra, dentro de la misma transacción. El celular y el email son del responsable. Una ficha tiene como máximo **un** alumno `propio` (una persona no es alumna dos veces), así que la sincronización es siempre entre dos filas; se toman los bloqueos en un orden fijo (primero el alumno, después la ficha) para que dos cambios simultáneos no se traben entre sí. *(Mi llamada.)*
 
-**Crear un padre desde Usuarios** pasa a exigir nombre, apellido y teléfono; el email, el DNI y la dirección son opcionales; no se pide vínculo (se define al asociarlo a un alumno). Con email se crea la cuenta como hoy (invitación o contraseña); sin email se crea la ficha sin cuenta, como la del importador. Profesores, secretarios y administradores siguen exigiendo lo de hoy.
+**Asignar o cambiar el responsable de un alumno ya inscripto.** Desde el legajo se puede asignar un responsable a un alumno que no tiene ninguno, cambiar de responsable y cambiar el vínculo (incluido pasar a `propio` o dejar de serlo). Es el mismo selector de responsable de la inscripción (uno existente, uno nuevo o "es responsable de sí mismo"), con las mismas reglas, y se guarda de forma atómica. Al dejar de ser `propio`, termina la sincronización de nombre, apellido y DNI; la ficha anterior queda como estaba. Sin esto, "responsable" no se podría completar después. *(Mi llamada.)*
+
+**Crear un padre desde Usuarios** pasa a exigir nombre, apellido y teléfono; el email, el DNI y la dirección son opcionales; no se pide vínculo (se define al asociarlo a un alumno). Con email se crea la cuenta como hoy (invitación o contraseña); sin email se crea la ficha sin cuenta, como la del importador. Esa alta, hecha desde Usuarios, puede dejar a un responsable sin ningún alumno todavía, igual que hoy: los alumnos se asocian al inscribir. *(Mi llamada: se conserva el comportamiento actual.)* Profesores, secretarios y administradores siguen exigiendo lo de hoy; el teléfono del profesor sigue siendo opcional y su formato se controla cuando se carga.
+
+**Cuentas en la inscripción.** El pedido único de inscripción trae también el modo de acceso ("¿Cómo accede?": invitación o contraseña) para un responsable nuevo y para un adulto `propio` que tenga email; la invitación sale **después de confirmar**, como en el subproyecto 2, y si el correo falla el alta queda hecha. Un responsable o un adulto sin email no tiene cuenta, y por lo tanto no tiene panel, hasta que se le cargue el email y se lo invite.
 
 **Otros comportamientos que no cambian:** el descuento por hermanos se calcula por responsable (un adulto solo no lo tiene; una mamá que estudia junto a su hijo sí, porque son dos alumnos del mismo responsable); la autorización de imagen la firma el responsable desde su panel (un adulto, la suya); la cuota del mes se genera al inscribir como hoy.
 
@@ -101,9 +106,9 @@ Cambios al modelo (todas las columnas nuevas o relajadas admiten vacío para que
 
 Un criterio único (función pura, en el módulo de alumnos, con el mismo formato que `documento.faltantes.ts`) que, para cada alumno, dice qué le falta:
 
-`dni` · `fechaNacimiento` · `curso` · `responsable` (no tiene ninguno) · `responsableDni` · `responsableTelefono` · `responsableEmail`
+`dni` · `fechaNacimiento` · `responsable` (no tiene ninguno) · `vinculo` (tiene responsable pero no el vínculo) · `responsableDni` · `responsableTelefono` · `responsableEmail`
 
-Cuando el vínculo es `propio`, el DNI se informa una sola vez (como `dni`), no también como `responsableDni`. La población es la misma que la de documentación pendiente: alumno activo e inscripto en el ciclo activo. Lo usan todos los lugares siguientes:
+No incluye el curso: la población exige una inscripción en el ciclo activo y toda inscripción tiene curso. Cuando el vínculo es `propio`, el DNI se informa una sola vez (como `dni`), no también como `responsableDni`. La población es la misma que la de documentación pendiente: alumno activo e inscripto en el ciclo activo. Lo usan todos los lugares siguientes:
 
 - **Marca** "Datos incompletos" en el listado de alumnos, con el detalle de lo que falta; y un cartel en el legajo que lista lo que falta con acceso directo a editar.
 - **Filtro** "Datos incompletos" en el listado de alumnos, en la dirección (`?datos=incompletos`), siguiendo las reglas de filtros en la dirección.
@@ -125,6 +130,7 @@ Vale para los mismos formularios de edición. Se apoya en lo del 3c (la consulta
 - Cuando el registro cambia en el servidor por otra persona: los campos **sin tocar** se actualizan solos (con el resaltado breve de siempre); los **tocados** conservan lo que escribió quien edita, sin ningún marcado de conflicto; lo mandado al guardar se compara contra el valor nuevo del servidor.
 - Un aviso **fijo dentro del formulario** dice quién y qué: "Mientras editabas, Lucía cambió: teléfono y dirección." Nombra solo los campos que se actualizaron solos. Los nombres de los campos salen de una tabla de etiquetas por formulario; el autor sale de lo que ya registra el 3c.
 - Si no hubo ningún campo actualizado (cambió solo algo que quien edita también estaba tocando), no aparece nada.
+- **Cómo se sabe qué campos cambiaron:** la señal del 3c trae el dato, los ids y el autor, no los campos; el formulario compara el registro vuelto a pedir contra el último valor del servidor que conocía. Si varias personas cambian cosas en la misma ventana de tiempo, cada vez se compara contra el valor más reciente y el aviso nombra a la última persona que hizo un cambio ajeno sobre ese registro. Si el cambio lo hizo el sistema (sin autor), el aviso dice "el sistema".
 - Esto es un mecanismo genérico en `core/` que cada formulario usa; no se programa formulario por formulario.
 
 ### 7. El panel del responsable (padres y adultos)
@@ -147,7 +153,8 @@ Cada error sale en castellano y aparece **al lado del campo** que lo causó, tam
 ## Datos existentes
 
 - No se convierten. El DNI, la fecha y el padre de los alumnos viejos se ven como están; los que no cumplan las reglas nuevas solo se revalidan si alguien los edita.
-- La migración rellena `Alumno.vinculoResponsable` desde el vínculo del padre de cada alumno que ya tiene padre (hoy 3 de los 147 alumnos reales; el resto no tiene padre cargado y figurará como "datos incompletos" con el ciclo activo, lo cual es lo esperado).
+- La migración rellena `Alumno.vinculoResponsable` desde el vínculo del padre de cada alumno que ya tiene padre (hoy 3 de los 147 alumnos reales; como `Padre.vinculo` era obligatorio, todos los que tienen padre quedan con vínculo). La columna sigue admitiendo vacío en la base (los alumnos sin padre no tienen vínculo); el servicio exige el vínculo siempre que haya responsable. `Alumno.cursoId` también sigue admitiendo vacío en la base (hay alumnos viejos sin curso); el servicio lo exige para toda inscripción nueva.
+- El ciclo activo hoy es el 2027, y los alumnos reales del 2025 no están inscriptos en él, así que el aviso de "datos incompletos" no los va a contar mientras ese ciclo siga activo. Aparecerán si alguna vez se activa el ciclo en el que están.
 - Los scripts de prueba y `datos-prueba-2026.ts` que crean padres con vínculo se actualizan al modelo nuevo.
 
 ## Cómo se verifica
@@ -168,6 +175,12 @@ Cada error sale en castellano y aparece **al lado del campo** que lo causó, tam
 7. Los topes de largo, el cupo de 1 a 50, el rango de 1 año para la fecha de evaluación y la no superposición de horarios.
 8. El aviso "Mientras editabas…" nombra solo los campos que se actualizaron solos.
 9. El teléfono se guarda como `+549` y los 10 dígitos; el DNI como dígitos puros.
+10. El responsable de un alumno ya inscripto se puede asignar o cambiar desde el legajo, con el mismo selector de la inscripción.
+11. Al reutilizar una ficha por DNI, manda la ficha existente: lo escrito solo completa lo que le faltaba.
+12. Una ficha tiene como máximo un alumno `propio`.
+13. No hay búsqueda automática por nombre para detectar fichas duplicadas de adultos sin DNI.
+14. Un responsable creado desde Usuarios puede quedar sin alumnos, como hoy.
+15. El criterio de datos incompletos no incluye el curso e incluye un ítem `vinculo`.
 
 ## Limitaciones conocidas
 
