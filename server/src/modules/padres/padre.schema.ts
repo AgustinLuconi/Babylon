@@ -9,7 +9,6 @@ export const crearPadreSchema = z.object({
   email: z.email("Email inválido"),
   // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
   password: passwordNueva.optional(),
-  vinculo: z.enum(["padre", "madre", "tutor"]),
 });
 
 export type CrearPadreInput = z.infer<typeof crearPadreSchema>;
@@ -24,7 +23,6 @@ export const crearPadreSinCuentaSchema = z.object({
   dni: z.string().min(1, "El DNI es requerido"),
   direccion: z.string().optional(),
   telefono: z.string().optional(),
-  vinculo: z.enum(["padre", "madre", "tutor"]),
 });
 
 export type CrearPadreSinCuentaInput = z.infer<typeof crearPadreSinCuentaSchema>;
@@ -35,7 +33,6 @@ export const actualizarPadreSchema = z.object({
   direccion: z.string().optional(),
   telefono: z.string().optional(),
   email: z.email("Email inválido").optional(),
-  vinculo: z.enum(["padre", "madre", "tutor"]).optional(),
 });
 
 export type ActualizarPadreInput = z.infer<typeof actualizarPadreSchema>;

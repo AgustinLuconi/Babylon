@@ -42,6 +42,7 @@ enum VinculoPadre {
   padre
   madre
   tutor
+  propio
 }
 
 enum EstadoAlumno {
@@ -164,11 +165,10 @@ model Padre {
   id        String       @id
   nombre    String
   apellido  String
-  dni       String       @unique
+  dni       String?      @unique
   direccion String?
   telefono  String?
   email     String?
-  vinculo   VinculoPadre
   usuarioId String?      @unique
 
   usuario Usuario? @relation(fields: [usuarioId], references: [id])
@@ -195,8 +195,8 @@ model Alumno {
   id                      String       @id
   nombre                  String
   apellido                String
-  dni                     String       @unique
-  fechaNacimiento         DateTime
+  dni                     String?      @unique
+  fechaNacimiento         DateTime?
   direccion               String?
   telefono                String?
   email                   String?
@@ -205,6 +205,7 @@ model Alumno {
   fechaInscripcion        DateTime
   estado                  EstadoAlumno
   padreId                 String?
+  vinculoResponsable      VinculoPadre?
   cursoId                 String?
   aplicaDescuentoHermanos Boolean
 
@@ -474,6 +475,7 @@ enum TipoNotificacion {
   observacion_nueva
   mensajes_familia
   mensajes_instituto
+  datos_incompletos
 }
 
 enum ClaseNotificacion {

@@ -8,6 +8,9 @@ type FilaAlumno = Awaited<ReturnType<PrismaClient["alumno"]["findUniqueOrThrow"]
 function aEntidad(fila: FilaAlumno): Alumno {
   return {
     ...fila,
+    dni: fila.dni ?? undefined,
+    fechaNacimiento: fila.fechaNacimiento ?? undefined,
+    vinculoResponsable: fila.vinculoResponsable ?? undefined,
     direccion: fila.direccion ?? undefined,
     telefono: fila.telefono ?? undefined,
     email: fila.email ?? undefined,
@@ -61,6 +64,9 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
         where: { id },
         data: {
           ...entidad,
+          dni: entidad.dni ?? null,
+          fechaNacimiento: entidad.fechaNacimiento ?? null,
+          vinculoResponsable: entidad.vinculoResponsable ?? null,
           direccion: entidad.direccion ?? null,
           telefono: entidad.telefono ?? null,
           email: entidad.email ?? null,

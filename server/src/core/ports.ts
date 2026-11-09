@@ -14,6 +14,10 @@ export interface Repository<T, ID = string> {
   delete(id: ID, tx?: unknown): Promise<void>;
 }
 
+// Cambios parciales de una entidad (`actualizarParcial`): una clave ausente no se toca y, en los campos opcionales,
+// `null` borra el dato.
+export type Cambios<T> = { [K in keyof T]?: undefined extends T[K] ? T[K] | null : T[K] };
+
 export interface UnitOfWork<TContext = unknown> {
   runInTransaction<T>(work: (context: TContext) => Promise<T>): Promise<T>;
 }

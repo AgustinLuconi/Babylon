@@ -88,7 +88,6 @@ async function main() {
       apellido: "Rodríguez",
       dni: "33333333",
       email: padreUsuario.email,
-      vinculo: "padre",
       usuarioId: padreUsuario.id,
     },
   });
@@ -124,6 +123,7 @@ async function main() {
       fechaInscripcion: new Date(),
       estado: "activo",
       padreId: padre.id,
+      vinculoResponsable: "padre",
       cursoId: curso.id,
       aplicaDescuentoHermanos: false,
     },

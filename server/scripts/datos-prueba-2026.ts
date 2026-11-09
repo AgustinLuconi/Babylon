@@ -62,7 +62,7 @@ const CURSOS: {
   { n: 5, nombre: "Cambridge Prep", nivel: "cambridge_prep", prof: "silvana", aula: "3", cupo: 12, base: 45000, horarios: [{ d: "sabado", ini: "10:00", fin: "12:00" }] },
 ];
 
-// [nombre, apellido, curso, padre(1..10), vinculo padre]
+// [nombre, apellido, curso, padre(1..13)]; el vínculo de cada alumno sale del de su padre (VINCULOS).
 const ALUMNOS: [string, string, number, number][] = [
   ["Mateo", "Rodríguez", 1, 1], ["Lucía", "Rodríguez", 1, 1], ["Julieta", "Ferreyra", 1, 2], ["Bautista", "Acosta", 1, 3],
   ["Sofía", "Méndez", 2, 4], ["Tomás", "Méndez", 2, 4], ["Camila", "Bustos", 2, 5], ["Joaquín", "Ledesma", 2, 6],
@@ -94,7 +94,7 @@ async function crear() {
 
   // Padres (los 6 primeros con cuenta de acceso)
   for (let i = 0; i < PADRES.length; i++) {
-    const [nombre, apellido, vinculo] = PADRES[i];
+    const [nombre, apellido] = PADRES[i];
     const n = i + 1;
     let usuarioId: string | undefined;
     if (n <= 6) {
@@ -107,7 +107,7 @@ async function crear() {
       data: {
         id: `${P}padre-${n}`, nombre, apellido, dni: `800000${String(n).padStart(2, "0")}`,
         direccion: `Calle ${100 + n * 7}, San Luis`, telefono: `2664-55${String(n).padStart(4, "0")}`,
-        email: n <= 6 ? `p${n}@prueba.babylon.test` : undefined, vinculo, usuarioId,
+        email: n <= 6 ? `p${n}@prueba.babylon.test` : undefined, usuarioId,
       },
     });
   }
@@ -139,7 +139,7 @@ async function crear() {
         direccion: `Av. Illia ${200 + idx * 11}, San Luis`, telefono: idx % 3 === 0 ? `2664-77${String(idx).padStart(4, "0")}` : undefined,
         email: idx % 4 === 0 ? `${nombre.toLowerCase().replace(/[^a-z]/g, "")}@prueba.test` : undefined,
         observacionesMedicas: idx === 2 ? "Alergia a la penicilina" : idx === 9 ? "Asma leve" : undefined,
-        fechaInscripcion: fechaInsc, estado: "activo", padreId: `${P}padre-${padreN}`, cursoId: `${P}curso-${cursoN}`, aplicaDescuentoHermanos: hermano,
+        fechaInscripcion: fechaInsc, estado: "activo", padreId: `${P}padre-${padreN}`, vinculoResponsable: PADRES[padreN - 1][2], cursoId: `${P}curso-${cursoN}`, aplicaDescuentoHermanos: hermano,
       },
     });
     await prisma.inscripcion.create({ data: { id: `${P}insc-${idx + 1}`, alumnoId: id, cursoId: `${P}curso-${cursoN}`, cicloId: ciclo.id, fecha: fechaInsc, aplicaDescuentoHermanos: hermano } });

@@ -76,7 +76,6 @@ export class PadreService {
         dni: datos.dni,
         telefono: datos.telefono,
         email: datos.email,
-        vinculo: datos.vinculo,
         usuarioId,
       };
       const creado = await this.padreRepo.create(padre, tx);
@@ -106,7 +105,6 @@ export class PadreService {
       dni: datos.dni,
       direccion: datos.direccion,
       telefono: datos.telefono,
-      vinculo: datos.vinculo,
     };
     const creado = await this.padreRepo.create(padre);
     await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "alta", ids: { padreIds: [creado.id] } });
@@ -126,7 +124,6 @@ export class PadreService {
       direccion: datos.direccion ?? actual.direccion,
       telefono: datos.telefono ?? actual.telefono,
       email: datos.email ?? actual.email,
-      vinculo: datos.vinculo ?? actual.vinculo,
     };
     const cambiaEmail = datos.email !== undefined && datos.email !== actual.email;
     if (!cambiaEmail || !actual.usuarioId) {

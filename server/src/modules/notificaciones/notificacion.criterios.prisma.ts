@@ -56,6 +56,9 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         return this.mensajesDeFamilias(tx);
       case "mensajes_instituto":
         return this.mensajesDelInstituto(tx);
+      // Se completa en la Tarea 6 (criterio único de datos incompletos).
+      case "datos_incompletos":
+        return Promise.resolve([]);
     }
   }
 

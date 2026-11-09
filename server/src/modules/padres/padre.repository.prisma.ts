@@ -8,6 +8,7 @@ type FilaPadre = Awaited<ReturnType<PrismaClient["padre"]["findUniqueOrThrow"]>>
 function aEntidad(fila: FilaPadre): Padre {
   return {
     ...fila,
+    dni: fila.dni ?? undefined,
     direccion: fila.direccion ?? undefined,
     telefono: fila.telefono ?? undefined,
     email: fila.email ?? undefined,
@@ -53,6 +54,7 @@ export class PrismaPadreRepository implements PadreRepository {
         where: { id },
         data: {
           ...entidad,
+          dni: entidad.dni ?? null,
           direccion: entidad.direccion ?? null,
           telefono: entidad.telefono ?? null,
           email: entidad.email ?? null,
