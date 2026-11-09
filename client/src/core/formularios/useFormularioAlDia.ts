@@ -3,6 +3,8 @@ import { ultimoCambioAjeno } from "@/core/tiempoReal/cambiosEnVivo";
 import { reconciliar, textoDelAviso } from "./reconciliar";
 
 const RESALTADO_MS = 2500;
+// Un cambio ajeno se le atribuye a quien lo hizo solo si llegó hace poco: pasado ese tiempo, "alguien".
+const VENTANA_DE_AUTORIA_MS = 15_000;
 
 interface Opciones<T extends Record<string, unknown>> {
   // El formulario está abierto: solo entonces se reconcilia. Al abrirse toma como base lo que dice `servidor`.
@@ -54,8 +56,10 @@ export function useFormularioAlDia<T extends Record<string, unknown>>(opciones: 
     if (resultado.actualizados.length === 0) return;
     aplicar(Object.fromEntries(resultado.actualizados.map((k) => [k, resultado.valores[k]])) as Partial<T>);
     const cambio = ultimoCambioAjeno(dato);
-    const esDeEsteRegistro = cambio?.ids[claveDeId]?.includes(id);
-    setAviso(textoDelAviso(esDeEsteRegistro ? (cambio?.por?.nombre ?? null) : undefined, resultado.actualizados.map((k) => etiquetas[k])));
+    const reciente = cambio !== undefined && Date.now() - cambio.en <= VENTANA_DE_AUTORIA_MS;
+    // Un dato sin ids (la configuración) concierne a cualquiera; el resto, solo si el cambio nombra este registro.
+    const concierne = reciente && (claveDeId === "" || cambio.ids[claveDeId]?.includes(id));
+    setAviso(textoDelAviso(concierne ? (cambio.por?.nombre ?? null) : undefined, resultado.actualizados.map((k) => etiquetas[k])));
     setResaltados(new Set(resultado.actualizados));
     const t = window.setTimeout(() => setResaltados(new Set()), RESALTADO_MS);
     return () => window.clearTimeout(t);

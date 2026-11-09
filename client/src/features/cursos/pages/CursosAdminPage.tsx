@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueries } from "@tanstack/react-query";
 import { z } from "zod";
 import { ChevronLeft, Pencil, Plus, Search, ToggleLeft, ToggleRight, Trash2, Users } from "lucide-react";
@@ -13,8 +12,13 @@ import { Badge } from "@/core/components/ui/badge";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Modal } from "@/core/components/ui/modal";
 import { Panel } from "@/core/components/ui/panel";
-import { ApiError } from "@/core/lib/apiClient";
+import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
+import { resolverSoloModificados } from "@/core/formularios/resolverSoloModificados";
+import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
+import { cambiosParaEnviar, hayCambios } from "@/core/lib/diferencias";
+import { erroresDeCampo } from "@/core/lib/erroresDeCampo";
 import { normalizarTexto } from "@/core/lib/utils";
+import { textoOpcional, textoRequerido } from "@/core/lib/validacion";
 import { useAlumnos } from "@/features/alumnos/hooks/useAlumnos";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCuotas } from "@/features/cuotas/hooks/useCuotas";
@@ -25,6 +29,7 @@ import { useCrearCurso } from "../hooks/useCrearCurso";
 import { useActualizarCurso } from "../hooks/useActualizarCurso";
 import { useCursos } from "../hooks/useCursos";
 import { useHorarios } from "../hooks/useHorarios";
+import { erroresDeHorarios } from "../horarios";
 import {
   DIA_SEMANA_LABELS,
   NIVEL_GRUPO,
@@ -32,23 +37,33 @@ import {
   type Curso,
   type DiaSemana,
   type EstadoCurso,
+  type ActualizarCursoInput,
   type Horario,
   type NivelCurso,
 } from "../types";
 
+const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const cursoSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido"),
-  nivel: z.enum(["kids", "teens_a1", "teens_a2", "adults_b1", "adults_b2", "cambridge_prep"]),
+  nombre: textoRequerido("El nombre", 80),
+  nivel: z.enum(["kids", "teens_a1", "teens_a2", "adults_b1", "adults_b2", "cambridge_prep"], { error: "Elegí el nivel" }),
   profesorId: z.string().min(1, "El curso debe tener un profesor asignado"),
-  aula: z.string().optional(),
-  cupo: z.coerce.number().int().positive("El cupo debe ser un número positivo"),
-  horarios: z.array(
-    z.object({
-      diaSemana: z.enum(["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]),
-      horaInicio: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Formato de hora inválido"),
-      horaFin: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Formato de hora inválido"),
+  aula: textoOpcional(30),
+  cupo: z.coerce
+    .number({ error: "El cupo tiene que ser un número" })
+    .int("El cupo tiene que ser un número entero")
+    .min(1, "El cupo mínimo es 1")
+    .max(50, "El cupo máximo es 50"),
+  horarios: z
+    .array(
+      z.object({
+        diaSemana: z.enum(["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]),
+        horaInicio: z.string().regex(HORA, "Formato de hora inválido"),
+        horaFin: z.string().regex(HORA, "Formato de hora inválido"),
+      }),
+    )
+    .superRefine((horarios, ctx) => {
+      for (const e of erroresDeHorarios(horarios)) ctx.addIssue({ code: "custom", path: e.campo ? [e.indice, e.campo] : [e.indice], message: e.mensaje });
     }),
-  ),
 });
 
 // En zod 4, z.coerce.number() tiene tipo de entrada `unknown` (lo que tipea
@@ -57,6 +72,26 @@ const cursoSchema = z.object({
 // el de entrada; handleSubmit entrega el de salida (tercer genérico de RHF).
 type CursoFormInput = z.input<typeof cursoSchema>;
 type CursoForm = z.output<typeof cursoSchema>;
+
+// El curso tal como lo muestra el formulario de edición (para calcular qué cambió y qué cambió otra persona).
+interface FormCurso extends Record<string, unknown> {
+  nombre: string;
+  nivel: NivelCurso;
+  profesorId: string;
+  aula: string;
+  cupo: number;
+  horarios: { diaSemana: DiaSemana; horaInicio: string; horaFin: string }[];
+  estado: EstadoCurso;
+}
+const ETIQUETAS_CURSO: Record<keyof FormCurso, string> = {
+  nombre: "nombre",
+  nivel: "nivel",
+  profesorId: "profesor",
+  aula: "aula",
+  cupo: "cupo",
+  horarios: "horarios",
+  estado: "estado",
+};
 
 const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
@@ -89,17 +124,24 @@ export default function CursosAdminPage() {
   const [modal, setModal] = useState<{ mode: "new" } | { mode: "edit"; curso: Curso } | null>(null);
   const [estadoForm, setEstadoForm] = useState<EstadoCurso>("activo");
   const [verAlumnosDe, setVerAlumnosDe] = useState<Curso | null>(null);
+  const [sinCambios, setSinCambios] = useState(false);
 
+  // Al editar solo se validan los campos que se modificaron (un dato viejo que no se toca no bloquea el guardado).
+  const baseDeEdicion = useRef<Record<string, unknown> | undefined>(undefined);
+  const resolver = useMemo(() => resolverSoloModificados<CursoFormInput, CursoForm>(cursoSchema, () => baseDeEdicion.current), []);
   const {
     register,
     control,
     handleSubmit,
     reset,
+    setValue,
+    setError,
+    watch,
     formState: { errors, isDirty },
-  } = useForm<CursoFormInput, unknown, CursoForm>({ resolver: zodResolver(cursoSchema), defaultValues: { horarios: [] } });
+  } = useForm<CursoFormInput, unknown, CursoForm>({ resolver, defaultValues: { horarios: [] } });
   useSinGuardar(!!modal && isDirty);
 
-  const { fields, append, remove } = useFieldArray({ control, name: "horarios" });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: "horarios" });
 
   const nombresPorProfesor = useMemo(() => {
     const mapa = new Map<string, string>();
@@ -145,35 +187,110 @@ export default function CursosAdminPage() {
   }, [cursos, busqueda, filtroNivel, filtroProfesor, filtroCiclo, cicloActivo, nombresPorProfesor]);
   const filasCursos = useListaConSalidas(filtrados, (c) => c.id, ["cursos", "alumnos", "profesores"]);
 
+  // El curso que se está editando, tal como lo guarda el servidor ahora (se actualiza solo si otra persona lo cambia).
+  const horariosDeForm = (cursoId: string) => {
+    const delCurso = horariosPorCurso.get(cursoId) ?? [];
+    return delCurso.length > 0
+      ? delCurso.map((h) => ({ diaSemana: h.diaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin }))
+      : [{ diaSemana: "lunes" as DiaSemana, horaInicio: "18:00", horaFin: "19:30" }];
+  };
+  const cursoEnEdicion = modal?.mode === "edit" ? cursos?.find((c) => c.id === modal.curso.id) : undefined;
+  const servidorCurso = useMemo<FormCurso | undefined>(
+    () =>
+      cursoEnEdicion && {
+        nombre: cursoEnEdicion.nombre,
+        nivel: cursoEnEdicion.nivel,
+        profesorId: cursoEnEdicion.profesorId,
+        aula: cursoEnEdicion.aula ?? "",
+        cupo: cursoEnEdicion.cupo,
+        horarios: horariosDeForm(cursoEnEdicion.id),
+        estado: cursoEnEdicion.estado,
+      },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cursoEnEdicion, horariosPorCurso],
+  );
+  const w = watch();
+  const valoresDelFormulario: FormCurso = {
+    nombre: w.nombre ?? "",
+    nivel: w.nivel as NivelCurso,
+    profesorId: w.profesorId ?? "",
+    aula: w.aula ?? "",
+    cupo: Number(w.cupo),
+    horarios: (w.horarios ?? []).map((h) => ({ diaSemana: h.diaSemana as DiaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin })),
+    estado: estadoForm,
+  };
+  const alDia = useFormularioAlDia<FormCurso>({
+    activo: modal?.mode === "edit",
+    dato: "cursos",
+    claveDeId: "cursoIds",
+    id: cursoEnEdicion?.id ?? "",
+    servidor: servidorCurso,
+    etiquetas: ETIQUETAS_CURSO,
+    valores: valoresDelFormulario,
+    aplicar: (parcial) => {
+      for (const [clave, valor] of Object.entries(parcial)) {
+        if (clave === "estado") setEstadoForm(valor as EstadoCurso);
+        else if (clave === "horarios") replace(valor as FormCurso["horarios"]);
+        else setValue(clave as "nombre", valor as string, { shouldDirty: false });
+      }
+    },
+  });
+  const baseDelCurso = alDia.base ?? servidorCurso;
+  useEffect(() => {
+    baseDeEdicion.current = modal?.mode === "edit" ? baseDelCurso : undefined;
+  });
+
   const abrirNuevo = () => {
     reset({ nombre: "", profesorId: "", aula: "", cupo: 20, horarios: [{ diaSemana: "lunes", horaInicio: "18:00", horaFin: "19:30" }] });
     setEstadoForm("activo");
+    setSinCambios(false);
     setModal({ mode: "new" });
   };
 
   const abrirEditar = (curso: Curso) => {
-    const horariosDelCurso = horariosPorCurso.get(curso.id) ?? [];
     reset({
       nombre: curso.nombre,
       nivel: curso.nivel,
       profesorId: curso.profesorId,
       aula: curso.aula ?? "",
       cupo: curso.cupo,
-      horarios: horariosDelCurso.length
-        ? horariosDelCurso.map((h) => ({ diaSemana: h.diaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin }))
-        : [{ diaSemana: "lunes", horaInicio: "18:00", horaFin: "19:30" }],
+      horarios: horariosDeForm(curso.id),
     });
     setEstadoForm(curso.estado);
+    setSinCambios(false);
     setModal({ mode: "edit", curso });
   };
 
   const onSubmit = handleSubmit(async (datos) => {
-    if (modal?.mode === "edit") {
-      await actualizarCurso.mutateAsync({ id: modal.curso.id, datos: { ...datos, estado: estadoForm } });
-    } else {
-      await crearCurso.mutateAsync(datos);
+    setSinCambios(false);
+    try {
+      if (modal?.mode === "edit") {
+        // Al editar se manda solo lo que cambió (los horarios cuentan como un solo campo).
+        const valores: FormCurso = {
+          nombre: datos.nombre ?? "",
+          nivel: datos.nivel as NivelCurso,
+          profesorId: datos.profesorId,
+          aula: datos.aula ?? "",
+          cupo: Number(datos.cupo),
+          horarios: (datos.horarios ?? []).map((h) => ({ diaSemana: h.diaSemana as DiaSemana, horaInicio: h.horaInicio, horaFin: h.horaFin })),
+          estado: estadoForm,
+        };
+        const cambios = cambiosParaEnviar(valores, baseDelCurso ?? valores, ["aula"]);
+        if (!hayCambios(cambios)) {
+          setSinCambios(true);
+          return;
+        }
+        await actualizarCurso.mutateAsync({ id: modal.curso.id, datos: cambios as ActualizarCursoInput });
+      } else {
+        await crearCurso.mutateAsync(datos);
+      }
+      setModal(null);
+    } catch (error) {
+      // Cada error del servidor al lado de su campo.
+      for (const [campo, mensaje] of Object.entries(erroresDeCampo(error).campos)) {
+        if (campo in cursoSchema.shape) setError(campo as keyof CursoFormInput, { message: mensaje });
+      }
     }
-    setModal(null);
   });
 
   const toggleEstado = (curso: Curso) => {
@@ -336,10 +453,11 @@ export default function CursosAdminPage() {
           }
         >
           <form className="space-y-4" noValidate>
+            <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
             <div className="grid grid-cols-2 gap-3.5">
               <div className="col-span-2 space-y-1.5">
                 <label className="label">Nombre del curso</label>
-                <Input {...register("nombre")} placeholder="Ej: Teens A2 - Turno Tarde" />
+                <Input {...register("nombre")} placeholder="Ej: Teens A2 - Turno Tarde" className={alDia.resaltados.has("nombre") ? "cambio-resaltado" : undefined} />
                 {errors.nombre && <p className="text-sm text-destructive">{errors.nombre.message}</p>}
               </div>
               <div className="space-y-1.5">
@@ -358,7 +476,8 @@ export default function CursosAdminPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="label">Aula</label>
-                <Input {...register("aula")} placeholder="Aula 1" />
+                <Input {...register("aula")} placeholder="Aula 1" className={alDia.resaltados.has("aula") ? "cambio-resaltado" : undefined} />
+                {errors.aula && <p className="text-sm text-destructive">{errors.aula.message}</p>}
               </div>
               <div className="space-y-1.5">
                 <label className="label">Profesor asignado</label>
@@ -376,7 +495,7 @@ export default function CursosAdminPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="label">Cupo máximo</label>
-                <Input type="number" min={1} max={60} {...register("cupo")} />
+                <Input type="number" min={1} max={50} {...register("cupo")} className={alDia.resaltados.has("cupo") ? "cambio-resaltado" : undefined} />
                 {errors.cupo && <p className="text-sm text-destructive">{errors.cupo.message}</p>}
               </div>
             </div>
@@ -395,7 +514,8 @@ export default function CursosAdminPage() {
               </div>
               <div className="space-y-2">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex items-center gap-2">
+                  <div key={field.id} className="space-y-1">
+                  <div className="flex items-center gap-2">
                     <Select {...register(`horarios.${index}.diaSemana`)} defaultValue={field.diaSemana} className="flex-2">
                       {(Object.entries(DIA_SEMANA_LABELS) as [DiaSemana, string][]).map(([valor, etiqueta]) => (
                         <option key={valor} value={valor}>
@@ -411,6 +531,10 @@ export default function CursosAdminPage() {
                         <Trash2 size={13} />
                       </button>
                     )}
+                  </div>
+                  {(errors.horarios?.[index]?.horaFin?.message ?? errors.horarios?.[index]?.message) && (
+                    <p className="text-sm text-destructive">{errors.horarios?.[index]?.horaFin?.message ?? errors.horarios?.[index]?.message}</p>
+                  )}
                   </div>
                 ))}
               </div>
@@ -439,11 +563,8 @@ export default function CursosAdminPage() {
               </div>
             )}
 
-            {errorGuardado && (
-              <p className="text-sm text-destructive">
-                {errorGuardado instanceof ApiError ? errorGuardado.message : "No se pudo guardar el curso"}
-              </p>
-            )}
+            {sinCambios && <p className="text-sm text-muted-foreground">No hay cambios para guardar</p>}
+            {errorGuardado && erroresDeCampo(errorGuardado).general && <p className="text-sm text-destructive">{erroresDeCampo(errorGuardado).general}</p>}
           </form>
         </Modal>
       )}

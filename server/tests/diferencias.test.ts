@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { cambiosParaEnviar, hayCambios } from "../../client/src/core/lib/diferencias";
-import { erroresDeCampo } from "../../client/src/core/lib/erroresDeCampo";
+import { erroresDeCampo, mensajeDeError } from "../../client/src/core/lib/erroresDeCampo";
 
 const base = { nombre: "Ana", apellido: "Gómez", telefono: "351 555-1234", direccion: "Calle 1" };
 const borrables = ["telefono", "direccion"] as const;
@@ -58,4 +58,13 @@ describe("erroresDeCampo", () => {
     const r = erroresDeCampo(new ErrorDeApi("Datos inválidos", 400, { responsable: ["x"], "responsable.datos.telefono": ["El celular no es válido"] }));
     assert.equal(r.campos["responsable.datos.telefono"], "El celular no es válido");
   });
+});
+
+describe("mensajeDeError", () => {
+  test("con errores de campos junta los mensajes en uno legible", () => {
+    const error = new ErrorDeApi("Datos inválidos", 400, { nombre: ["El nombre de la evaluación admite hasta 80 caracteres"], fecha: ["La fecha de la evaluación no es válida"] });
+    assert.equal(mensajeDeError(error), "El nombre de la evaluación admite hasta 80 caracteres · La fecha de la evaluación no es válida");
+  });
+  test("sin campos devuelve el mensaje del error", () => assert.equal(mensajeDeError(new ErrorDeApi("Curso con id x no encontrado/a", 404)), "Curso con id x no encontrado/a"));
+  test("sin error devuelve null", () => assert.equal(mensajeDeError(null), null));
 });

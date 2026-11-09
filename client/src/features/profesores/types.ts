@@ -29,7 +29,8 @@ export interface ActualizarProfesorInput {
   nombre?: string;
   apellido?: string;
   dni?: string;
-  telefono?: string;
+  // null borra el teléfono.
+  telefono?: string | null;
   email?: string;
   estado?: EstadoProfesor;
 }

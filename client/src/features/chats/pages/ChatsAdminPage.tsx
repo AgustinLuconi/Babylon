@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { MAX_MENSAJE } from "../types";
 import { ChevronLeft, MessageSquarePlus, Send } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
-import { ApiError } from "@/core/lib/apiClient";
+import { mensajeDeError } from "@/core/lib/erroresDeCampo";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { NuevaConversacion } from "../components/NuevaConversacion";
 import { BurbujaMensaje } from "../components/BurbujaMensaje";
@@ -150,6 +151,7 @@ export default function ChatsAdminPage() {
           <div className="flex items-center gap-2 px-4 py-3" style={{ borderTop: "1px solid var(--border-hex)" }}>
             <Input
               value={texto}
+              maxLength={MAX_MENSAJE}
               onChange={(e) => setTexto(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -166,7 +168,7 @@ export default function ChatsAdminPage() {
           </div>
           {enviarMensaje.isError && (
             <p className="px-4 pb-2 text-sm text-destructive">
-              {enviarMensaje.error instanceof ApiError ? enviarMensaje.error.message : "No se pudo enviar el mensaje"}
+              {mensajeDeError(enviarMensaje.error) ?? "No se pudo enviar el mensaje"}
             </p>
           )}
         </div>

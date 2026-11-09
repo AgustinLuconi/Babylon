@@ -59,3 +59,6 @@ export interface Mensaje {
 export interface EnviarMensajeInput {
   texto: string;
 }
+
+// Largo máximo de un mensaje del chat (igual al del servidor).
+export const MAX_MENSAJE = 2000;

@@ -9,8 +9,8 @@ import { Input } from "@/core/components/ui/input";
 import { Modal } from "@/core/components/ui/modal";
 import { Panel } from "@/core/components/ui/panel";
 import { Select } from "@/core/components/ui/select";
-import { ApiError } from "@/core/lib/apiClient";
-import { formatFecha, hoyLocalISO } from "@/core/lib/utils";
+import { mensajeDeError } from "@/core/lib/erroresDeCampo";
+import { fechaLocalISO, formatFecha, hoyLocalISO } from "@/core/lib/utils";
 import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useCalificacionesDeEvaluacion } from "../hooks/useCalificacionesDeEvaluacion";
@@ -207,12 +207,22 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
     cargarCalificaciones.mutate({ notas: notasCompletas });
   };
 
+  // La fecha de una evaluación tiene que estar entre un año atrás y un año adelante (igual que en el servidor).
+  const hoy = new Date();
+  const fechaDesde = fechaLocalISO(new Date(hoy.getFullYear() - 1, hoy.getMonth(), hoy.getDate()));
+  const fechaHasta = fechaLocalISO(new Date(hoy.getFullYear() + 1, hoy.getMonth(), hoy.getDate()));
+  const fechaDeEvaluacionFuera = newForm.fecha !== "" && (newForm.fecha < fechaDesde || newForm.fecha > fechaHasta);
+
   const onCrearEvaluacion = async () => {
-    if (!newForm.nombre.trim()) return;
-    const creada = await crearEvaluacion.mutateAsync({ ...newForm, cursoId });
-    setSelectedEvalId(creada.id);
-    setShowNewEval(false);
-    setNewForm({ nombre: "", tipo: "examen", periodo: "julio", escala: "numerica", fecha: hoyLocalISO() });
+    if (!newForm.nombre.trim() || fechaDeEvaluacionFuera) return;
+    try {
+      const creada = await crearEvaluacion.mutateAsync({ ...newForm, cursoId });
+      setSelectedEvalId(creada.id);
+      setShowNewEval(false);
+      setNewForm({ nombre: "", tipo: "examen", periodo: "julio", escala: "numerica", fecha: hoyLocalISO() });
+    } catch {
+      // El motivo se muestra en el formulario (crearEvaluacion.error).
+    }
   };
 
   return (
@@ -385,7 +395,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
           </div>
           {cargarCalificaciones.isError && (
             <p className="text-sm text-destructive">
-              {cargarCalificaciones.error instanceof ApiError ? cargarCalificaciones.error.message : "No se pudieron guardar las notas"}
+              {mensajeDeError(cargarCalificaciones.error) ?? "No se pudieron guardar las notas"}
             </p>
           )}
           {cargarCalificaciones.isSuccess && <p className="text-sm" style={{ color: "var(--brand)" }}>Notas guardadas correctamente.</p>}
@@ -408,7 +418,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
               <Button variant="outline" className="flex-1" onClick={() => setShowNewEval(false)}>
                 Cancelar
               </Button>
-              <Button className="flex-1" disabled={!newForm.nombre.trim() || crearEvaluacion.isPending} onClick={onCrearEvaluacion}>
+              <Button className="flex-1" disabled={!newForm.nombre.trim() || fechaDeEvaluacionFuera || crearEvaluacion.isPending} onClick={onCrearEvaluacion}>
                 {crearEvaluacion.isPending ? "Creando…" : "Crear"}
               </Button>
             </>
@@ -419,6 +429,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
             <Input
               value={newForm.nombre}
               onChange={(e) => setNewForm((f) => ({ ...f, nombre: e.target.value }))}
+              maxLength={80}
               placeholder="Ej: Speaking Test 2"
             />
           </div>
@@ -454,7 +465,9 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
           </div>
           <div className="space-y-1.5">
             <label className="label">Fecha</label>
-            <Input type="date" value={newForm.fecha} onChange={(e) => setNewForm((f) => ({ ...f, fecha: e.target.value }))} />
+            <Input type="date" min={fechaDesde} max={fechaHasta} value={newForm.fecha} onChange={(e) => setNewForm((f) => ({ ...f, fecha: e.target.value }))} />
+            {fechaDeEvaluacionFuera && <p className="text-sm text-destructive">La fecha tiene que estar entre un año atrás y un año adelante</p>}
+            {crearEvaluacion.isError && <p className="text-sm text-destructive">{mensajeDeError(crearEvaluacion.error) ?? "No se pudo crear la evaluación"}</p>}
           </div>
         </Modal>
       )}
@@ -591,7 +604,7 @@ function SeccionNotasCierre({ cursoId, soloLectura }: { cursoId: string; soloLec
 
       {cargarNotasCierre.isError && (
         <p className="text-sm text-destructive">
-          {cargarNotasCierre.error instanceof ApiError ? cargarNotasCierre.error.message : "No se pudieron guardar las notas de cierre"}
+          {mensajeDeError(cargarNotasCierre.error) ?? "No se pudieron guardar las notas de cierre"}
         </p>
       )}
       {cargarNotasCierre.isSuccess && <p className="text-sm" style={{ color: "var(--brand)" }}>Borrador guardado correctamente.</p>}

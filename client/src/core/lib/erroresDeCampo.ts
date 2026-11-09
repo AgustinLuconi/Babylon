@@ -21,3 +21,12 @@ export function erroresDeCampo(error: unknown): ErroresDeCampo {
   if (status === 409 && /DNI/.test(error.message)) return { campos: { dni: error.message }, general: null };
   return { campos, general: error.message };
 }
+
+// Un solo mensaje legible para los formularios chicos que no tienen un lugar por campo: los errores de campos juntos, o
+// el mensaje del error. Sin error, null.
+export function mensajeDeError(error: unknown): string | null {
+  if (!error) return null;
+  const { campos, general } = erroresDeCampo(error);
+  const mensajes = Object.values(campos);
+  return mensajes.length > 0 ? mensajes.join(" · ") : general;
+}

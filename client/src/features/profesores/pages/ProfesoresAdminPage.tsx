@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { passwordNueva } from "@/core/lib/validacion";
+import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
+import { resolverSoloModificados } from "@/core/formularios/resolverSoloModificados";
+import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
+import { cambiosParaEnviar, hayCambios } from "@/core/lib/diferencias";
+import { erroresDeCampo } from "@/core/lib/erroresDeCampo";
+import { celularSchema, dniSchema, emailSchema, opcional, passwordNueva, textoRequerido } from "@/core/lib/validacion";
 import { mensajeDeAlta } from "@/features/usuarios/alta";
 import { ModoDeAcceso, type ModoAcceso } from "@/features/usuarios/components/ModoDeAcceso";
 import { Pencil, Search, ToggleLeft, ToggleRight, UserPlus } from "lucide-react";
@@ -13,7 +17,6 @@ import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Modal } from "@/core/components/ui/modal";
-import { ApiError } from "@/core/lib/apiClient";
 import { formatDni, normalizarTexto } from "@/core/lib/utils";
 import { useAlumnos } from "@/features/alumnos/hooks/useAlumnos";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
@@ -22,20 +25,47 @@ import { NIVEL_GRUPO, type Curso } from "@/features/cursos/types";
 import { useActualizarProfesor } from "../hooks/useActualizarProfesor";
 import { useCrearProfesor } from "../hooks/useCrearProfesor";
 import { useProfesores } from "../hooks/useProfesores";
-import type { EstadoProfesor, Profesor } from "../types";
+import type { ActualizarProfesorInput, EstadoProfesor, Profesor } from "../types";
 
 // La contraseña solo se exige al crear (ver `onSubmit`): al editar no se pide,
 // porque no hay flujo de cambio de contraseña y pisarla desde acá sería una
 // operación distinta a "editar la ficha".
 const profesorSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido"),
-  apellido: z.string().min(1, "El apellido es requerido"),
-  dni: z.string().min(1, "El DNI es requerido"),
-  telefono: z.string().optional(),
-  email: z.email("Email inválido"),
+  nombre: textoRequerido("El nombre", 60),
+  apellido: textoRequerido("El apellido", 60),
+  dni: dniSchema,
+  telefono: opcional(celularSchema),
+  email: emailSchema,
   password: z.string().optional(),
 });
-type ProfesorForm = z.infer<typeof profesorSchema>;
+type ProfesorFormInput = z.input<typeof profesorSchema>;
+type ProfesorForm = z.output<typeof profesorSchema>;
+
+// El profesor tal como lo muestra el formulario de edición (para calcular qué cambió y qué cambió otra persona).
+interface FormProfesor extends Record<string, unknown> {
+  nombre: string;
+  apellido: string;
+  dni: string;
+  telefono: string;
+  email: string;
+  estado: EstadoProfesor;
+}
+const ETIQUETAS_PROFESOR: Record<keyof FormProfesor, string> = {
+  nombre: "nombre",
+  apellido: "apellido",
+  dni: "DNI",
+  telefono: "teléfono",
+  email: "email",
+  estado: "estado",
+};
+const aFormProfesor = (p: Profesor): FormProfesor => ({
+  nombre: p.nombre,
+  apellido: p.apellido ?? "",
+  dni: p.dni ?? "",
+  telefono: p.telefono ?? "",
+  email: p.email ?? "",
+  estado: p.estado,
+});
 
 type ModalEstado = { mode: "new" } | { mode: "edit"; profesor: Profesor } | null;
 
@@ -61,14 +91,20 @@ export default function ProfesoresAdminPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Al editar solo se validan los campos que se modificaron (un dato viejo que no se toca no bloquea el guardado).
+  const baseDeEdicion = useRef<Record<string, unknown> | undefined>(undefined);
+  const resolver = useMemo(() => resolverSoloModificados<ProfesorFormInput, ProfesorForm>(profesorSchema, () => baseDeEdicion.current), []);
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     formState: { errors, isDirty },
-  } = useForm<ProfesorForm>({ resolver: zodResolver(profesorSchema) });
+  } = useForm<ProfesorFormInput, unknown, ProfesorForm>({ resolver });
   useSinGuardar(!!modal && isDirty);
+  const [sinCambios, setSinCambios] = useState(false);
 
   const cicloActivo = ciclos?.find((c) => c.activo);
 
@@ -105,9 +141,41 @@ export default function ProfesoresAdminPage() {
   }, [profesores, busqueda]);
   const filasProfesores = useListaConSalidas(profesoresFiltrados, (p) => p.id, ["profesores", "cursos"]);
 
+  const profesorEnEdicion = modal?.mode === "edit" ? profesores?.find((p) => p.id === modal.profesor.id) : undefined;
+  const servidorProfesor = useMemo(() => (profesorEnEdicion ? aFormProfesor(profesorEnEdicion) : undefined), [profesorEnEdicion]);
+  const w = watch();
+  const valoresDelFormulario: FormProfesor = {
+    nombre: String(w.nombre ?? ""),
+    apellido: String(w.apellido ?? ""),
+    dni: String(w.dni ?? ""),
+    telefono: String(w.telefono ?? ""),
+    email: String(w.email ?? ""),
+    estado: estadoForm,
+  };
+  const alDia = useFormularioAlDia<FormProfesor>({
+    activo: modal?.mode === "edit",
+    dato: "profesores",
+    claveDeId: "profesorIds",
+    id: profesorEnEdicion?.id ?? "",
+    servidor: servidorProfesor,
+    etiquetas: ETIQUETAS_PROFESOR,
+    valores: valoresDelFormulario,
+    aplicar: (parcial) => {
+      for (const [clave, valor] of Object.entries(parcial)) {
+        if (clave === "estado") setEstadoForm(valor as EstadoProfesor);
+        else setValue(clave as "nombre", valor as string, { shouldDirty: false });
+      }
+    },
+  });
+  const baseDelProfesor = alDia.base ?? servidorProfesor;
+  useEffect(() => {
+    baseDeEdicion.current = modal?.mode === "edit" ? baseDelProfesor : undefined;
+  });
+
   const abrirNuevo = () => {
     reset({ nombre: "", apellido: "", dni: "", telefono: "", email: "", password: "" });
     crearProfesor.reset();
+    setSinCambios(false);
     setModoAcceso("invitacion");
     setModal({ mode: "new" });
   };
@@ -122,38 +190,51 @@ export default function ProfesoresAdminPage() {
       password: "",
     });
     actualizarProfesor.reset();
+    setSinCambios(false);
     setEstadoForm(profesor.estado);
     setModal({ mode: "edit", profesor });
   };
 
   const onSubmit = handleSubmit(async (datos) => {
-    if (modal?.mode === "edit") {
-      await actualizarProfesor.mutateAsync({
-        id: modal.profesor.id,
-        datos: {
-          nombre: datos.nombre,
-          apellido: datos.apellido,
-          dni: datos.dni,
-          telefono: datos.telefono || undefined,
-          email: datos.email,
+    setSinCambios(false);
+    try {
+      if (modal?.mode === "edit") {
+        // Al editar se manda solo lo que cambió.
+        const valores: FormProfesor = {
+          nombre: String(datos.nombre ?? ""),
+          apellido: String(datos.apellido ?? ""),
+          dni: String(datos.dni ?? ""),
+          telefono: String(datos.telefono ?? ""),
+          email: String(datos.email ?? ""),
           estado: estadoForm,
-        },
-      });
-      setToast("Cambios guardados correctamente");
-    } else {
-      let password: string | undefined;
-      if (modoAcceso === "contrasena") {
-        const resultadoPassword = passwordNueva.safeParse(datos.password ?? "");
-        if (!resultadoPassword.success) {
-          setError("password", { message: resultadoPassword.error.issues[0].message });
+        };
+        const cambios = cambiosParaEnviar(valores, baseDelProfesor ?? valores, ["telefono"]);
+        if (!hayCambios(cambios)) {
+          setSinCambios(true);
           return;
         }
-        password = resultadoPassword.data;
+        await actualizarProfesor.mutateAsync({ id: modal.profesor.id, datos: cambios as ActualizarProfesorInput });
+        setToast("Cambios guardados correctamente");
+      } else {
+        let password: string | undefined;
+        if (modoAcceso === "contrasena") {
+          const resultadoPassword = passwordNueva.safeParse(datos.password ?? "");
+          if (!resultadoPassword.success) {
+            setError("password", { message: resultadoPassword.error.issues[0].message });
+            return;
+          }
+          password = resultadoPassword.data;
+        }
+        const creado = await crearProfesor.mutateAsync({ ...datos, password });
+        setToast(mensajeDeAlta(datos.email, creado.invitacion));
       }
-      const creado = await crearProfesor.mutateAsync({ ...datos, password });
-      setToast(mensajeDeAlta(datos.email, creado.invitacion));
+      setModal(null);
+    } catch (error) {
+      // Cada error del servidor al lado de su campo.
+      for (const [campo, mensaje] of Object.entries(erroresDeCampo(error).campos)) {
+        if (campo in profesorSchema.shape) setError(campo as keyof ProfesorFormInput, { message: mensaje });
+      }
     }
-    setModal(null);
   });
 
   const alternarEstado = (profesor: Profesor) => {
@@ -329,29 +410,31 @@ export default function ProfesoresAdminPage() {
           }
         >
           <form className="space-y-4" noValidate onSubmit={onSubmit}>
+            <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="label">Nombre</label>
-                <Input {...register("nombre")} />
+                <Input {...register("nombre")} className={alDia.resaltados.has("nombre") ? "cambio-resaltado" : undefined} />
                 {errors.nombre && <p className="text-sm text-destructive">{errors.nombre.message}</p>}
               </div>
               <div className="space-y-1.5">
                 <label className="label">Apellido</label>
-                <Input {...register("apellido")} />
+                <Input {...register("apellido")} className={alDia.resaltados.has("apellido") ? "cambio-resaltado" : undefined} />
                 {errors.apellido && <p className="text-sm text-destructive">{errors.apellido.message}</p>}
               </div>
               <div className="space-y-1.5">
                 <label className="label">DNI</label>
-                <Input {...register("dni")} className="font-mono" />
+                <Input {...register("dni")} className={`font-mono ${alDia.resaltados.has("dni") ? "cambio-resaltado" : ""}`} />
                 {errors.dni && <p className="text-sm text-destructive">{errors.dni.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="label">Teléfono</label>
-                <Input {...register("telefono")} />
+                <label className="label">Teléfono · opcional</label>
+                <Input {...register("telefono")} placeholder="351 555-1234" className={alDia.resaltados.has("telefono") ? "cambio-resaltado" : undefined} />
+                {errors.telefono && <p className="text-sm text-destructive">{errors.telefono.message}</p>}
               </div>
               <div className="col-span-2 space-y-1.5">
                 <label className="label">Email (login del sistema)</label>
-                <Input type="email" {...register("email")} className="font-mono" />
+                <Input type="email" {...register("email")} className={`font-mono ${alDia.resaltados.has("email") ? "cambio-resaltado" : ""}`} />
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
               {modal.mode === "new" && (
@@ -399,11 +482,8 @@ export default function ProfesoresAdminPage() {
               </div>
             )}
 
-            {errorGuardado && (
-              <p className="text-sm text-destructive">
-                {errorGuardado instanceof ApiError ? errorGuardado.message : "No se pudo guardar el profesor"}
-              </p>
-            )}
+            {sinCambios && <p className="text-sm text-muted-foreground">No hay cambios para guardar</p>}
+            {errorGuardado && erroresDeCampo(errorGuardado).general && <p className="text-sm text-destructive">{erroresDeCampo(errorGuardado).general}</p>}
           </form>
         </Modal>
       )}

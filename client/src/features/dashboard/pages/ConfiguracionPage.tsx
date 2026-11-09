@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
+import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { Moon, Plus, Sun } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
@@ -26,15 +28,26 @@ export default function ConfiguracionPage() {
   const [cuotaGuardada, setCuotaGuardada] = useState(false);
 
   const valorGuardado = configuracion?.valorCuota != null ? String(configuracion.valorCuota) : "";
-  // Si otra persona cambia el valor, el campo se pone al día solo mientras siga mostrando el valor guardado anterior:
-  // lo que se está escribiendo nunca se pisa.
-  const ultimoGuardado = useRef("");
+  // El campo muestra el valor guardado apenas se carga; después, si otra persona lo cambia, se pone al día solo mientras no
+  // se lo haya tocado (lo que se está escribiendo nunca se pisa) y un aviso dice quién lo cambió.
+  const [cargado, setCargado] = useState(false);
   useEffect(() => {
-    // El anterior se copia antes: la función de setValorCuota corre recién en el próximo render.
-    const anterior = ultimoGuardado.current;
-    ultimoGuardado.current = valorGuardado;
-    setValorCuota((actual) => (actual === anterior ? valorGuardado : actual));
-  }, [valorGuardado]);
+    if (configuracion && !cargado) {
+      setValorCuota(valorGuardado);
+      setCargado(true);
+    }
+  }, [configuracion, cargado, valorGuardado]);
+  const servidor = useMemo(() => (configuracion ? { valorCuota: valorGuardado } : undefined), [configuracion, valorGuardado]);
+  const alDia = useFormularioAlDia<{ valorCuota: string }>({
+    activo: cargado,
+    dato: "configuracion",
+    claveDeId: "",
+    id: "",
+    servidor,
+    etiquetas: { valorCuota: "el valor de la cuota" },
+    valores: { valorCuota },
+    aplicar: (parcial) => setValorCuota(parcial.valorCuota ?? ""),
+  });
 
   useSinGuardar(valorCuota !== valorGuardado || nuevoAnio.trim() !== "");
 
@@ -98,6 +111,7 @@ export default function ConfiguracionPage() {
               Todavía no hay un valor cargado: mientras tanto no se generan cuotas.
             </p>
           )}
+          <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-muted-foreground">$</span>
@@ -111,7 +125,7 @@ export default function ConfiguracionPage() {
                   setCuotaGuardada(false);
                 }}
                 placeholder="35000"
-                className="tnum w-44 pl-7"
+                className={`tnum w-44 pl-7 ${alDia.resaltados.has("valorCuota") ? "cambio-resaltado" : ""}`}
               />
             </div>
             <Button onClick={onGuardarCuota} disabled={!valorValido || actualizarConfiguracion.isPending}>

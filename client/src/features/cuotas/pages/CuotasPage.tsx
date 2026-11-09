@@ -8,7 +8,7 @@ import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { KpiCard } from "@/core/components/ui/kpi-card";
 import { Modal } from "@/core/components/ui/modal";
-import { ApiError } from "@/core/lib/apiClient";
+import { mensajeDeError } from "@/core/lib/erroresDeCampo";
 import { formatDni, formatMonto, hoyLocalISO, normalizarTexto } from "@/core/lib/utils";
 import { useAlumnos } from "@/features/alumnos/hooks/useAlumnos";
 import type { Alumno } from "@/features/alumnos/types";
@@ -529,7 +529,7 @@ export default function CuotasPage() {
 
           {registrarPago.isError && (
             <p className="text-sm text-destructive">
-              {registrarPago.error instanceof ApiError ? registrarPago.error.message : "No se pudo registrar el pago"}
+              {mensajeDeError(registrarPago.error) ?? "No se pudo registrar el pago"}
             </p>
           )}
         </Modal>

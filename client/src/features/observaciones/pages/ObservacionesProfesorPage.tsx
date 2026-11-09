@@ -8,7 +8,7 @@ import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Panel } from "@/core/components/ui/panel";
 import { Select } from "@/core/components/ui/select";
-import { ApiError } from "@/core/lib/apiClient";
+import { mensajeDeError } from "@/core/lib/erroresDeCampo";
 import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useCategoriasPersonalizadas } from "../hooks/useCategoriasPersonalizadas";
@@ -156,6 +156,7 @@ export default function ObservacionesProfesorPage() {
                   <Input
                     value={nuevaCategoriaNombre}
                     onChange={(e) => setNuevaCategoriaNombre(e.target.value)}
+                    maxLength={80}
                     placeholder="Ej: Participación en clase"
                   />
                   <p className="text-[11px] text-muted-foreground">Queda guardada solo para este curso.</p>
@@ -167,7 +168,7 @@ export default function ObservacionesProfesorPage() {
             )}
             {crearCategoria.isError && (
               <p className="text-sm text-destructive">
-                {crearCategoria.error instanceof ApiError ? crearCategoria.error.message : "No se pudo crear la categoría"}
+                {mensajeDeError(crearCategoria.error) ?? "No se pudo crear la categoría"}
               </p>
             )}
 
@@ -186,7 +187,7 @@ export default function ObservacionesProfesorPage() {
 
             {crearObservacion.isError && (
               <p className="text-sm text-destructive">
-                {crearObservacion.error instanceof ApiError ? crearObservacion.error.message : "No se pudo crear la observación"}
+                {mensajeDeError(crearObservacion.error) ?? "No se pudo crear la observación"}
               </p>
             )}
 
