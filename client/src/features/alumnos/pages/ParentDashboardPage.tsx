@@ -234,7 +234,8 @@ export default function ParentDashboardPage() {
               }}
             >
               <Avatar name={`${h.nombre} ${h.apellido}`} size="sm" tone={i === kidIdx ? "brand" : "neutral"} />
-              <span className="truncate">{h.nombre}</span>
+              {/* Su propia cursada (un adulto que además es responsable de otros) se llama "Yo". */}
+              <span className="truncate">{h.vinculoResponsable === "propio" ? "Yo" : h.nombre}</span>
             </button>
           ))}
         </div>
@@ -250,7 +251,7 @@ export default function ParentDashboardPage() {
               </div>
             )}
             <h2 className="text-[18px] font-semibold leading-tight tracking-tight">
-              {kid.nombre} {kid.apellido}
+              {kid.vinculoResponsable === "propio" ? "Mi cursada" : `${kid.nombre} ${kid.apellido}`}
             </h2>
             <p className="mt-1.5 text-[12.5px] text-muted-foreground">
               {kid.profesorNombre && `Prof. ${kid.profesorNombre}`}

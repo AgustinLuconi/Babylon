@@ -9,6 +9,7 @@ import logoTintaBlanca from "@/assets/babylon-logo-tinta-blanca.png";
 import logoTintaVerde from "@/assets/babylon-logo-tinta-verde.png";
 import { AREA_POR_ROL, navPorRol } from "./nav";
 import { obtenerTituloPagina } from "./pageTitles";
+import { useModoDelPanel } from "@/features/alumnos/hooks/useModoDelPanel";
 import { GlobalSearch } from "./GlobalSearch";
 import { NotificationBell } from "./NotificationBell";
 import { ContadorChats } from "./ContadorChats";
@@ -42,8 +43,9 @@ function BabylonLogo({ dark = false }: { dark?: boolean }) {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { usuario, logout } = useAuth();
   const { tema, alternarTema } = useThemeStore();
+  const modoDelPanel = useModoDelPanel();
   if (!usuario) return null;
-  const grupos = navPorRol(usuario.rol);
+  const grupos = navPorRol(usuario.rol, modoDelPanel);
   const todosLosItems = grupos.flatMap((g) => g.items);
 
   return (
@@ -126,7 +128,8 @@ export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { usuario } = useAuth();
   const { pathname } = useLocation();
-  const encabezado = obtenerTituloPagina(pathname);
+  const modoDelPanel = useModoDelPanel();
+  const encabezado = obtenerTituloPagina(pathname, modoDelPanel);
   const puedeBuscar = usuario?.rol === "admin" || usuario?.rol === "secretario";
 
   return (
