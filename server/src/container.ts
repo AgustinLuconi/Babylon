@@ -145,7 +145,7 @@ const chatService = new ChatService(chatRepository, usuarioRepository, padreRepo
 const reporteService = new ReporteService(prisma, documentoRepository);
 const notificacionService = new NotificacionService(
   new PrismaNotificacionRepository(prisma),
-  new PrismaCriteriosDeAvisos(prisma, documentoRepository),
+  new PrismaCriteriosDeAvisos(prisma, documentoRepository, alumnoRepository),
   canalEnVivo,
   unitOfWork,
 );

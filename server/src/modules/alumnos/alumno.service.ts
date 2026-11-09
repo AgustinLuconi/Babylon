@@ -14,6 +14,7 @@ import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { CuentaPreparada, EstadoInvitacion } from "../usuarios/invitacion.service";
 import type { AlumnoRepository } from "./alumno.repository";
 import type { Alumno, VinculoResponsable } from "./alumno.entity";
+import type { DatoFaltante } from "./alumno.incompleto";
 import type { ActualizarAlumnoInput, NuevoAlumnoInput, ResponsableInput } from "./alumno.schema";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosAlumnos } from "./alumno.eventos";
@@ -58,6 +59,12 @@ export class AlumnoService {
 
   async listarAlumnos(): Promise<Alumno[]> {
     return this.alumnoRepo.findAll();
+  }
+
+  // Para el filtro y la marca de Alumnos: { [alumnoId]: lo que le falta }.
+  async listarIncompletos(): Promise<Record<string, DatoFaltante[]>> {
+    const incompletos = await this.alumnoRepo.findIncompletos();
+    return Object.fromEntries(incompletos.map((a) => [a.alumnoId, a.faltan]));
   }
 
   async listarPorPadre(padreId: string): Promise<Alumno[]> {

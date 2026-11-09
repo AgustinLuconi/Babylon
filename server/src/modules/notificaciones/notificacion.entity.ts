@@ -21,6 +21,7 @@ export type TonoNotificacion = "danger" | "warning" | "info";
 export type RecursoAviso =
   | { tipo: "cuotas-vencidas" }
   | { tipo: "documentacion-pendiente" }
+  | { tipo: "datos-incompletos" }
   | { tipo: "evaluacion"; cursoId: string; evaluacionId: string }
   | { tipo: "asistencia"; cursoId: string; fecha: string }
   | { tipo: "cierre"; cursoId: string; periodo: string }

@@ -19,6 +19,10 @@ export class AlumnoController {
     res.status(200).json(alumnos);
   };
 
+  incompletos = async (_req: Request, res: Response) => {
+    res.status(200).json(await this.alumnoService.listarIncompletos());
+  };
+
   misHijos = async (req: Request, res: Response) => {
     const padre = await this.padreService.buscarPorUsuarioId(req.auth!.sub);
     const alumnos = await this.alumnoService.listarPorPadreConCurso(padre.id);

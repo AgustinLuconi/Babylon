@@ -10,7 +10,14 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
   const sincronizar = (tipos: TipoEstado[]) => (_datos: unknown, tx: unknown) => avisos.sincronizar(tipos, tx);
 
   tablero.alPublicarse("cuotas.cambiaron", sincronizar(["cuota", "cuotas_vencidas"]));
-  tablero.alPublicarse("alumnos.cambiaron", sincronizar(["cuota", "cuotas_vencidas", "documentacion_hijo", "documentacion_pendiente"]));
+  tablero.alPublicarse(
+    "alumnos.cambiaron",
+    sincronizar(["cuota", "cuotas_vencidas", "documentacion_hijo", "documentacion_pendiente", "datos_incompletos"]),
+  );
+  // Completar o borrar un dato de un responsable cambia lo que les falta a sus alumnos.
+  tablero.alPublicarse("datos.cambiaron", async ({ dato }, tx) => {
+    if (dato === "padres") await avisos.sincronizar(["datos_incompletos"], tx);
+  });
   tablero.alPublicarse("documentos.cambiaron", sincronizar(["documentacion_hijo", "documentacion_pendiente"]));
   tablero.alPublicarse("asistencia.registrada", sincronizar(["asistencia_pendiente"]));
   tablero.alPublicarse("cursos.cambiaron", sincronizar(["asistencia_pendiente", "evaluacion_proxima", "notas_sin_publicar", "cierre_sin_publicar"]));

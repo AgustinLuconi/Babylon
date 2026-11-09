@@ -4,6 +4,7 @@ import type { Cambios } from "../../core/ports";
 import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import type { AlumnoRepository } from "./alumno.repository";
 import type { Alumno } from "./alumno.entity";
+import { datosFaltantes, type AlumnoConDatosFaltantes } from "./alumno.incompleto";
 
 type FilaAlumno = Awaited<ReturnType<PrismaClient["alumno"]["findUniqueOrThrow"]>>;
 
@@ -82,6 +83,37 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
     } catch {
       throw new EntityNotFoundError("Alumno", id);
     }
+  }
+
+  async findIncompletos(tx?: unknown): Promise<AlumnoConDatosFaltantes[]> {
+    const alumnos = await this.client(tx).alumno.findMany({
+      where: { estado: "activo", inscripciones: { some: { ciclo: { activo: true } } } },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        dni: true,
+        fechaNacimiento: true,
+        padreId: true,
+        vinculoResponsable: true,
+        padre: { select: { dni: true, telefono: true, email: true } },
+      },
+    });
+    return alumnos
+      .map((a) => ({
+        alumnoId: a.id,
+        nombre: `${a.nombre} ${a.apellido}`,
+        faltan: datosFaltantes(
+          {
+            dni: a.dni ?? undefined,
+            fechaNacimiento: a.fechaNacimiento ?? undefined,
+            padreId: a.padreId ?? undefined,
+            vinculoResponsable: a.vinculoResponsable ?? undefined,
+          },
+          a.padre ? { dni: a.padre.dni ?? undefined, telefono: a.padre.telefono ?? undefined, email: a.padre.email ?? undefined } : null,
+        ),
+      }))
+      .filter((a) => a.faltan.length > 0);
   }
 
   async actualizarParcial(id: string, cambios: Cambios<Alumno>, tx?: unknown): Promise<Alumno> {
