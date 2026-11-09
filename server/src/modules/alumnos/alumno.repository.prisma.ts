@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import type { Cambios } from "../../core/ports";
+import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import type { AlumnoRepository } from "./alumno.repository";
 import type { Alumno } from "./alumno.entity";
 
@@ -80,6 +82,19 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
     } catch {
       throw new EntityNotFoundError("Alumno", id);
     }
+  }
+
+  async actualizarParcial(id: string, cambios: Cambios<Alumno>, tx?: unknown): Promise<Alumno> {
+    try {
+      const fila = await this.client(tx).alumno.update({ where: { id }, data: cambios });
+      return aEntidad(fila);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Alumno", id);
+    }
+  }
+
+  async bloquear(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).$queryRaw`SELECT "id" FROM "Alumno" WHERE "id" = ${id} FOR UPDATE`;
   }
 
   async delete(id: string, tx?: unknown): Promise<void> {

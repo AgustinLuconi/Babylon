@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
+import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
 import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
 import type { SesionRepository } from "../usuarios/sesion.repository";
@@ -185,7 +186,8 @@ export class ProfesorService {
           }
         }
       }
-      const guardado = await this.profesorRepo.update(id, actualizado, tx);
+      // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.
+      const guardado = await this.profesorRepo.actualizarParcial(id, soloPresentes(datos), tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [id] } }, tx);
       return guardado;
     });

@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import type { Cambios } from "../../core/ports";
+import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
 
@@ -69,6 +71,19 @@ export class PrismaPadreRepository implements PadreRepository {
 
   async vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void> {
     await this.client(tx).padre.updateMany({ where: { id }, data: { usuarioId } });
+  }
+
+  async actualizarParcial(id: string, cambios: Cambios<Padre>, tx?: unknown): Promise<Padre> {
+    try {
+      const fila = await this.client(tx).padre.update({ where: { id }, data: cambios });
+      return aEntidad(fila);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Padre", id);
+    }
+  }
+
+  async bloquear(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).$queryRaw`SELECT "id" FROM "Padre" WHERE "id" = ${id} FOR UPDATE`;
   }
 
   async delete(id: string, tx?: unknown): Promise<void> {

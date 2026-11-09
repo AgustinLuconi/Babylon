@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import type { Cambios } from "../../core/ports";
+import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import type { ProfesorRepository } from "./profesor.repository";
 import type { Profesor } from "./profesor.entity";
 
@@ -69,6 +71,15 @@ export class PrismaProfesorRepository implements ProfesorRepository {
 
   async vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void> {
     await this.client(tx).profesor.updateMany({ where: { id }, data: { usuarioId } });
+  }
+
+  async actualizarParcial(id: string, cambios: Cambios<Profesor>, tx?: unknown): Promise<Profesor> {
+    try {
+      const fila = await this.client(tx).profesor.update({ where: { id }, data: cambios });
+      return aEntidad(fila);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Profesor", id);
+    }
   }
 
   async delete(id: string, tx?: unknown): Promise<void> {

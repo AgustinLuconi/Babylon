@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EntityNotFoundError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
+import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
@@ -89,16 +90,9 @@ export class CursoService {
         }
       }
 
-      const actualizado: Curso = {
-        ...actual,
-        nombre: datos.nombre ?? actual.nombre,
-        nivel: datos.nivel ?? actual.nivel,
-        profesorId: datos.profesorId ?? actual.profesorId,
-        aula: datos.aula ?? actual.aula,
-        cupo: datos.cupo ?? actual.cupo,
-        estado: datos.estado ?? actual.estado,
-      };
-      await this.cursoRepo.update(id, actualizado, tx);
+      // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra. Los horarios no son una columna.
+      const { horarios: _horarios, ...columnas } = datos;
+      const actualizado = await this.cursoRepo.actualizarParcial(id, soloPresentes(columnas), tx);
 
       if (datos.horarios) {
         await this.cursoRepo.eliminarHorariosByCursoId(id, tx);

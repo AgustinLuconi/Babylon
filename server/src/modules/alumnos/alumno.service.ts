@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AuthorizationError, ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
+import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { CuotaService } from "../cuotas/cuota.service";
@@ -155,19 +156,12 @@ export class AlumnoService {
         throw new EntityNotFoundError("Alumno", id);
       }
 
-      const actualizado: Alumno = {
-        ...actual,
-        nombre: datos.nombre ?? actual.nombre,
-        apellido: datos.apellido ?? actual.apellido,
-        fechaNacimiento: datos.fechaNacimiento ?? actual.fechaNacimiento,
-        direccion: datos.direccion ?? actual.direccion,
-        telefono: datos.telefono ?? actual.telefono,
-        email: datos.email ?? actual.email,
-        observacionesMedicas: datos.observacionesMedicas ?? actual.observacionesMedicas,
-        cursoId: datos.cursoId ?? actual.cursoId,
-        estado: datos.estado ?? actual.estado,
-      };
-      const resultado = await this.alumnoRepo.update(id, actualizado, tx);
+      if (datos.dni && datos.dni !== actual.dni) {
+        const otro = await this.alumnoRepo.findByDni(datos.dni, tx);
+        if (otro && otro.id !== id) throw new ConflictError(`Ya existe un alumno con el DNI ${datos.dni}`);
+      }
+      // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.
+      const resultado = await this.alumnoRepo.actualizarParcial(id, soloPresentes(datos), tx);
 
       // Si cambió de curso, la inscripción del ciclo activo tiene que
       // reflejar el nuevo curso — si no existía todavía (ej. no tenía curso

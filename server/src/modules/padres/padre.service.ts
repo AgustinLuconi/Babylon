@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
-import { ConflictError, EntityNotFoundError } from "../../core/errors";
+import { soloPresentes } from "../../core/cambios";
+import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
 import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
@@ -112,41 +113,37 @@ export class PadreService {
   }
 
   async actualizarPadre(id: string, datos: ActualizarPadreInput): Promise<Padre> {
-    const actual = await this.padreRepo.findById(id);
-    if (!actual) {
-      throw new EntityNotFoundError("Padre", id);
-    }
-
-    const actualizado: Padre = {
-      ...actual,
-      nombre: datos.nombre ?? actual.nombre,
-      apellido: datos.apellido ?? actual.apellido,
-      direccion: datos.direccion ?? actual.direccion,
-      telefono: datos.telefono ?? actual.telefono,
-      email: datos.email ?? actual.email,
-    };
-    const cambiaEmail = datos.email !== undefined && datos.email !== actual.email;
-    if (!cambiaEmail || !actual.usuarioId) {
-      const guardado = await this.padreRepo.update(id, actualizado);
-      await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [id] } });
-      return guardado;
-    }
-
-    // Con una invitación todavía sin aceptar, corregir el email de la ficha corrige el de la cuenta y anula la invitación
-    // que se mandó a la dirección anterior (queda "vencida" hasta reenviarla a la nueva). Una cuenta ya activa conserva su
-    // email de acceso: cambiarlo es otra operación (fuera de alcance).
-    const usuarioId = actual.usuarioId;
     return this.unitOfWork.runInTransaction(async (tx) => {
-      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
-      const usuario = await this.usuarioRepo.findById(usuarioId, tx);
-      if (usuario?.estado === "pendiente") {
-        const emailNuevo = datos.email!;
-        const otra = await this.usuarioRepo.findByEmail(emailNuevo, tx);
-        if (otra && otra.id !== usuario.id) throw new ConflictError(`Ya existe un usuario con el email ${emailNuevo}`);
-        await this.usuarioRepo.actualizarParcial(usuario.id, { email: emailNuevo }, tx);
-        await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", new Date(), tx);
+      const actual = await this.padreRepo.findById(id, tx);
+      if (!actual) {
+        throw new EntityNotFoundError("Padre", id);
       }
-      const guardado = await this.padreRepo.update(id, actualizado, tx);
+      if (datos.dni && datos.dni !== actual.dni) {
+        const otra = await this.padreRepo.findByDni(datos.dni, tx);
+        if (otra && otra.id !== id) throw new ConflictError(`Ya existe un responsable con el DNI ${datos.dni}`);
+      }
+      // El email de la ficha es el de su cuenta de acceso: con cuenta, no se puede dejar sin email.
+      if (datos.email === null && actual.usuarioId) {
+        throw new ValidationError("Este responsable ya tiene una cuenta de acceso: no se puede borrar su email");
+      }
+
+      // Con una invitación todavía sin aceptar, corregir el email de la ficha corrige el de la cuenta y anula la invitación
+      // que se mandó a la dirección anterior (queda "vencida" hasta reenviarla a la nueva). Una cuenta ya activa conserva su
+      // email de acceso: cambiarlo es otra operación (fuera de alcance).
+      if (typeof datos.email === "string" && datos.email !== actual.email && actual.usuarioId) {
+        const usuarioId = actual.usuarioId;
+        await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
+        const usuario = await this.usuarioRepo.findById(usuarioId, tx);
+        if (usuario?.estado === "pendiente") {
+          const otra = await this.usuarioRepo.findByEmail(datos.email, tx);
+          if (otra && otra.id !== usuario.id) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+          await this.usuarioRepo.actualizarParcial(usuario.id, { email: datos.email }, tx);
+          await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", new Date(), tx);
+        }
+      }
+
+      // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.
+      const guardado = await this.padreRepo.actualizarParcial(id, soloPresentes(datos), tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [id] } }, tx);
       return guardado;
     });
