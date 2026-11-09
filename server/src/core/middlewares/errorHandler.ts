@@ -4,7 +4,12 @@ import { DomainError, ValidationError } from "../errors";
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof ZodError) {
-    res.status(400).json({ error: "Datos inválidos", details: z.flattenError(err).fieldErrors });
+    // Por campo de primer nivel y, para lo anidado, también por ruta completa ("responsable.datos.telefono").
+    const porRuta: Record<string, string[]> = {};
+    for (const issue of err.issues) {
+      if (issue.path.length > 1) (porRuta[issue.path.join(".")] ??= []).push(issue.message);
+    }
+    res.status(400).json({ error: "Datos inválidos", details: { ...z.flattenError(err).fieldErrors, ...porRuta } });
     return;
   }
 
