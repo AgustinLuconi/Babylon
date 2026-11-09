@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { PadreService } from "../padres/padre.service";
-import { actualizarAlumnoSchema, nuevoAlumnoSchema } from "./alumno.schema";
+import { actualizarAlumnoSchema, nuevoAlumnoSchema, responsableSchema } from "./alumno.schema";
 import type { AlumnoService } from "./alumno.service";
 
 export class AlumnoController {
@@ -29,6 +29,12 @@ export class AlumnoController {
     const datos = nuevoAlumnoSchema.parse(req.body);
     const alumno = await this.alumnoService.inscribirAlumno(datos);
     res.status(201).json(alumno);
+  };
+
+  asignarResponsable = async (req: Request, res: Response) => {
+    const responsable = responsableSchema.parse(req.body);
+    const alumno = await this.alumnoService.asignarResponsable(String(req.params.id), responsable);
+    res.status(200).json(alumno);
   };
 
   actualizar = async (req: Request, res: Response) => {

@@ -1,19 +1,29 @@
 import { z } from "zod";
-import { borrable, celularSchema, dniSchema, emailSchema, opcional, passwordNueva, texto, textoRequerido } from "../../core/validacion";
+import { borrable, celularSchema, dniSchema, emailSchema, opcional, passwordNueva, texto, textoOpcional, textoRequerido } from "../../core/validacion";
 
-export const crearPadreSchema = z
+// Lo mínimo de una ficha de responsable: nombre, apellido y celular. DNI, email y dirección se completan después.
+// Con email se crea la cuenta (con contraseña, activa; sin ella, pendiente + invitación); sin email, no hay cuenta.
+const sinContrasenaSinEmail = (d: { password?: string; email?: string }) => !d.password || d.email !== undefined;
+const MENSAJE_PASSWORD_SIN_EMAIL = { message: "Para asignar una contraseña hace falta un email", path: ["email"] };
+
+export const datosDeFichaSchema = z
   .object({
     nombre: textoRequerido("El nombre", 60),
     apellido: textoRequerido("El apellido", 60),
-    dni: dniSchema,
-    telefono: opcional(celularSchema),
-    email: emailSchema,
-    // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
+    telefono: celularSchema,
+    dni: opcional(dniSchema),
+    email: opcional(emailSchema),
+    direccion: textoOpcional(150),
     password: passwordNueva.optional(),
   })
-  .strict();
+  .strict()
+  .refine(sinContrasenaSinEmail, MENSAJE_PASSWORD_SIN_EMAIL);
 
-export type CrearPadreInput = z.infer<typeof crearPadreSchema>;
+export type DatosDeFichaInput = z.infer<typeof datosDeFichaSchema>;
+
+export const crearPadreSchema = datosDeFichaSchema;
+export type CrearPadreInput = DatosDeFichaInput;
+export { sinContrasenaSinEmail, MENSAJE_PASSWORD_SIN_EMAIL };
 
 // Usado solo por el importador de datos históricos (ej. ciclo 2025): la
 // planilla real no trae el email del padre/madre/tutor, así que se crea el

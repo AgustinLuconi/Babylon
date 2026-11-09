@@ -115,7 +115,7 @@ const mailer: Mailer = config.SMTP_HOST
 const invitacionService = new InvitacionService(usuarioRepository, padreRepository, profesorRepository, unitOfWork, mailer, tablero);
 const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, mailer, invitacionService, tablero);
 const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
-const padreService = new PadreService(padreRepository, usuarioRepository, unitOfWork, invitacionService, tablero);
+const padreService = new PadreService(padreRepository, usuarioRepository, alumnoRepository, unitOfWork, invitacionService, tablero);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork, invitacionService, tablero);
 const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, cicloRepository, configuracionRepository, unitOfWork, tablero);
 const configuracionService = new ConfiguracionService(configuracionRepository, tablero);
@@ -124,6 +124,8 @@ const alumnoService = new AlumnoService(
   cursoRepository,
   profesorRepository,
   cicloRepository,
+  padreRepository,
+  padreService,
   cuotaService,
   unitOfWork,
   tablero,
