@@ -17,7 +17,7 @@ export function NuevaConversacion({ onCerrar, onAbierta }: { onCerrar: () => voi
     const termino = normalizarTexto(busqueda.trim());
     if (!termino) return [];
     return (padres ?? [])
-      .filter((p) => normalizarTexto(`${p.nombre} ${p.apellido} ${p.dni}`).includes(termino))
+      .filter((p) => normalizarTexto(`${p.nombre} ${p.apellido} ${p.dni ?? ""}`).includes(termino))
       .slice(0, 8);
   }, [padres, busqueda]);
 

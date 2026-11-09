@@ -27,7 +27,7 @@ export function GlobalSearch() {
     const termino = normalizarTexto(query.trim());
     if (!termino) return [];
     return (alumnos ?? [])
-      .filter((a) => normalizarTexto(`${a.nombre} ${a.apellido} ${a.dni}`).includes(termino))
+      .filter((a) => normalizarTexto(`${a.nombre} ${a.apellido} ${a.dni ?? ""}`).includes(termino))
       .slice(0, 6);
   }, [alumnos, query]);
 

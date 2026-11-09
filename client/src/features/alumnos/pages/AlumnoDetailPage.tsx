@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
-import { ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
@@ -13,7 +13,7 @@ import { Panel } from "@/core/components/ui/panel";
 import { Select } from "@/core/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table";
 import { ApiError } from "@/core/lib/apiClient";
-import { calcularEdad, formatDni, formatFecha, formatMonto } from "@/core/lib/utils";
+import { calcularEdad, formatCelular, formatDni, formatFecha, formatMonto } from "@/core/lib/utils";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
@@ -41,6 +41,8 @@ import { CambiarResponsableModal } from "../components/CambiarResponsableModal";
 import { EditarDatosModal } from "../components/EditarDatosModal";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
+import { useAlumnosIncompletos } from "../hooks/useAlumnosIncompletos";
+import { textoIncompleto } from "../datosFaltantes";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
@@ -242,6 +244,8 @@ export default function AlumnoDetailPage() {
   const actualizarAlumno = useActualizarAlumno();
   const [modalEditar, setModalEditar] = useState(false);
   const [modalResponsable, setModalResponsable] = useState(false);
+  const { data: incompletos } = useAlumnosIncompletos();
+  const faltan = alumno ? (incompletos?.[alumno.id] ?? []) : [];
   const observacionSinGuardar = modalObs && obsTexto.trim() !== "";
   useSinGuardar(observacionSinGuardar);
 
@@ -319,6 +323,16 @@ export default function AlumnoDetailPage() {
         </CardContent>
       </Card>
 
+      {faltan.length > 0 && (
+        <div data-datos-incompletos role="status" className="flex flex-wrap items-center gap-3 rounded px-4 py-3 text-[13px]" style={{ background: "var(--warning-soft)" }}>
+          <AlertCircle size={15} className="shrink-0" />
+          <span className="flex-1">Faltan completar: {textoIncompleto(faltan)}.</span>
+          <Button variant="outline" size="sm" onClick={() => (faltan.includes("responsable") || faltan.includes("vinculo") ? setModalResponsable(true) : setModalEditar(true))}>
+            {faltan.includes("responsable") ? "Asignar responsable" : faltan.includes("vinculo") ? "Elegir el vínculo" : "Completar datos"}
+          </Button>
+        </div>
+      )}
+
       <div className="flex items-center gap-1 overflow-x-auto rounded-md border bg-muted/40 p-1">
         {TABS.map((t) => (
           <button
@@ -351,7 +365,7 @@ export default function AlumnoDetailPage() {
                   }
                 />
                 <Campo label="Dirección" value={alumno.direccion} />
-                <Campo label="Teléfono" value={alumno.telefono} />
+                <Campo label="Celular" value={alumno.telefono && formatCelular(alumno.telefono)} />
                 <Campo label="Email" value={alumno.email} />
                 <Campo
                   label="Obs. médicas / alergias"
@@ -381,7 +395,7 @@ export default function AlumnoDetailPage() {
                 <Campo label="DNI" value={padre?.dni && formatDni(padre.dni)} mono />
                 <Campo label="Vínculo" value={alumno.vinculoResponsable && VINCULO_LABELS[alumno.vinculoResponsable]} />
                 <Campo label="Dirección" value={padre?.direccion} />
-                <Campo label="Teléfono" value={padre?.telefono} />
+                <Campo label="Celular" value={padre?.telefono && formatCelular(padre.telefono)} />
                 <Campo label="Email" value={padre?.email} />
                 {hermanos.length > 0 && (
                   <div className="mt-3 flex items-center gap-2 rounded-md border p-2.5" style={{ background: "var(--brand-soft)", borderColor: "var(--brand-border)" }}>

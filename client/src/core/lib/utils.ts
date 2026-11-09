@@ -82,6 +82,13 @@ export function formatearVariacionPp(pp: number): { delta: string; tono: "positi
 // "45123456" -> "45.123.456". Solo para mostrar: el dato guardado y la
 // búsqueda siguen usando los dígitos crudos. Si no son 7-8 dígitos (dato
 // histórico con otro formato), se devuelve tal cual.
+// Un celular guardado normalizado (+549 y 10 dígitos) se muestra legible; uno viejo con otro formato, tal cual.
+export function formatCelular(telefono: string | undefined): string {
+  if (!telefono) return "—";
+  const m = /^\+549(\d{10})$/.exec(telefono);
+  return m ? `+54 9 ${m[1].slice(0, -4)}-${m[1].slice(-4)}` : telefono;
+}
+
 // Un alumno o responsable puede no tener el DNI cargado todavía.
 export function formatDni(dni: string | undefined): string {
   if (!dni) return "sin cargar";

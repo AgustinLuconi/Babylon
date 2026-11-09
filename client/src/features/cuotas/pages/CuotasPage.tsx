@@ -141,7 +141,7 @@ export default function CuotasPage() {
     const termino = normalizarTexto(payBusqueda.trim());
     if (!termino) return [];
     return (alumnos ?? [])
-      .filter((a) => normalizarTexto(`${a.nombre} ${a.apellido} ${a.dni}`).includes(termino))
+      .filter((a) => normalizarTexto(`${a.nombre} ${a.apellido} ${a.dni ?? ""}`).includes(termino))
       .slice(0, 8);
   }, [alumnos, payBusqueda]);
 
