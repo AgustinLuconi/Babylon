@@ -112,6 +112,14 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
     }
     return [];
   }, [modo, valoresNuevo.nombre, valoresNuevo.apellido, alumno, padres]);
+  // Un adulto "propio" cuyo DNI ya es de una ficha: el servidor reutiliza esa ficha y manda ella (el alumno toma su nombre).
+  // Se muestra cuál es y, si el nombre no se parece (un DNI mal tipeado daría con otra persona), hay que confirmarlo.
+  const fichaPorDni = useMemo(() => {
+    if (modo !== "propio" || !alumno.dni) return undefined;
+    return (padres ?? []).find((f) => normalizarDniSimple(f.dni) === normalizarDniSimple(alumno.dni));
+  }, [modo, alumno.dni, padres]);
+  const nombreCoincide = fichaPorDni ? fichasParecidas(alumno, [fichaPorDni]).length > 0 : true;
+  const [fichaConfirmada, setFichaConfirmada] = useState<string | null>(null);
   const clave = `${modo}:${parecidas.map((f) => f.id).join(",")}`;
   const decidido = decision?.clave === clave;
 
@@ -171,6 +179,9 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
       if (email?.success && modoAcceso === "contrasena") {
         const r = passwordNueva.safeParse(propio.password);
         if (!r.success) return fallo("password", r.error.issues[0].message);
+      }
+      if (fichaPorDni && !nombreCoincide && fichaConfirmada !== fichaPorDni.id) {
+        return fallo("fichaPorDni", "Confirmá que es la misma persona o corregí el DNI del alumno");
       }
       if (parecidas.length > 0 && !decidido) return fallo("parecidas", "Elegí si es la misma persona que una ficha que ya existe");
       return {
@@ -396,6 +407,25 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
                   <Mensaje mensaje={errores.password} />
                 </div>
               )}
+            </>
+          )}
+        </div>
+      )}
+
+      {fichaPorDni && (
+        <div role="alert" data-ficha-por-dni className="space-y-2 rounded-md border p-3" style={{ background: "var(--warning-soft)", borderColor: "var(--warning)" }}>
+          <p className="text-[12.5px]">
+            Ya existe una ficha con ese DNI: <strong>{ficha(fichaPorDni)}</strong>. Se va a usar esa ficha y el alumno va a figurar con el nombre de la ficha.
+          </p>
+          {!nombreCoincide && (
+            <>
+              <p className="text-[12.5px] font-medium">
+                El nombre no coincide con el del alumno ({alumno.nombre} {alumno.apellido}): revisá que el DNI esté bien.
+              </p>
+              <Button type="button" size="sm" variant={fichaConfirmada === fichaPorDni.id ? "default" : "outline"} onClick={() => setFichaConfirmada(fichaPorDni.id)}>
+                {fichaConfirmada === fichaPorDni.id ? "✓ Es la misma persona" : "Es la misma persona"}
+              </Button>
+              <Mensaje mensaje={errores.fichaPorDni} />
             </>
           )}
         </div>

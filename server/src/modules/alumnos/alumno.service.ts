@@ -281,6 +281,9 @@ export class AlumnoService {
         (datos.nombre !== undefined || datos.apellido !== undefined || datos.dni !== undefined);
       if (sincroniza) await this.padreRepo.bloquear(actual.padreId as string, tx);
 
+      if (datos.cursoId && datos.cursoId !== actual.cursoId && !(await this.cursoRepo.findById(datos.cursoId, tx))) {
+        throw new EntityNotFoundError("Curso", datos.cursoId);
+      }
       if (datos.dni && datos.dni !== actual.dni) {
         const otro = await this.alumnoRepo.findByDni(datos.dni, tx);
         if (otro && otro.id !== id) throw new ConflictError(`Ya existe un alumno con el DNI ${datos.dni}`);
