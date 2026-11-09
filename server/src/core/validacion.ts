@@ -73,6 +73,9 @@ export const textoRequerido = (etiqueta: string, max: number) =>
     .min(1, `${etiqueta} es requerido`)
     .max(max, `${etiqueta} admite hasta ${max} caracteres`);
 
+// Texto con tope de largo, sin exigir que no esté vacío (se combina con `opcional` o `borrable`).
+export const texto = (max: number) => z.string().trim().max(max, `Admite hasta ${max} caracteres`);
+
 // Opcional: un texto de puros espacios cuenta como vacío (queda "sin dato").
 export const textoOpcional = (max: number) =>
   z
@@ -110,3 +113,36 @@ export const opcional = <T extends z.ZodType>(schema: T) =>
 // Al editar: ausente = no se toca; vacío o null = se borra el dato.
 export const borrable = <T extends z.ZodType>(schema: T) =>
   z.preprocess((v) => (v === null || (typeof v === "string" && v.trim() === "") ? null : v), schema.nullable().optional());
+
+// ── Fechas de calendario (solo servidor) ──────────────────────────────────────────────────────────────────
+const FECHA_CALENDARIO = /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/;
+
+// AAAA-MM-DD (o un ISO con hora, de donde se toma solo el día) que existe en el calendario.
+export function esFechaReal(texto: string): boolean {
+  const f = FECHA_CALENDARIO.exec(texto);
+  if (!f) return false;
+  const [anio, mes, dia] = [Number(f[1]), Number(f[2]), Number(f[3])];
+  const real = new Date(Date.UTC(anio, mes - 1, dia));
+  return real.getUTCFullYear() === anio && real.getUTCMonth() === mes - 1 && real.getUTCDate() === dia;
+}
+
+// Fecha calendario como medianoche UTC (así se guardan las fechas de evaluaciones, asistencia, vencimientos…).
+export const fechaCalendario = (mensaje: string) =>
+  z
+    .string({ error: mensaje })
+    .refine(esFechaReal, mensaje)
+    .transform((t) => new Date(`${t.slice(0, 10)}T00:00:00.000Z`));
+
+const diaISO = (fecha: Date) => fecha.toISOString().slice(0, 10);
+
+export const fechaDeEvaluacionSchema = fechaCalendario("La fecha de la evaluación no es válida").refine((fecha) => {
+  const [anio, mes, dia] = hoyISOEnArgentina().split("-").map(Number);
+  const desde = diaISO(new Date(Date.UTC(anio - 1, mes - 1, dia)));
+  const hasta = diaISO(new Date(Date.UTC(anio + 1, mes - 1, dia)));
+  return diaISO(fecha) >= desde && diaISO(fecha) <= hasta;
+}, "La fecha de la evaluación tiene que estar entre un año atrás y un año adelante");
+
+export const fechaDeAsistenciaSchema = fechaCalendario("La fecha de la asistencia no es válida").refine(
+  (fecha) => diaISO(fecha) <= hoyISOEnArgentina(),
+  "La fecha de la asistencia no puede ser futura",
+);

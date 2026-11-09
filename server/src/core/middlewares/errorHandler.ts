@@ -21,6 +21,13 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
+  // Un cuerpo que no es JSON (o demasiado grande): lo rechaza el lector de cuerpos con su propio estado 4xx.
+  const { status, type } = err as { status?: unknown; type?: unknown };
+  if (typeof status === "number" && status >= 400 && status < 500 && typeof type === "string" && type.startsWith("entity.")) {
+    res.status(status).json({ error: status === 413 ? "El pedido es demasiado grande" : "El pedido no tiene un formato válido" });
+    return;
+  }
+
   console.error(err);
   res.status(500).json({ error: "Error interno del servidor" });
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { passwordNueva } from "../../core/validacion";
+import { emailSchema, passwordNueva, textoRequerido } from "../../core/validacion";
 
 const rolSchema = z.enum(["admin", "secretario", "profesor", "padre"]);
 
@@ -19,12 +19,14 @@ export const credencialesSchema = z.object({
 
 export type CredencialesInput = z.infer<typeof credencialesSchema>;
 
-export const crearSecretarioSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido"),
-  email: z.email("Email inválido"),
-  // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
-  password: passwordNueva.optional(),
-});
+export const crearSecretarioSchema = z
+  .object({
+    nombre: textoRequerido("El nombre", 60),
+    email: emailSchema,
+    // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
+    password: passwordNueva.optional(),
+  })
+  .strict();
 
 export type CrearSecretarioInput = z.infer<typeof crearSecretarioSchema>;
 

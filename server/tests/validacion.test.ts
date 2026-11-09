@@ -68,9 +68,41 @@ for (const [nombre, v] of Object.entries(copias)) {
       assert.deepEqual(editar.parse({ dni: null }), { dni: null });
       assert.deepEqual(editar.parse({ dni: " " }), { dni: null });
     });
+    test("texto(max) recorta, respeta el máximo y con borrable deja null en vacío", () => {
+      assert.equal(v.texto(5).parse("  ab "), "ab");
+      assert.equal(v.texto(5).safeParse("abcdef").success, false);
+      assert.equal(v.borrable(v.texto(5)).parse("   "), null);
+      assert.equal(v.borrable(v.texto(5)).parse(null), null);
+      assert.equal(v.borrable(v.texto(5)).parse("ab"), "ab");
+    });
     test("textoOpcional trata puros espacios como vacío", () => {
       assert.equal(v.textoOpcional(10).parse("   "), undefined);
       assert.equal(v.textoOpcional(10).safeParse("x".repeat(11)).success, false);
     });
   });
 }
+
+// Solo del servidor: fechas de calendario de evaluaciones y asistencia (se comparan contra "hoy" en Argentina).
+const dias = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+describe("fechas de calendario (server)", () => {
+  test("fechaCalendario acepta AAAA-MM-DD y un ISO con hora, y devuelve medianoche UTC", () => {
+    assert.equal(server.fechaCalendario("x").parse("2026-03-04").toISOString(), "2026-03-04T00:00:00.000Z");
+    assert.equal(server.fechaCalendario("x").parse("2026-03-04T15:30:00.000Z").toISOString(), "2026-03-04T00:00:00.000Z");
+  });
+  test("fechaCalendario rechaza fechas inexistentes y textos", () => {
+    assert.equal(server.fechaCalendario("x").safeParse("2026-02-31").success, false);
+    assert.equal(server.fechaCalendario("x").safeParse("mañana").success, false);
+    assert.equal(server.fechaCalendario("x").safeParse(20260304).success, false);
+  });
+  test("fechaDeEvaluacionSchema: entre un año atrás y un año adelante", () => {
+    assert.equal(server.fechaDeEvaluacionSchema.safeParse(dias(0)).success, true);
+    assert.equal(server.fechaDeEvaluacionSchema.safeParse(dias(300)).success, true);
+    assert.equal(server.fechaDeEvaluacionSchema.safeParse(dias(-300)).success, true);
+    assert.equal(server.fechaDeEvaluacionSchema.safeParse(dias(400)).success, false);
+    assert.equal(server.fechaDeEvaluacionSchema.safeParse(dias(-400)).success, false);
+  });
+  test("fechaDeAsistenciaSchema: no futura", () => {
+    assert.equal(server.fechaDeAsistenciaSchema.safeParse(dias(-3)).success, true);
+    assert.equal(server.fechaDeAsistenciaSchema.safeParse(dias(2)).success, false);
+  });
+});

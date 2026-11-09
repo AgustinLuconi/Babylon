@@ -72,6 +72,9 @@ export const textoRequerido = (etiqueta: string, max: number) =>
     .min(1, `${etiqueta} es requerido`)
     .max(max, `${etiqueta} admite hasta ${max} caracteres`);
 
+// Texto con tope de largo, sin exigir que no esté vacío (se combina con `opcional` o `borrable`).
+export const texto = (max: number) => z.string().trim().max(max, `Admite hasta ${max} caracteres`);
+
 // Opcional: un texto de puros espacios cuenta como vacío (queda "sin dato").
 export const textoOpcional = (max: number) =>
   z
