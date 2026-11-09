@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
 import { esMesLectivo } from "../cuotas/cuota.calendario";
+import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "../documentos/documento.repository";
 import type { CriteriosDeAvisos } from "./notificacion.criterios";
 import type { AvisoEsperado, Destinatario, TipoEstado } from "./notificacion.entity";
@@ -28,6 +29,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly documentoRepo: DocumentoRepository,
+    private readonly alumnoRepo: AlumnoRepository,
   ) {}
 
   private db(tx?: unknown) {
@@ -56,6 +58,8 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         return this.mensajesDeFamilias(tx);
       case "mensajes_instituto":
         return this.mensajesDelInstituto(tx);
+      case "datos_incompletos":
+        return this.datosIncompletos(tx);
     }
   }
 
@@ -105,6 +109,15 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     const texto = `Hay ${cantidad(n, "alumno", "alumnos")} con documentación pendiente`;
     return (await this.staff(tx)).map((d) =>
       aviso({ ...d, tipo: "documentacion_pendiente", clave: "documentacion-pendiente", tono: "warning", texto, recurso: { tipo: "documentacion-pendiente" }, nivel: n }),
+    );
+  }
+
+  private async datosIncompletos(tx?: unknown): Promise<AvisoEsperado[]> {
+    const n = (await this.alumnoRepo.findIncompletos(tx)).length;
+    if (n === 0) return [];
+    const texto = `Hay ${cantidad(n, "alumno", "alumnos")} con datos incompletos`;
+    return (await this.staff(tx)).map((d) =>
+      aviso({ ...d, tipo: "datos_incompletos", clave: "datos-incompletos", tono: "warning", texto, recurso: { tipo: "datos-incompletos" }, nivel: n }),
     );
   }
 

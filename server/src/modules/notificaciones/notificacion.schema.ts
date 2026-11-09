@@ -14,6 +14,7 @@ export const tipoNotificacionSchema = z.enum([
   "observacion_nueva",
   "mensajes_familia",
   "mensajes_instituto",
+  "datos_incompletos",
 ]);
 
 export const historialSchema = z.object({

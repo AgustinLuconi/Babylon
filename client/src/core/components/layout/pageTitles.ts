@@ -1,3 +1,5 @@
+import type { EtiquetasDelPanel } from "./etiquetasDelPanel";
+
 const ANIO_ACTUAL = new Date().getFullYear();
 
 // Coincide en forma con SCREEN_TITLES del prototipo — mapea por prefijo de ruta
@@ -15,7 +17,7 @@ const TITULOS: { prefijo: string; titulo: string; subtitulo: string }[] = [
   { prefijo: "/chats", titulo: "Chats", subtitulo: "Consultas de las familias con administración" },
   { prefijo: "/asistencia", titulo: "Asistencia", subtitulo: "Registro de presentes, tardanzas y ausencias" },
   { prefijo: "/calificaciones", titulo: "Calificaciones", subtitulo: "Carga y publicación de evaluaciones" },
-  { prefijo: "/observaciones", titulo: "Observaciones", subtitulo: "Comunicaciones al tutor del alumno" },
+  { prefijo: "/observaciones", titulo: "Observaciones", subtitulo: "Comunicaciones al responsable del alumno" },
   { prefijo: "/mi-cuenta", titulo: "Mi cuenta", subtitulo: "Datos, contraseña y sesiones" },
   { prefijo: "/notificaciones", titulo: "Notificaciones", subtitulo: "Avisos de los últimos 30 días" },
   { prefijo: "/mis-hijos/calificaciones", titulo: "Calificaciones", subtitulo: "" },
@@ -26,7 +28,20 @@ const TITULOS: { prefijo: string; titulo: string; subtitulo: string }[] = [
   { prefijo: "/chat", titulo: "Mensajes", subtitulo: "Consultas con administración" },
 ];
 
-export function obtenerTituloPagina(pathname: string): { titulo: string; subtitulo: string } | null {
+// Las pantallas del responsable cambian de nombre según su modo (familia, adulto solo o adulto con hijos).
+const CLAVE_DEL_RESPONSABLE: Record<string, keyof EtiquetasDelPanel["menu"]> = {
+  "/mis-hijos": "resumen",
+  "/mis-hijos/calificaciones": "notas",
+  "/mis-hijos/asistencia": "asistencia",
+  "/mis-hijos/cuotas": "cuotas",
+  "/mis-hijos/documentacion": "documentacion",
+  "/chat": "chat",
+};
+
+export function obtenerTituloPagina(pathname: string, etiquetas: EtiquetasDelPanel): { titulo: string; subtitulo: string } | null {
   const match = TITULOS.filter((t) => pathname.startsWith(t.prefijo)).sort((a, b) => b.prefijo.length - a.prefijo.length)[0];
-  return match ? { titulo: match.titulo, subtitulo: match.subtitulo } : null;
+  if (!match) return null;
+  const clave = CLAVE_DEL_RESPONSABLE[match.prefijo];
+  if (!clave) return { titulo: match.titulo, subtitulo: match.subtitulo };
+  return { titulo: etiquetas.menu[clave], subtitulo: clave === "documentacion" ? etiquetas.subtituloDocumentacion : match.subtitulo };
 }

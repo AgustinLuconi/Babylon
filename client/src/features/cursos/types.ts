@@ -69,7 +69,8 @@ export interface ActualizarCursoInput {
   nombre?: string;
   nivel?: NivelCurso;
   profesorId?: string;
-  aula?: string;
+  // null borra el aula.
+  aula?: string | null;
   cupo?: number;
   estado?: EstadoCurso;
   horarios?: HorarioInput[];

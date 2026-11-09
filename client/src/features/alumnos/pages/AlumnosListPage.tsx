@@ -8,18 +8,20 @@ import { Select } from "@/core/components/ui/select";
 import { Badge } from "@/core/components/ui/badge";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table";
-import { formatDni, normalizarTexto } from "@/core/lib/utils";
+import { formatCelular, formatDni, normalizarTexto } from "@/core/lib/utils";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCuotas } from "@/features/cuotas/hooks/useCuotas";
 import { estadoMasUrgente, type Cuota, type EstadoCuota } from "@/features/cuotas/types";
 import { usePadres } from "@/features/padres/hooks/usePadres";
-import type { Padre } from "@/features/padres/types";
+import { VINCULO_LABELS, type Padre, type VinculoPadre } from "@/features/padres/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
 import { NIVEL_GRUPO, type Curso } from "@/features/cursos/types";
 import { elegir, useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { useDocumentosFaltantes } from "@/features/documentos/hooks/useDocumentosFaltantes";
 import type { TipoDocumento } from "@/features/documentos/types";
 import { useAlumnos } from "../hooks/useAlumnos";
+import { useAlumnosIncompletos } from "../hooks/useAlumnosIncompletos";
+import { textoIncompleto, type DatoFaltante } from "../datosFaltantes";
 
 const CUOTA_VARIANT: Record<EstadoCuota, "success" | "warning" | "danger"> = {
   pagada: "success",
@@ -32,9 +34,14 @@ const CUOTA_LABELS: Record<EstadoCuota, string> = {
   vencida: "Vencida",
 };
 
+// El teléfono de contacto de un alumno es el celular de su responsable, con quién es.
+const contactoDe = (padre: Padre | undefined, vinculo: VinculoPadre | undefined) =>
+  padre?.telefono ? `${formatCelular(padre.telefono)}${vinculo ? ` · ${VINCULO_LABELS[vinculo]}` : ""}` : "—";
+
 const POR_PAGINA = 8;
 const FILTROS_CUOTA = ["todas", "pagada", "pendiente", "vencida"] as const;
 const FILTROS_DOCUMENTACION = ["todos", "pendiente", "formulario_inscripcion", "copia_dni", "autorizacion_imagen"] as const;
+const FILTROS_DATOS = ["todos", "incompletos"] as const;
 const FALTA_CORTO: Record<TipoDocumento, string> = { formulario_inscripcion: "formulario", copia_dni: "DNI", autorizacion_imagen: "imagen" };
 const textoFaltante = (faltan: TipoDocumento[]) => `Falta ${faltan.map((t) => FALTA_CORTO[t]).join(", ")}`;
 
@@ -60,6 +67,7 @@ export default function AlumnosListPage() {
     cicloPedido === "activo" || cicloPedido === "todos" || !ciclos || ciclos.some((c) => c.id === cicloPedido) ? cicloPedido : "activo";
   const filtroCuota = elegir(leer("cuota"), FILTROS_CUOTA, "todas");
   const filtroDocumentacion = elegir(leer("documentacion"), FILTROS_DOCUMENTACION, "todos");
+  const filtroDatos = elegir(leer("datos"), FILTROS_DATOS, "todos");
   const pagina = Math.max(1, Number(leer("pagina")) || 1);
   // Cambiar cualquier filtro vuelve a la primera página.
   const cambiarFiltros = (cambios: Record<string, string | null>) => escribir({ ...cambios, pagina: null });
@@ -71,6 +79,8 @@ export default function AlumnosListPage() {
   const { data: cuotas } = useCuotas();
   const { data: faltantes } = useDocumentosFaltantes();
   const faltanDe = (alumnoId: string): TipoDocumento[] => faltantes?.[alumnoId] ?? [];
+  const { data: incompletos } = useAlumnosIncompletos();
+  const incompletosDe = (alumnoId: string): DatoFaltante[] => incompletos?.[alumnoId] ?? [];
 
   const [busqueda, setBusqueda] = useState("");
 
@@ -111,15 +121,16 @@ export default function AlumnosListPage() {
     const termino = normalizarTexto(busqueda.trim());
     return alumnos.filter((alumno) => {
       const matchTexto =
-        !termino || normalizarTexto(`${alumno.nombre} ${alumno.apellido} ${alumno.dni}`).includes(termino);
+        !termino || normalizarTexto(`${alumno.nombre} ${alumno.apellido} ${alumno.dni ?? ""}`).includes(termino);
       const matchCuota = filtroCuota === "todas" || estadoCuotaPorAlumno.get(alumno.id) === filtroCuota;
       const matchCurso = filtroCurso === "todos" || alumno.cursoId === filtroCurso;
       const faltan = faltantes?.[alumno.id] ?? [];
       const matchDocumentacion =
         filtroDocumentacion === "todos" || (filtroDocumentacion === "pendiente" ? faltan.length > 0 : faltan.includes(filtroDocumentacion));
-      return matchTexto && matchCuota && matchCurso && matchDocumentacion;
+      const matchDatos = filtroDatos === "todos" || (incompletos?.[alumno.id] ?? []).length > 0;
+      return matchTexto && matchCuota && matchCurso && matchDocumentacion && matchDatos;
     });
-  }, [alumnos, busqueda, filtroCuota, filtroCurso, filtroDocumentacion, faltantes, estadoCuotaPorAlumno]);
+  }, [alumnos, busqueda, filtroCuota, filtroCurso, filtroDocumentacion, filtroDatos, faltantes, incompletos, estadoCuotaPorAlumno]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);
@@ -217,6 +228,15 @@ export default function AlumnosListPage() {
             <option value="copia_dni">Falta copia de DNI</option>
             <option value="autorizacion_imagen">Falta autorización de imagen</option>
           </Select>
+          <Select
+            aria-label="Datos"
+            value={filtroDatos}
+            onChange={(e) => cambiarFiltros({ datos: e.target.value === "todos" ? null : e.target.value })}
+            className="w-auto"
+          >
+            <option value="todos">Todos los datos</option>
+            <option value="incompletos">Con datos incompletos</option>
+          </Select>
           <span data-cantidad-alumnos className="ml-2 text-[12px]" style={{ color: "var(--text-faint)" }}>
             {filtrados.length} alumno{filtrados.length !== 1 ? "s" : ""}
           </span>
@@ -235,7 +255,7 @@ export default function AlumnosListPage() {
             <TableHead>Alumno</TableHead>
             <TableHead>DNI</TableHead>
             <TableHead>Curso</TableHead>
-            <TableHead>Padre/Madre/Tutor</TableHead>
+            <TableHead>Responsable</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Cuota</TableHead>
             <TableHead />
@@ -286,6 +306,11 @@ export default function AlumnosListPage() {
                           {textoFaltante(faltanDe(alumno.id))}
                         </div>
                       )}
+                      {incompletosDe(alumno.id).length > 0 && (
+                        <div data-datos-incompletos className="text-[11px]" style={{ color: "var(--warning)" }} title={`Falta: ${textoIncompleto(incompletosDe(alumno.id))}`}>
+                          Datos incompletos
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TableCell>
@@ -296,7 +321,7 @@ export default function AlumnosListPage() {
                 <TableCell className="text-muted-foreground">
                   {padre ? `${padre.nombre} ${padre.apellido}` : "—"}
                 </TableCell>
-                <TableCell className="text-muted-foreground">{padre?.telefono ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{contactoDe(padre, alumno.vinculoResponsable)}</TableCell>
                 <TableCell>
                   {estadoCuota ? (
                     <Badge variant={CUOTA_VARIANT[estadoCuota]}>{CUOTA_LABELS[estadoCuota]}</Badge>
@@ -360,6 +385,11 @@ export default function AlumnosListPage() {
                         {textoFaltante(faltanDe(alumno.id))}
                       </p>
                     )}
+                    {incompletosDe(alumno.id).length > 0 && (
+                      <p data-datos-incompletos className="text-[11.5px]" style={{ color: "var(--warning)" }} title={`Falta: ${textoIncompleto(incompletosDe(alumno.id))}`}>
+                        Datos incompletos
+                      </p>
+                    )}
                   </div>
                 </div>
                 {estadoCuota ? (
@@ -371,12 +401,12 @@ export default function AlumnosListPage() {
               <div className="mt-3 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-[12px]" style={{ borderColor: "var(--border-hex)" }}>
                 <div>{curso && <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{curso.nombre}</span>}</div>
                 <div className="text-muted-foreground">
-                  <span className="text-[11px]">Tutor </span>
+                  <span className="text-[11px]">Responsable </span>
                   {padre ? `${padre.nombre} ${padre.apellido}` : "—"}
                 </div>
                 <div className="col-span-2 text-muted-foreground">
                   <span className="text-[11px]">Tel </span>
-                  <span className="tnum">{padre?.telefono ?? "—"}</span>
+                  <span className="tnum">{contactoDe(padre, alumno.vinculoResponsable)}</span>
                 </div>
               </div>
               <Link to={`/alumnos/${alumno.id}`}>

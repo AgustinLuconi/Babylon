@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import type { Cambios } from "../../core/ports";
+import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import type { CursoRepository } from "./curso.repository";
 import type { Curso } from "./curso.entity";
 import type { Horario } from "./horario.entity";
@@ -48,6 +50,15 @@ export class PrismaCursoRepository implements CursoRepository {
       return aEntidad(fila);
     } catch {
       throw new EntityNotFoundError("Curso", id);
+    }
+  }
+
+  async actualizarParcial(id: string, cambios: Cambios<Curso>, tx?: unknown): Promise<Curso> {
+    try {
+      const fila = await this.client(tx).curso.update({ where: { id }, data: cambios });
+      return aEntidad(fila);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Curso", id);
     }
   }
 

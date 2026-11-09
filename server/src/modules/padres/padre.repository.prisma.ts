@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
+import type { Cambios } from "../../core/ports";
+import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
 
@@ -8,6 +10,7 @@ type FilaPadre = Awaited<ReturnType<PrismaClient["padre"]["findUniqueOrThrow"]>>
 function aEntidad(fila: FilaPadre): Padre {
   return {
     ...fila,
+    dni: fila.dni ?? undefined,
     direccion: fila.direccion ?? undefined,
     telefono: fila.telefono ?? undefined,
     email: fila.email ?? undefined,
@@ -43,8 +46,13 @@ export class PrismaPadreRepository implements PadreRepository {
   }
 
   async create(entidad: Padre, tx?: unknown): Promise<Padre> {
-    const fila = await this.client(tx).padre.create({ data: entidad });
-    return aEntidad(fila);
+    try {
+      const fila = await this.client(tx).padre.create({ data: entidad });
+      return aEntidad(fila);
+    } catch (error) {
+      // Dos altas simultáneas con el mismo DNI: la restricción de la base deja pasar una sola y la otra es un 409.
+      throw traducirErrorDeEscritura(error, "Padre", entidad.id, "responsable");
+    }
   }
 
   async update(id: string, entidad: Padre, tx?: unknown): Promise<Padre> {
@@ -53,6 +61,7 @@ export class PrismaPadreRepository implements PadreRepository {
         where: { id },
         data: {
           ...entidad,
+          dni: entidad.dni ?? null,
           direccion: entidad.direccion ?? null,
           telefono: entidad.telefono ?? null,
           email: entidad.email ?? null,
@@ -67,6 +76,19 @@ export class PrismaPadreRepository implements PadreRepository {
 
   async vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void> {
     await this.client(tx).padre.updateMany({ where: { id }, data: { usuarioId } });
+  }
+
+  async actualizarParcial(id: string, cambios: Cambios<Padre>, tx?: unknown): Promise<Padre> {
+    try {
+      const fila = await this.client(tx).padre.update({ where: { id }, data: cambios });
+      return aEntidad(fila);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Padre", id);
+    }
+  }
+
+  async bloquear(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).$queryRaw`SELECT "id" FROM "Padre" WHERE "id" = ${id} FOR UPDATE`;
   }
 
   async delete(id: string, tx?: unknown): Promise<void> {

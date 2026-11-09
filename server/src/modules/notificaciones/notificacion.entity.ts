@@ -10,7 +10,8 @@ export type TipoEstado =
   | "cuota"
   | "documentacion_hijo"
   | "mensajes_familia"
-  | "mensajes_instituto";
+  | "mensajes_instituto"
+  | "datos_incompletos";
 export type TipoEvento = "nota_publicada" | "cierre_publicado" | "observacion_nueva";
 export type TipoNotificacion = TipoEstado | TipoEvento;
 export type ClaseNotificacion = "estado" | "evento";
@@ -20,6 +21,7 @@ export type TonoNotificacion = "danger" | "warning" | "info";
 export type RecursoAviso =
   | { tipo: "cuotas-vencidas" }
   | { tipo: "documentacion-pendiente" }
+  | { tipo: "datos-incompletos" }
   | { tipo: "evaluacion"; cursoId: string; evaluacionId: string }
   | { tipo: "asistencia"; cursoId: string; fecha: string }
   | { tipo: "cierre"; cursoId: string; periodo: string }

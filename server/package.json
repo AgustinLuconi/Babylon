@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json && node -e \"require('fs').writeFileSync('dist/version.json', JSON.stringify({ version: new Date().toISOString() }))\"",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

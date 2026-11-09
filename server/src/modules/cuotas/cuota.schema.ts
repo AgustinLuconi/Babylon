@@ -1,12 +1,15 @@
 import { z } from "zod";
+import { textoOpcional } from "../../core/validacion";
 
-export const registrarPagoSchema = z.object({
-  cuotaIds: z.array(z.string().min(1)).min(1, "Debe indicar al menos una cuota a pagar"),
-  metodo: z.enum(["efectivo", "transferencia", "mercadopago", "otro"]),
-  // AAAA-MM-DD. Si no viene, se toma el momento actual. No puede ser futura.
-  fechaPago: z.iso.date().optional(),
-  notas: z.string().trim().max(200, "Máximo 200 caracteres").optional(),
-});
+export const registrarPagoSchema = z
+  .object({
+    cuotaIds: z.array(z.string().min(1)).min(1, "Debe indicar al menos una cuota a pagar"),
+    metodo: z.enum(["efectivo", "transferencia", "mercadopago", "otro"]),
+    // AAAA-MM-DD. Si no viene, se toma el momento actual. No puede ser futura.
+    fechaPago: z.iso.date().optional(),
+    notas: textoOpcional(200),
+  })
+  .strict();
 
 export type RegistrarPagoBody = z.infer<typeof registrarPagoSchema>;
 

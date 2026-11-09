@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
-import { ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
 import { Card, CardContent } from "@/core/components/ui/card";
-import { Input } from "@/core/components/ui/input";
 import { Label } from "@/core/components/ui/label";
 import { Modal } from "@/core/components/ui/modal";
 import { Panel } from "@/core/components/ui/panel";
 import { Select } from "@/core/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/core/components/ui/table";
 import { ApiError } from "@/core/lib/apiClient";
-import { calcularEdad, formatDni, formatFecha, formatMonto } from "@/core/lib/utils";
+import { calcularEdad, formatCelular, formatDni, formatFecha, formatMonto } from "@/core/lib/utils";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
@@ -36,11 +35,14 @@ import { useCategoriasPersonalizadas } from "@/features/observaciones/hooks/useC
 import { useCrearObservacion } from "@/features/observaciones/hooks/useCrearObservacion";
 import { useObservacionesPorAlumno } from "@/features/observaciones/hooks/useObservacionesPorAlumno";
 import { CATEGORIA_LABELS } from "@/features/observaciones/types";
-import { useActualizarPadre } from "@/features/padres/hooks/useActualizarPadre";
 import { usePadres } from "@/features/padres/hooks/usePadres";
-import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
+import { VINCULO_LABELS } from "@/features/padres/types";
+import { CambiarResponsableModal } from "../components/CambiarResponsableModal";
+import { EditarDatosModal } from "../components/EditarDatosModal";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
+import { useAlumnosIncompletos } from "../hooks/useAlumnosIncompletos";
+import { textoIncompleto } from "../datosFaltantes";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
@@ -219,7 +221,7 @@ export default function AlumnoDetailPage() {
       {
         onSuccess: () => {
           setModalObs(false);
-          mostrarToast("Observación enviada al tutor");
+          mostrarToast("Observación enviada al responsable");
         },
       },
     );
@@ -238,57 +240,14 @@ export default function AlumnoDetailPage() {
     window.open(doc.urlArchivo, "_blank");
   };
 
-  // Editar datos (modal)
+  // Editar datos y cambiar de responsable (modales propios).
   const actualizarAlumno = useActualizarAlumno();
-  const actualizarPadre = useActualizarPadre();
   const [modalEditar, setModalEditar] = useState(false);
-  const [formAlumno, setFormAlumno] = useState({
-    nombre: "", apellido: "", direccion: "", telefono: "", email: "", observacionesMedicas: "",
-  });
-  const [formPadre, setFormPadre] = useState({
-    nombre: "", apellido: "", direccion: "", telefono: "", email: "", vinculo: "padre" as VinculoPadre,
-  });
-  // Cómo estaba el formulario al abrirse: distinto de eso es "sin guardar".
-  const [inicialEdicion, setInicialEdicion] = useState("");
-  const abrirEditar = () => {
-    if (!alumno) return;
-    const datosAlumno = {
-      nombre: alumno.nombre,
-      apellido: alumno.apellido,
-      direccion: alumno.direccion ?? "",
-      telefono: alumno.telefono ?? "",
-      email: alumno.email ?? "",
-      observacionesMedicas: alumno.observacionesMedicas ?? "",
-    };
-    const datosPadre = padre
-      ? {
-          nombre: padre.nombre,
-          apellido: padre.apellido,
-          direccion: padre.direccion ?? "",
-          telefono: padre.telefono ?? "",
-          email: padre.email ?? "",
-          vinculo: padre.vinculo,
-        }
-      : formPadre;
-    setFormAlumno(datosAlumno);
-    setFormPadre(datosPadre);
-    setInicialEdicion(JSON.stringify({ datosAlumno, datosPadre }));
-    setModalEditar(true);
-  };
-  const edicionSinGuardar = modalEditar && JSON.stringify({ datosAlumno: formAlumno, datosPadre: formPadre }) !== inicialEdicion;
+  const [modalResponsable, setModalResponsable] = useState(false);
+  const { data: incompletos } = useAlumnosIncompletos();
+  const faltan = alumno ? (incompletos?.[alumno.id] ?? []) : [];
   const observacionSinGuardar = modalObs && obsTexto.trim() !== "";
-  useSinGuardar(edicionSinGuardar || observacionSinGuardar);
-  const guardandoEdicion = actualizarAlumno.isPending || actualizarPadre.isPending;
-  const errorEdicion = actualizarAlumno.error ?? actualizarPadre.error;
-  const onGuardarEdicion = async () => {
-    if (!alumno) return;
-    await actualizarAlumno.mutateAsync({ id: alumno.id, datos: { ...formAlumno } });
-    if (padre) {
-      await actualizarPadre.mutateAsync({ id: padre.id, datos: { ...formPadre } });
-    }
-    setModalEditar(false);
-    mostrarToast("Datos actualizados");
-  };
+  useSinGuardar(observacionSinGuardar);
 
   // Desactivar / reactivar alumno
   const [confirmarEstado, setConfirmarEstado] = useState(false);
@@ -339,7 +298,7 @@ export default function AlumnoDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
-            <Button variant="outline" size="sm" onClick={abrirEditar}>
+            <Button variant="outline" size="sm" onClick={() => setModalEditar(true)}>
               <Pencil className="mr-1.5" size={14} /> Editar datos
             </Button>
             {puedeGestionar && (
@@ -364,6 +323,16 @@ export default function AlumnoDetailPage() {
         </CardContent>
       </Card>
 
+      {faltan.length > 0 && (
+        <div data-datos-incompletos role="status" className="flex flex-wrap items-center gap-3 rounded px-4 py-3 text-[13px]" style={{ background: "var(--warning-soft)" }}>
+          <AlertCircle size={15} className="shrink-0" />
+          <span className="flex-1">Faltan completar: {textoIncompleto(faltan)}.</span>
+          <Button variant="outline" size="sm" onClick={() => (faltan.includes("responsable") || faltan.includes("vinculo") ? setModalResponsable(true) : setModalEditar(true))}>
+            {faltan.includes("responsable") ? "Asignar responsable" : faltan.includes("vinculo") ? "Elegir el vínculo" : "Completar datos"}
+          </Button>
+        </div>
+      )}
+
       <div className="flex items-center gap-1 overflow-x-auto rounded-md border bg-muted/40 p-1">
         {TABS.map((t) => (
           <button
@@ -387,10 +356,16 @@ export default function AlumnoDetailPage() {
                 <Campo label="DNI" value={formatDni(alumno.dni)} mono />
                 <Campo
                   label="Fecha de nacimiento"
-                  value={edad !== null ? `${formatFecha(alumno.fechaNacimiento)} · ${edad} años` : formatFecha(alumno.fechaNacimiento)}
+                  value={
+                    alumno.fechaNacimiento
+                      ? edad !== null
+                        ? `${formatFecha(alumno.fechaNacimiento)} · ${edad} años`
+                        : formatFecha(alumno.fechaNacimiento)
+                      : "Sin cargar"
+                  }
                 />
                 <Campo label="Dirección" value={alumno.direccion} />
-                <Campo label="Teléfono" value={alumno.telefono} />
+                <Campo label="Celular" value={alumno.telefono && formatCelular(alumno.telefono)} />
                 <Campo label="Email" value={alumno.email} />
                 <Campo
                   label="Obs. médicas / alergias"
@@ -407,13 +382,20 @@ export default function AlumnoDetailPage() {
               </div>
             </Panel>
 
-            <Panel title="Datos del padre / tutor">
+            <Panel
+              title="Datos del responsable"
+              action={
+                <Button variant="outline" size="sm" onClick={() => setModalResponsable(true)}>
+                  {padre ? "Cambiar responsable" : "Asignar responsable"}
+                </Button>
+              }
+            >
               <div className="p-5 pt-1">
                 <Campo label="Nombre" value={padre && `${padre.nombre} ${padre.apellido}`} />
                 <Campo label="DNI" value={padre?.dni && formatDni(padre.dni)} mono />
-                <Campo label="Vínculo" value={padre && VINCULO_LABELS[padre.vinculo]} />
+                <Campo label="Vínculo" value={alumno.vinculoResponsable && VINCULO_LABELS[alumno.vinculoResponsable]} />
                 <Campo label="Dirección" value={padre?.direccion} />
-                <Campo label="Teléfono" value={padre?.telefono} />
+                <Campo label="Celular" value={padre?.telefono && formatCelular(padre.telefono)} />
                 <Campo label="Email" value={padre?.email} />
                 {hermanos.length > 0 && (
                   <div className="mt-3 flex items-center gap-2 rounded-md border p-2.5" style={{ background: "var(--brand-soft)", borderColor: "var(--brand-border)" }}>
@@ -429,7 +411,7 @@ export default function AlumnoDetailPage() {
 
           <Panel
             title="Documentación"
-            action={<span className="text-[11px] text-muted-foreground">La carga inicial la realiza el padre desde su cuenta</span>}
+            action={<span className="text-[11px] text-muted-foreground">La carga inicial la realiza el responsable desde su cuenta</span>}
           >
             <div>
               {ORDEN_DOCUMENTOS.map((tipo, i) => {
@@ -594,7 +576,7 @@ export default function AlumnoDetailPage() {
                 {notaCierrePeriodo.estado === "publicada" ? (
                   <Badge variant="success">Publicada</Badge>
                 ) : (
-                  <Badge variant="warning">Borrador — no visible para el padre</Badge>
+                  <Badge variant="warning">Borrador — no visible para el responsable</Badge>
                 )}
               </CardContent>
             </Card>
@@ -807,7 +789,7 @@ export default function AlumnoDetailPage() {
           }
         >
           <p className="text-[12px] text-muted-foreground">
-            Se enviará al tutor de <strong className="text-foreground">{alumno.nombre} {alumno.apellido}</strong>.
+            Se enviará al responsable de <strong className="text-foreground">{alumno.nombre} {alumno.apellido}</strong>.
           </p>
           <div className="space-y-1.5">
             <Label>Categoría</Label>
@@ -849,102 +831,26 @@ export default function AlumnoDetailPage() {
       )}
 
       {modalEditar && (
-        <Modal
-          title="Editar datos"
-          sinGuardar={edicionSinGuardar}
+        <EditarDatosModal
+          alumno={alumno}
+          padre={padre}
           onClose={() => setModalEditar(false)}
-          footer={
-            <>
-              <Button variant="outline" className="flex-1" onClick={() => setModalEditar(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" disabled={guardandoEdicion} onClick={onGuardarEdicion}>
-                {guardandoEdicion ? "Guardando..." : "Guardar cambios"}
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            <p className="text-[12.5px] font-semibold">Datos del alumno</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Nombre</Label>
-                <Input value={formAlumno.nombre} onChange={(e) => setFormAlumno((f) => ({ ...f, nombre: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Apellido</Label>
-                <Input value={formAlumno.apellido} onChange={(e) => setFormAlumno((f) => ({ ...f, apellido: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Dirección</Label>
-              <Input value={formAlumno.direccion} onChange={(e) => setFormAlumno((f) => ({ ...f, direccion: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Teléfono</Label>
-                <Input value={formAlumno.telefono} onChange={(e) => setFormAlumno((f) => ({ ...f, telefono: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Email</Label>
-                <Input type="email" value={formAlumno.email} onChange={(e) => setFormAlumno((f) => ({ ...f, email: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Obs. médicas / alergias</Label>
-              <Input
-                value={formAlumno.observacionesMedicas}
-                onChange={(e) => setFormAlumno((f) => ({ ...f, observacionesMedicas: e.target.value }))}
-              />
-            </div>
-          </div>
+          onGuardado={(mensaje) => {
+            setModalEditar(false);
+            mostrarToast(mensaje);
+          }}
+        />
+      )}
 
-          {padre && (
-            <div className="space-y-3 border-t pt-4" style={{ borderColor: "var(--border-hex)" }}>
-              <p className="text-[12.5px] font-semibold">Datos del padre / tutor</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Nombre</Label>
-                  <Input value={formPadre.nombre} onChange={(e) => setFormPadre((f) => ({ ...f, nombre: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Apellido</Label>
-                  <Input value={formPadre.apellido} onChange={(e) => setFormPadre((f) => ({ ...f, apellido: e.target.value }))} />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Vínculo</Label>
-                <Select value={formPadre.vinculo} onChange={(e) => setFormPadre((f) => ({ ...f, vinculo: e.target.value as VinculoPadre }))}>
-                  {(Object.entries(VINCULO_LABELS) as [VinculoPadre, string][]).map(([valor, etiqueta]) => (
-                    <option key={valor} value={valor}>
-                      {etiqueta}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Dirección</Label>
-                <Input value={formPadre.direccion} onChange={(e) => setFormPadre((f) => ({ ...f, direccion: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Teléfono</Label>
-                  <Input value={formPadre.telefono} onChange={(e) => setFormPadre((f) => ({ ...f, telefono: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input type="email" value={formPadre.email} onChange={(e) => setFormPadre((f) => ({ ...f, email: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {errorEdicion && (
-            <p className="text-sm text-destructive">
-              {errorEdicion instanceof ApiError ? errorEdicion.message : "No se pudieron guardar los cambios"}
-            </p>
-          )}
-        </Modal>
+      {modalResponsable && (
+        <CambiarResponsableModal
+          alumno={alumno}
+          onClose={() => setModalResponsable(false)}
+          onGuardado={(mensaje) => {
+            setModalResponsable(false);
+            mostrarToast(mensaje);
+          }}
+        />
       )}
 
       {confirmarEstado && (

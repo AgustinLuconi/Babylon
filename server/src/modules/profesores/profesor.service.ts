@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
+import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
 import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
 import type { SesionRepository } from "../usuarios/sesion.repository";
@@ -111,29 +112,42 @@ export class ProfesorService {
   // se mantiene sincronizado con la ficha en la misma transacción: un
   // profesor inactivo no puede iniciar sesión (ver UsuarioService.autenticar).
   async actualizarProfesor(id: string, datos: ActualizarProfesorInput): Promise<Profesor> {
-    const profesor = await this.profesorRepo.findById(id);
-    if (!profesor) {
+    // Esta lectura solo dice si existe y si tiene cuenta (para saber qué bloquear); los datos con los que se decide se
+    // leen de nuevo dentro de la transacción.
+    const previo = await this.profesorRepo.findById(id);
+    if (!previo) {
       throw new EntityNotFoundError("Profesor", id);
     }
 
-    if (datos.dni && datos.dni !== profesor.dni) {
-      const dniExistente = await this.profesorRepo.findByDni(datos.dni);
-      if (dniExistente && dniExistente.id !== id) {
-        throw new ConflictError(`Ya existe un profesor con el DNI ${datos.dni}`);
-      }
-    }
-
-    const actualizado: Profesor = {
-      ...profesor,
-      nombre: datos.nombre ?? profesor.nombre,
-      apellido: datos.apellido ?? profesor.apellido,
-      dni: datos.dni ?? profesor.dni,
-      telefono: datos.telefono ?? profesor.telefono,
-      email: datos.email ?? profesor.email,
-      estado: datos.estado ?? profesor.estado,
-    };
-
     return this.unitOfWork.runInTransaction(async (tx) => {
+      // El bloqueo de la cuenta serializa las ediciones de un profesor con cuenta (y los cambios de estado de esa cuenta):
+      // con él tomado se relee la ficha, así el nombre de la cuenta sale de lo último guardado y no de una lectura vieja.
+      if (previo.usuarioId) await this.usuarioRepo.bloquearCuenta(previo.usuarioId, tx);
+      const profesor = await this.profesorRepo.findById(id, tx);
+      if (!profesor) {
+        throw new EntityNotFoundError("Profesor", id);
+      }
+      if (profesor.usuarioId !== previo.usuarioId) {
+        throw new ConflictError("El profesor cambió mientras se guardaba: volvé a intentarlo");
+      }
+
+      if (datos.dni && datos.dni !== profesor.dni) {
+        const dniExistente = await this.profesorRepo.findByDni(datos.dni, tx);
+        if (dniExistente && dniExistente.id !== id) {
+          throw new ConflictError(`Ya existe un profesor con el DNI ${datos.dni}`);
+        }
+      }
+
+      const actualizado: Profesor = {
+        ...profesor,
+        nombre: datos.nombre ?? profesor.nombre,
+        apellido: datos.apellido ?? profesor.apellido,
+        dni: datos.dni ?? profesor.dni,
+        telefono: datos.telefono ?? profesor.telefono,
+        email: datos.email ?? profesor.email,
+        estado: datos.estado ?? profesor.estado,
+      };
+
       if (profesor.usuarioId) {
         const usuario = await this.usuarioRepo.findById(profesor.usuarioId, tx);
         if (usuario) {
@@ -143,10 +157,7 @@ export class ProfesorService {
               throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
             }
           }
-          await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
-          // Se relee con el bloqueo tomado: la cuenta pudo haberse activado o cancelado mientras tanto.
-          const actual = await this.usuarioRepo.findById(usuario.id, tx);
-          if (actual?.estado === "pendiente") {
+          if (usuario.estado === "pendiente") {
             // Invitación sin aceptar: el estado de la cuenta no se toca desde la ficha (pasa a activa solo cuando la
             // persona la activa) y el estado del profesor tampoco puede cambiar hasta entonces.
             if (actualizado.estado !== profesor.estado) throw new ValidationError("La cuenta todavía no fue activada");
@@ -185,7 +196,8 @@ export class ProfesorService {
           }
         }
       }
-      const guardado = await this.profesorRepo.update(id, actualizado, tx);
+      // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.
+      const guardado = await this.profesorRepo.actualizarParcial(id, soloPresentes(datos), tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [id] } }, tx);
       return guardado;
     });

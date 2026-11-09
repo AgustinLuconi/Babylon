@@ -11,6 +11,8 @@ export function rutaDeAviso(recurso: RecursoAviso, rol: Rol): string {
       return conFiltros("/cuotas", { pestana: "vencidas" });
     case "documentacion-pendiente":
       return conFiltros("/alumnos", { ciclo: "activo", documentacion: "pendiente" });
+    case "datos-incompletos":
+      return conFiltros("/alumnos", { ciclo: "activo", datos: "incompletos" });
     case "evaluacion":
       // Administración y secretaría ven las próximas evaluaciones en su panel.
       return rol === "profesor" ? conFiltros("/calificaciones", { curso: recurso.cursoId, evaluacion: recurso.evaluacionId }) : "/dashboard";

@@ -11,7 +11,8 @@ export type TipoNotificacion =
   | "cierre_publicado"
   | "observacion_nueva"
   | "mensajes_familia"
-  | "mensajes_instituto";
+  | "mensajes_instituto"
+  | "datos_incompletos";
 
 export type TonoNotificacion = "danger" | "warning" | "info";
 
@@ -19,6 +20,7 @@ export type TonoNotificacion = "danger" | "warning" | "info";
 export type RecursoAviso =
   | { tipo: "cuotas-vencidas" }
   | { tipo: "documentacion-pendiente" }
+  | { tipo: "datos-incompletos" }
   | { tipo: "evaluacion"; cursoId: string; evaluacionId: string }
   | { tipo: "asistencia"; cursoId: string; fecha: string }
   | { tipo: "cierre"; cursoId: string; periodo: string }

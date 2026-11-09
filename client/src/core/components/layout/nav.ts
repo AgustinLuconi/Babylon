@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Rol } from "@/features/auth/types";
+import type { EtiquetasDelPanel } from "./etiquetasDelPanel";
 
 export interface NavItem {
   to: string;
@@ -82,21 +83,24 @@ const NAV_PROFESOR: NavGroup[] = [
   },
 ];
 
-const NAV_PADRE: NavGroup[] = [
-  {
-    group: "Mi familia",
-    items: [
-      { to: "/mis-hijos", label: "Resumen", icon: Home },
-      { to: "/mis-hijos/calificaciones", label: "Calificaciones", icon: FileText },
-      { to: "/mis-hijos/asistencia", label: "Asistencia", icon: CalendarCheck },
-      { to: "/mis-hijos/cuotas", label: "Cuotas", icon: Receipt },
-      { to: "/mis-hijos/documentacion", label: "Documentación", icon: FolderCheck },
-      { to: "/chat", label: "Mensajes", icon: MessageCircle, contador: "chats" },
-    ],
-  },
-];
+// El menú del responsable: los mismos destinos para todos, con los textos de su modo (familia, adulto solo o adulto con hijos).
+function navDelPadre({ grupo, menu }: EtiquetasDelPanel): NavGroup[] {
+  return [
+    {
+      group: grupo,
+      items: [
+        { to: "/mis-hijos", label: menu.resumen, icon: Home },
+        { to: "/mis-hijos/calificaciones", label: menu.notas, icon: FileText },
+        { to: "/mis-hijos/asistencia", label: menu.asistencia, icon: CalendarCheck },
+        { to: "/mis-hijos/cuotas", label: menu.cuotas, icon: Receipt },
+        { to: "/mis-hijos/documentacion", label: menu.documentacion, icon: FolderCheck },
+        { to: "/chat", label: menu.chat, icon: MessageCircle, contador: "chats" },
+      ],
+    },
+  ];
+}
 
-export function navPorRol(rol: Rol): NavGroup[] {
+export function navPorRol(rol: Rol, etiquetasDelPadre: EtiquetasDelPanel): NavGroup[] {
   switch (rol) {
     case "admin":
       return NAV_ADMIN;
@@ -105,7 +109,7 @@ export function navPorRol(rol: Rol): NavGroup[] {
     case "profesor":
       return NAV_PROFESOR;
     case "padre":
-      return NAV_PADRE;
+      return navDelPadre(etiquetasDelPadre);
   }
 }
 
