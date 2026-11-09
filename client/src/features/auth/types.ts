@@ -4,7 +4,7 @@ export const ROL_LABELS: Record<Rol, string> = {
   admin: "Administrador",
   secretario: "Secretario",
   profesor: "Profesor",
-  padre: "Padre/Madre/Tutor",
+  padre: "Responsable",
 };
 
 export interface Usuario {

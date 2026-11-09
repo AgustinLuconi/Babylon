@@ -358,7 +358,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
                     <Input
                       value={observaciones[alumno.id] ?? ""}
                       onChange={(e) => tipearObservacion(alumno.id, e.target.value)}
-                      placeholder={`Observación al padre (opcional, máx ${MAX_OBSERVACION_NOTA} car.)`}
+                      placeholder={`Observación al responsable (opcional, máx ${MAX_OBSERVACION_NOTA} car.)`}
                       maxLength={MAX_OBSERVACION_NOTA}
                       className="text-[12px] text-muted-foreground"
                     />

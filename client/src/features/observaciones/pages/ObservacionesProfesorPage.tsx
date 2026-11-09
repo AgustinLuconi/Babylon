@@ -195,7 +195,7 @@ export default function ObservacionesProfesorPage() {
               disabled={crearObservacion.isPending || !texto.trim() || !alumnoId || categoria === NUEVA_CATEGORIA}
               onClick={onEnviar}
             >
-              <Send className="mr-1.5" size={14} /> Enviar observación al tutor
+              <Send className="mr-1.5" size={14} /> Enviar observación al responsable
             </Button>
           </div>
         </Panel>

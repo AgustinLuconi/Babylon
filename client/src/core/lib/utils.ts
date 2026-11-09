@@ -62,7 +62,7 @@ export function hoyLocalISO(): string {
   return fechaLocalISO(new Date());
 }
 
-export function calcularEdad(fechaISO: string): number | null {
+export function calcularEdad(fechaISO: string | undefined): number | null {
   if (!fechaISO) return null;
   const nacimiento = new Date(fechaISO);
   if (Number.isNaN(nacimiento.getTime())) return null;
@@ -82,7 +82,9 @@ export function formatearVariacionPp(pp: number): { delta: string; tono: "positi
 // "45123456" -> "45.123.456". Solo para mostrar: el dato guardado y la
 // búsqueda siguen usando los dígitos crudos. Si no son 7-8 dígitos (dato
 // histórico con otro formato), se devuelve tal cual.
-export function formatDni(dni: string): string {
+// Un alumno o responsable puede no tener el DNI cargado todavía.
+export function formatDni(dni: string | undefined): string {
+  if (!dni) return "sin cargar";
   return /^\d{7,8}$/.test(dni) ? dni.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : dni;
 }
 

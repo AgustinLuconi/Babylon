@@ -66,9 +66,9 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
     case "documentos/manual":
       return sobre("registró la autorización de imagen de", "registró una autorización de imagen");
     case "padres/alta":
-      return `${quien} dio de alta a un padre o madre`;
+      return `${quien} dio de alta a un responsable`;
     case "padres/edicion":
-      return `${quien} actualizó los datos de un padre o madre`;
+      return `${quien} actualizó los datos de un responsable`;
     case "profesores/alta":
       return `${quien} dio de alta a un docente`;
     case "profesores/edicion":

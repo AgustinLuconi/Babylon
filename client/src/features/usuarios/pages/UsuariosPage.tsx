@@ -10,13 +10,12 @@ import { Avatar } from "@/core/components/ui/avatar";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Modal } from "@/core/components/ui/modal";
-import { Select } from "@/core/components/ui/select";
 import { ApiError } from "@/core/lib/apiClient";
 import { formatFecha } from "@/core/lib/utils";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ROL_LABELS, type Rol } from "@/features/auth/types";
 import { useCrearPadre } from "@/features/padres/hooks/useCrearPadre";
-import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
+import { normalizarCelular, normalizarDni, normalizarEmail } from "@/core/lib/validacion";
 import { useCrearProfesor } from "@/features/profesores/hooks/useCrearProfesor";
 import { useCrearSecretario } from "@/features/secretarios/hooks/useCrearSecretario";
 import { mensajeDeAlta } from "../alta";
@@ -33,7 +32,7 @@ const DESCRIPCION_ROL: Record<Rol, string> = {
   admin: "Acceso total al sistema, incluyendo configuración y datos sensibles.",
   secretario: "Puede gestionar legajos y registrar pagos. Sin acceso a reportes ni configuración.",
   profesor: "Accede solo a sus cursos asignados. No ve información de pagos.",
-  padre: "Solo puede ver la información de sus hijos vinculados.",
+  padre: "Ve la información de sus hijos o de su propia cursada. Solo lo suyo.",
 };
 
 const ORDEN_ROLES: Rol[] = ["admin", "secretario", "profesor", "padre"];
@@ -45,30 +44,39 @@ const ORDEN_ROLES: Rol[] = ["admin", "secretario", "profesor", "padre"];
 const cuentaSchema = z
   .object({
     rol: z.enum(["admin", "secretario", "profesor", "padre"]),
-    nombre: z.string().min(1, "El nombre es requerido"),
+    nombre: z.string().trim().min(1, "El nombre es requerido").max(60, "El nombre admite hasta 60 caracteres"),
     apellido: z.string().optional(),
     dni: z.string().optional(),
     telefono: z.string().optional(),
-    // Unión con "" (no solo optional): el <select> sin elegir vale "", no
-    // undefined — sin esto, un envío con el campo en blanco mostraba el
-    // mensaje técnico de zod para el enum en vez del "El vínculo es
-    // requerido" del superRefine de abajo.
-    vinculo: z.union([z.enum(["padre", "madre", "tutor"]), z.literal("")]).optional(),
-    email: z.email("Email inválido"),
+    // El responsable puede crearse sin email (queda sin cuenta); para los demás roles es obligatorio.
+    email: z.string(),
     password: z.string().optional(),
     modo: z.enum(["invitacion", "contrasena"]),
   })
   .superRefine((datos, ctx) => {
+    const error = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
+    const email = datos.email.trim();
     if (datos.rol === "profesor" || datos.rol === "padre") {
-      if (!datos.apellido?.trim()) ctx.addIssue({ code: "custom", path: ["apellido"], message: "El apellido es requerido" });
-      if (!datos.dni?.trim()) ctx.addIssue({ code: "custom", path: ["dni"], message: "El DNI es requerido" });
+      const apellido = datos.apellido?.trim() ?? "";
+      if (!apellido) error("apellido", "El apellido es requerido");
+      else if (apellido.length > 60) error("apellido", "El apellido admite hasta 60 caracteres");
     }
-    if (datos.rol === "padre" && !datos.vinculo) {
-      ctx.addIssue({ code: "custom", path: ["vinculo"], message: "El vínculo es requerido" });
+    const dni = datos.dni?.trim() ?? "";
+    if (datos.rol === "profesor" && !dni) error("dni", "El DNI es requerido");
+    else if (dni && normalizarDni(dni) === null) error("dni", "El DNI no es válido: tiene que tener 7 u 8 números");
+    const telefono = datos.telefono?.trim() ?? "";
+    if (datos.rol === "padre" && !telefono) error("telefono", "El celular es requerido");
+    else if (telefono && normalizarCelular(telefono) === null) {
+      error("telefono", "El celular no es válido: escribilo con el código de área, por ejemplo 351 555-1234");
     }
-    if (datos.modo === "contrasena") {
+    if (!email) {
+      if (datos.rol !== "padre") error("email", "El email es requerido");
+    } else if (!z.email().safeParse(normalizarEmail(email)).success) {
+      error("email", "Email inválido");
+    }
+    if (datos.modo === "contrasena" && email) {
       const resultado = passwordNueva.safeParse(datos.password ?? "");
-      if (!resultado.success) ctx.addIssue({ code: "custom", path: ["password"], message: resultado.error.issues[0].message });
+      if (!resultado.success) error("password", resultado.error.issues[0].message);
     }
   });
 type CuentaForm = z.infer<typeof cuentaSchema>;
@@ -79,7 +87,6 @@ const VALORES_INICIALES: CuentaForm = {
   apellido: "",
   dni: "",
   telefono: "",
-  vinculo: undefined,
   email: "",
   password: "",
   modo: "invitacion",
@@ -147,6 +154,7 @@ export default function UsuariosPage() {
   const rol = watch("rol");
   const password = watch("password");
   const modo = watch("modo");
+  const email = watch("email");
 
   const activas = useMemo(() => (cuentas ?? []).filter((c) => c.estado === "activo").length, [cuentas]);
 
@@ -168,29 +176,23 @@ export default function UsuariosPage() {
     const apellido = d.apellido?.trim() ?? "";
     const dni = d.dni?.trim() ?? "";
     const telefono = d.telefono?.trim() || undefined;
+    const email = d.email.trim();
     // Sin contraseña, el server crea la cuenta pendiente y manda la invitación.
-    const password = d.modo === "contrasena" ? d.password : undefined;
+    const password = d.modo === "contrasena" && email ? d.password : undefined;
 
     let creado: { invitacion: EstadoInvitacion | null };
     if (d.rol === "admin") {
-      creado = await crearAdministrador.mutateAsync({ nombre: d.nombre, email: d.email, password });
+      creado = await crearAdministrador.mutateAsync({ nombre: d.nombre, email, password });
     } else if (d.rol === "secretario") {
-      creado = await crearSecretario.mutateAsync({ nombre: d.nombre, email: d.email, password });
+      creado = await crearSecretario.mutateAsync({ nombre: d.nombre, email, password });
     } else if (d.rol === "profesor") {
-      creado = await crearProfesor.mutateAsync({ nombre: d.nombre, apellido, dni, telefono, email: d.email, password });
+      creado = await crearProfesor.mutateAsync({ nombre: d.nombre, apellido, dni, telefono, email, password });
     } else {
-      creado = await crearPadre.mutateAsync({
-        nombre: d.nombre,
-        apellido,
-        dni,
-        telefono,
-        email: d.email,
-        password,
-        vinculo: d.vinculo as VinculoPadre,
-      });
+      // Lo mínimo del responsable: nombre, apellido y celular. Sin email queda sin cuenta; el vínculo se elige al asociarlo a un alumno.
+      creado = await crearPadre.mutateAsync({ nombre: d.nombre, apellido, telefono: telefono ?? "", dni: dni || undefined, email: email || undefined, password });
     }
     setMostrarModal(false);
-    setToast(mensajeDeAlta(d.email, creado.invitacion));
+    setToast(d.rol === "padre" && !email ? "Responsable creado sin cuenta: cargá su email para poder invitarlo" : mensajeDeAlta(email, creado.invitacion));
   });
 
   const alternarEstado = (cuenta: CuentaUsuario) => {
@@ -431,37 +433,23 @@ export default function UsuariosPage() {
                     {errors.apellido && <p className="text-sm text-destructive">{errors.apellido.message}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <label className="label">DNI</label>
+                    <label className="label">DNI{rol === "padre" && " · opcional"}</label>
                     <Input {...register("dni")} className="font-mono" />
                     {errors.dni && <p className="text-sm text-destructive">{errors.dni.message}</p>}
                   </div>
                   <div className="space-y-1.5">
-                    <label className="label">Teléfono</label>
-                    <Input {...register("telefono")} />
+                    <label className="label">{rol === "padre" ? "Celular (WhatsApp)" : "Teléfono · opcional"}</label>
+                    <Input {...register("telefono")} placeholder="351 555-1234" />
+                    {errors.telefono && <p className="text-sm text-destructive">{errors.telefono.message}</p>}
                   </div>
                 </>
               )}
-              {rol === "padre" && (
-                <div className="col-span-2 space-y-1.5">
-                  <label className="label">Vínculo</label>
-                  <Select {...register("vinculo")} defaultValue="">
-                    <option value="" disabled>
-                      Elegir…
-                    </option>
-                    {(Object.entries(VINCULO_LABELS) as [VinculoPadre, string][]).map(([valor, etiqueta]) => (
-                      <option key={valor} value={valor}>
-                        {etiqueta}
-                      </option>
-                    ))}
-                  </Select>
-                  {errors.vinculo && <p className="text-sm text-destructive">{errors.vinculo.message}</p>}
-                </div>
-              )}
               <div className="col-span-2 space-y-1.5">
-                <label className="label">Email (usuario de acceso)</label>
+                <label className="label">Email (usuario de acceso){rol === "padre" && " · opcional"}</label>
                 <Input type="email" {...register("email")} className="font-mono" />
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
+              {(rol !== "padre" || email.trim() !== "") && (
               <div className="col-span-2">
                 <ModoDeAcceso
                   valor={modo}
@@ -471,7 +459,8 @@ export default function UsuariosPage() {
                   }}
                 />
               </div>
-              {modo === "contrasena" && (
+              )}
+              {modo === "contrasena" && (rol !== "padre" || email.trim() !== "") && (
                 <div className="col-span-2 space-y-1.5">
                   <label className="label">Contraseña de acceso</label>
                   <div className="flex gap-2">

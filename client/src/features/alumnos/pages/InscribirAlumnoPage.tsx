@@ -1,72 +1,75 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { descartarCambiosSinGuardar, useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { passwordNueva } from "@/core/lib/validacion";
-import { ModoDeAcceso, type ModoAcceso } from "@/features/usuarios/components/ModoDeAcceso";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Search, UserPlus } from "lucide-react";
-import { Avatar } from "@/core/components/ui/avatar";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Label } from "@/core/components/ui/label";
 import { Select } from "@/core/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card";
-import { ApiError } from "@/core/lib/apiClient";
-import { calcularEdad, formatDni, normalizarTexto } from "@/core/lib/utils";
+import { erroresDeCampo } from "@/core/lib/erroresDeCampo";
+import { calcularEdad, formatDni } from "@/core/lib/utils";
+import {
+  celularSchema,
+  dniSchema,
+  emailSchema,
+  fechaNacimientoSchema,
+  normalizarDni,
+  opcional,
+  textoOpcional,
+  textoRequerido,
+} from "@/core/lib/validacion";
 import { usePadres } from "@/features/padres/hooks/usePadres";
-import { useCrearPadre } from "@/features/padres/hooks/useCrearPadre";
-import { VINCULO_LABELS, type Padre, type VinculoPadre } from "@/features/padres/types";
+import { useActualizarPadre } from "@/features/padres/hooks/useActualizarPadre";
+import { SelectorDeResponsable, type ResultadoDelSelector, type SelectorDeResponsableHandle } from "@/features/padres/components/SelectorDeResponsable";
+import { VINCULO_LABELS } from "@/features/padres/types";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import { DIA_SEMANA_LABELS, NIVEL_GRUPO, NIVEL_LABELS } from "@/features/cursos/types";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { useInscribirAlumno } from "../hooks/useInscribirAlumno";
 
-const dniValido = (dni: string) => /^\d{7,8}$/.test(dni.replace(/\./g, ""));
-
 const PASOS = [
   { n: 1, label: "Alumno" },
-  { n: 2, label: "Tutor" },
-  { n: 3, label: "Curso" },
+  { n: 2, label: "Curso" },
+  { n: 3, label: "Responsable" },
   { n: 4, label: "Confirmar" },
 ] as const;
+type Paso = 1 | 2 | 3 | 4;
 
-const alumnoSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido"),
-  apellido: z.string().min(1, "El apellido es requerido"),
-  dni: z.string().min(1, "El DNI es requerido").refine(dniValido, "DNI inválido (7-8 dígitos)"),
-  fechaNacimiento: z.string().min(1, "La fecha de nacimiento es requerida"),
-  calleNumero: z.string().optional(),
-  ciudad: z.string().optional(),
-  telefono: z.string().optional(),
-  email: z.union([z.email("Email inválido"), z.literal("")]).optional(),
-  observacionesMedicas: z.string().optional(),
-});
-
-type AlumnoForm = z.infer<typeof alumnoSchema>;
-
-const nuevoPadreSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido"),
-  apellido: z.string().min(1, "El apellido es requerido"),
-  dni: z.string().min(1, "El DNI es requerido").refine(dniValido, "DNI inválido (7-8 dígitos)"),
-  telefono: z.string().optional(),
-  email: z.email("Email inválido"),
-  password: z.string().optional(),
-  vinculo: z.enum(["padre", "madre", "tutor"]),
-});
-
-type NuevoPadreForm = z.infer<typeof nuevoPadreSchema>;
+// Lo mínimo para inscribir es nombre, apellido, curso y responsable: lo demás se puede completar después.
+const alumnoSchema = z
+  .object({
+    nombre: textoRequerido("El nombre", 60),
+    apellido: textoRequerido("El apellido", 60),
+    dni: opcional(dniSchema),
+    fechaNacimiento: opcional(fechaNacimientoSchema),
+    calleNumero: textoOpcional(100),
+    ciudad: textoOpcional(50),
+    telefono: opcional(celularSchema),
+    email: opcional(emailSchema),
+    observacionesMedicas: textoOpcional(1000),
+  })
+  .superRefine((d, ctx) => {
+    // La ficha guarda una sola dirección: se arma con calle y ciudad.
+    if ([d.calleNumero, d.ciudad].filter(Boolean).join(", ").length > 150) {
+      ctx.addIssue({ code: "custom", path: ["calleNumero"], message: "La dirección admite hasta 150 caracteres" });
+    }
+  });
+type AlumnoForm = z.input<typeof alumnoSchema>;
+const CAMPOS_DEL_ALUMNO = ["nombre", "apellido", "dni", "fechaNacimiento", "direccion", "telefono", "email", "observacionesMedicas"];
 
 const AVISO_INVITACION_NO_ENVIADA =
-  "La inscripción quedó hecha, pero no se pudo enviar el correo de invitación al padre/madre/tutor. Se puede reenviar desde Usuarios → Pendientes.";
+  "La inscripción quedó hecha, pero no se pudo enviar el correo de invitación al responsable. Se puede reenviar desde Usuarios → Pendientes.";
 
 function Opcional() {
-  return (
-    <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>· opcional</span>
-  );
+  return <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>· opcional</span>;
 }
+
+const texto = (valor: unknown) => (typeof valor === "string" ? valor : "");
 
 export default function InscribirAlumnoPage() {
   const navigate = useNavigate();
@@ -74,110 +77,122 @@ export default function InscribirAlumnoPage() {
   const { data: cursos } = useCursos();
   const { data: horarios } = useHorarios();
   const { data: alumnos } = useAlumnos();
-  const crearPadre = useCrearPadre();
+  const actualizarPadre = useActualizarPadre();
   const inscribirAlumno = useInscribirAlumno();
+  const selector = useRef<SelectorDeResponsableHandle>(null);
 
-  const [paso, setPaso] = useState<1 | 2 | 3 | 4>(1);
-  const [modoPadre, setModoPadre] = useState<"buscar" | "crear">("buscar");
-  const [modoAcceso, setModoAcceso] = useState<ModoAcceso>("invitacion");
-  const [busquedaPadre, setBusquedaPadre] = useState("");
-  const [padreSeleccionado, setPadreSeleccionado] = useState<Padre | null>(null);
-  const [errorPaso, setErrorPaso] = useState<string | null>(null);
+  const [paso, setPaso] = useState<Paso>(1);
   const [cursoId, setCursoId] = useState("");
+  const [resultado, setResultado] = useState<ResultadoDelSelector | null>(null);
+  const [erroresDelServidor, setErroresDelServidor] = useState<Record<string, string>>({});
+  const [errorPaso, setErrorPaso] = useState<string | null>(null);
+  const [selectorModificado, setSelectorModificado] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
   const alumnoForm = useForm<AlumnoForm>({ resolver: zodResolver(alumnoSchema), defaultValues: { ciudad: "San Luis" } });
-  const padreForm = useForm<NuevoPadreForm>({ resolver: zodResolver(nuevoPadreSchema) });
-  useSinGuardar(alumnoForm.formState.isDirty || padreForm.formState.isDirty);
-
-  const padresFiltrados = useMemo(() => {
-    if (!padres) return [];
-    const termino = normalizarTexto(busquedaPadre.trim());
-    if (!termino) return padres;
-    return padres.filter((p) => normalizarTexto(`${p.nombre} ${p.apellido} ${p.dni}`).includes(termino));
-  }, [padres, busquedaPadre]);
+  useSinGuardar(alumnoForm.formState.isDirty || selectorModificado || cursoId !== "");
 
   const cursoSeleccionado = useMemo(() => cursos?.find((c) => c.id === cursoId), [cursos, cursoId]);
   const horariosDelCurso = useMemo(() => (horarios ?? []).filter((h) => h.cursoId === cursoId), [horarios, cursoId]);
 
-  const hermanosDelPadreSeleccionado = useMemo(() => {
-    if (modoPadre !== "buscar" || !padreSeleccionado || !alumnos) return [];
-    return alumnos.filter((a) => a.padreId === padreSeleccionado.id && a.estado === "activo");
-  }, [modoPadre, padreSeleccionado, alumnos]);
-
   const datosAlumno = alumnoForm.watch();
-  const edad = calcularEdad(datosAlumno.fechaNacimiento ?? "");
-
-  const cambiarModoPadre = (modo: "buscar" | "crear") => {
-    setModoPadre(modo);
-    setErrorPaso(null);
+  const edad = calcularEdad(texto(datosAlumno.fechaNacimiento));
+  // Un adulto puede ser responsable de sí mismo: por el nivel del curso o, si ya se cargó la fecha, por la edad.
+  const esAdulto = Boolean(cursoSeleccionado?.nivel.startsWith("adults_")) || (edad !== null && edad >= 18);
+  const alumnoParaElSelector = {
+    nombre: texto(datosAlumno.nombre),
+    apellido: texto(datosAlumno.apellido),
+    dni: normalizarDni(texto(datosAlumno.dni)) ?? undefined,
   };
 
   const irAlSiguientePaso = async () => {
     setErrorPaso(null);
-    if (paso === 1) {
-      const valido = await alumnoForm.trigger();
-      if (!valido) return;
-    }
-    if (paso === 2) {
-      if (modoPadre === "buscar" && !padreSeleccionado) {
-        setErrorPaso("Elegí un padre/madre/tutor existente o cargá uno nuevo");
-        return;
-      }
-      if (modoPadre === "crear") {
-        const valido = await padreForm.trigger();
-        if (!valido) return;
-        if (modoAcceso === "contrasena") {
-          const resultado = passwordNueva.safeParse(padreForm.getValues("password") ?? "");
-          if (!resultado.success) {
-            padreForm.setError("password", { message: resultado.error.issues[0].message });
-            return;
-          }
-        }
-      }
-    }
-    if (paso === 3 && !cursoId) {
+    if (paso === 1 && !(await alumnoForm.trigger())) return;
+    if (paso === 2 && !cursoId) {
       setErrorPaso("Seleccioná un curso");
       return;
     }
-    setPaso((p) => (p < 4 ? ((p + 1) as 1 | 2 | 3 | 4) : p));
+    if (paso === 3) {
+      const elegido = await selector.current?.validar();
+      if (!elegido) return;
+      setResultado(elegido);
+    }
+    setPaso((p) => (p < 4 ? ((p + 1) as Paso) : p));
   };
-
-  const irAlPasoAnterior = () => setPaso((p) => (p > 1 ? ((p - 1) as 1 | 2 | 3 | 4) : p));
+  const irAlPasoAnterior = () => setPaso((p) => (p > 1 ? ((p - 1) as Paso) : p));
 
   const onConfirmar = async () => {
     setErrorPaso(null);
-    let padreId = padreSeleccionado?.id;
-
-    let aviso: string | undefined;
-    if (modoPadre === "crear") {
-      const valores = padreForm.getValues();
-      const nuevoPadre = await crearPadre.mutateAsync({ ...valores, password: modoAcceso === "contrasena" ? valores.password : undefined });
-      padreId = nuevoPadre.id;
-      if (nuevoPadre.invitacion === "no-enviada") aviso = AVISO_INVITACION_NO_ENVIADA;
-    }
-    if (!padreId) {
-      setErrorPaso("Elegí un padre/madre/tutor existente o cargá uno nuevo");
+    setErroresDelServidor({});
+    const alumno = alumnoSchema.safeParse(alumnoForm.getValues());
+    if (!alumno.success || !resultado) {
+      setPaso(1);
+      void alumnoForm.trigger();
       return;
     }
-
-    const datos = alumnoForm.getValues();
-    // La ficha guarda una sola dirección: se arma con calle y ciudad.
-    const { calleNumero, ciudad, ...resto } = datos;
-    const direccion = [calleNumero, ciudad].map((t) => t?.trim()).filter(Boolean).join(", ") || undefined;
-    await inscribirAlumno.mutateAsync({
-      ...resto,
-      direccion,
-      email: datos.email || undefined,
-      padreId,
-      cursoId,
-    });
-    // Ya se guardó: esta salida no pregunta.
-    descartarCambiosSinGuardar();
-    navigate("/alumnos", aviso ? { state: { aviso } } : undefined);
+    const { calleNumero, ciudad, ...resto } = alumno.data;
+    const direccion = [calleNumero, ciudad].filter(Boolean).join(", ") || undefined;
+    setGuardando(true);
+    try {
+      // Una ficha que ya existía sin DNI y se eligió reutilizar: se le completa antes de inscribir.
+      if (resultado.completarDni) {
+        await actualizarPadre.mutateAsync({ id: resultado.completarDni.padreId, datos: { dni: resultado.completarDni.dni } });
+      }
+      const inscripto = await inscribirAlumno.mutateAsync({ ...resto, direccion, cursoId, responsable: resultado.responsable });
+      // Ya se guardó: esta salida no pregunta.
+      descartarCambiosSinGuardar();
+      navigate("/alumnos", inscripto.invitacion === "no-enviada" ? { state: { aviso: AVISO_INVITACION_NO_ENVIADA } } : undefined);
+    } catch (error) {
+      repartirErrores(error);
+    } finally {
+      setGuardando(false);
+    }
   };
 
-  const guardando = inscribirAlumno.isPending || crearPadre.isPending;
-  const error = inscribirAlumno.error ?? crearPadre.error;
+  // Cada error del servidor al lado de su campo: los del alumno en el paso 1, los del responsable en el paso 3.
+  const repartirErrores = (error: unknown) => {
+    const { campos, general } = erroresDeCampo(error);
+    const delResponsable: Record<string, string> = {};
+    const sueltos: string[] = [];
+    let alumnoConError = false;
+    for (const [campo, mensaje] of Object.entries(campos)) {
+      if (campo.startsWith("responsable") || (campo === "dni" && /responsable/i.test(mensaje))) delResponsable[campo] = mensaje;
+      else if (CAMPOS_DEL_ALUMNO.includes(campo)) {
+        alumnoForm.setError((campo === "direccion" ? "calleNumero" : campo) as keyof AlumnoForm, { message: mensaje });
+        alumnoConError = true;
+      } else sueltos.push(mensaje);
+    }
+    setErroresDelServidor(delResponsable);
+    if (alumnoConError) setPaso(1);
+    else if (Object.keys(delResponsable).length > 0) setPaso(3);
+    setErrorPaso(general ?? (sueltos.length > 0 ? sueltos.join(" · ") : null));
+  };
+
+  const pendientes = (() => {
+    const lista: string[] = [];
+    if (!normalizarDni(texto(datosAlumno.dni))) lista.push("el DNI del alumno");
+    if (!texto(datosAlumno.fechaNacimiento)) lista.push("su fecha de nacimiento");
+    if (resultado?.responsable.tipo === "nuevo" && !resultado.responsable.datos.dni) lista.push("el DNI del responsable");
+    if (resultado?.responsable.tipo === "nuevo" && !resultado.responsable.datos.email) lista.push("el email del responsable");
+    if (resultado?.responsable.tipo === "propio" && !resultado.responsable.email) lista.push("su email");
+    return lista;
+  })();
+
+  const responsableResumen = (() => {
+    if (!resultado) return { titulo: "—", detalle: "" };
+    const r = resultado.responsable;
+    if (r.tipo === "existente") {
+      const ficha = padres?.find((p) => p.id === r.padreId);
+      return { titulo: ficha ? `${ficha.nombre} ${ficha.apellido}` : "—", detalle: VINCULO_LABELS[r.vinculo] };
+    }
+    const acceso = (email?: string, password?: string) => (!email ? "Sin cuenta (sin email)" : password ? "Acceso: contraseña asignada" : "Acceso: invitación por email");
+    if (r.tipo === "nuevo") {
+      return { titulo: `${r.datos.nombre} ${r.datos.apellido}`, detalle: `${VINCULO_LABELS[r.vinculo]} · ${acceso(r.datos.email, r.datos.password)}` };
+    }
+    return { titulo: `${texto(datosAlumno.nombre)} ${texto(datosAlumno.apellido)}`, detalle: `${VINCULO_LABELS.propio} · ${acceso(r.email, r.password)}` };
+  })();
+
+  const error = erroresDeCampo(inscribirAlumno.error).general;
 
   return (
     <div className="space-y-5">
@@ -198,23 +213,15 @@ export default function InscribirAlumnoPage() {
               <div className="flex items-center gap-1.5">
                 <div
                   className="flex h-6 w-6 items-center justify-center rounded-full text-[11.5px] font-semibold"
-                  style={{
-                    background: paso >= p.n ? "var(--brand)" : "var(--bg-muted)",
-                    color: paso >= p.n ? "#fff" : "var(--text-faint)",
-                  }}
+                  style={{ background: paso >= p.n ? "var(--brand)" : "var(--bg-muted)", color: paso >= p.n ? "#fff" : "var(--text-faint)" }}
                 >
                   {paso > p.n ? <Check size={12} strokeWidth={2.5} /> : p.n}
                 </div>
-                <span
-                  className="hidden text-xs font-medium sm:inline"
-                  style={{ color: paso === p.n ? "var(--text)" : "var(--text-faint)" }}
-                >
+                <span className="hidden text-xs font-medium sm:inline" style={{ color: paso === p.n ? "var(--text)" : "var(--text-faint)" }}>
                   {p.label}
                 </span>
               </div>
-              {i < PASOS.length - 1 && (
-                <div className="mx-2 h-px flex-1" style={{ background: paso > p.n ? "var(--brand)" : "var(--border-hex)" }} />
-              )}
+              {i < PASOS.length - 1 && <div className="mx-2 h-px flex-1" style={{ background: paso > p.n ? "var(--brand)" : "var(--border-hex)" }} />}
             </div>
           ))}
         </CardContent>
@@ -222,62 +229,65 @@ export default function InscribirAlumnoPage() {
 
       {paso === 1 && (
         <Card className="p-5">
-          <h3 className="mb-4 text-[14px] font-semibold">Datos del alumno</h3>
+          <h3 className="mb-1 text-[14px] font-semibold">Datos del alumno</h3>
+          <p className="mb-4 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            Alcanza con el nombre y el apellido: el resto se puede completar después.
+          </p>
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="nombre">Nombre</Label>
               <Input id="nombre" placeholder="Valentina" {...alumnoForm.register("nombre")} />
-              {alumnoForm.formState.errors.nombre && (
-                <p className="text-sm text-destructive">{alumnoForm.formState.errors.nombre.message}</p>
-              )}
+              {alumnoForm.formState.errors.nombre && <p className="text-sm text-destructive">{alumnoForm.formState.errors.nombre.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="apellido">Apellido</Label>
               <Input id="apellido" placeholder="Rodríguez" {...alumnoForm.register("apellido")} />
-              {alumnoForm.formState.errors.apellido && (
-                <p className="text-sm text-destructive">{alumnoForm.formState.errors.apellido.message}</p>
-              )}
+              {alumnoForm.formState.errors.apellido && <p className="text-sm text-destructive">{alumnoForm.formState.errors.apellido.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dni">DNI</Label>
+              <Label htmlFor="dni">
+                DNI <Opcional />
+              </Label>
               <Input id="dni" placeholder="45123456" {...alumnoForm.register("dni")} />
               <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
-                Solo números, sin puntos
+                7 u 8 números, con o sin puntos
               </p>
-              {alumnoForm.formState.errors.dni && (
-                <p className="text-sm text-destructive">{alumnoForm.formState.errors.dni.message}</p>
-              )}
+              {alumnoForm.formState.errors.dni && <p className="text-sm text-destructive">{alumnoForm.formState.errors.dni.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="fechaNacimiento">Fecha de nacimiento</Label>
+              <Label htmlFor="fechaNacimiento">
+                Fecha de nacimiento <Opcional />
+              </Label>
               <Input id="fechaNacimiento" type="date" {...alumnoForm.register("fechaNacimiento")} />
               {edad !== null && <p className="text-[12px] font-medium" style={{ color: "var(--brand)" }}>Edad calculada: {edad} años</p>}
-              {alumnoForm.formState.errors.fechaNacimiento && (
-                <p className="text-sm text-destructive">{alumnoForm.formState.errors.fechaNacimiento.message}</p>
-              )}
+              {alumnoForm.formState.errors.fechaNacimiento && <p className="text-sm text-destructive">{alumnoForm.formState.errors.fechaNacimiento.message}</p>}
             </div>
             <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="calleNumero">Calle y número</Label>
+              <Label htmlFor="calleNumero">
+                Calle y número <Opcional />
+              </Label>
               <Input id="calleNumero" placeholder="Av. Illia 234" {...alumnoForm.register("calleNumero")} />
+              {alumnoForm.formState.errors.calleNumero && <p className="text-sm text-destructive">{alumnoForm.formState.errors.calleNumero.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ciudad">Ciudad</Label>
+              <Label htmlFor="ciudad">
+                Ciudad <Opcional />
+              </Label>
               <Input id="ciudad" {...alumnoForm.register("ciudad")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="telefono">
-                Teléfono <Opcional />
+                Celular del alumno <Opcional />
               </Label>
-              <Input id="telefono" placeholder="2664-123456" {...alumnoForm.register("telefono")} />
+              <Input id="telefono" placeholder="351 555-1234" {...alumnoForm.register("telefono")} />
+              {alumnoForm.formState.errors.telefono && <p className="text-sm text-destructive">{alumnoForm.formState.errors.telefono.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="email">
                 Email <Opcional />
               </Label>
               <Input id="email" type="email" {...alumnoForm.register("email")} />
-              {alumnoForm.formState.errors.email && (
-                <p className="text-sm text-destructive">{alumnoForm.formState.errors.email.message}</p>
-              )}
+              {alumnoForm.formState.errors.email && <p className="text-sm text-destructive">{alumnoForm.formState.errors.email.message}</p>}
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label htmlFor="observacionesMedicas">
@@ -290,190 +300,13 @@ export default function InscribirAlumnoPage() {
                 className="flex w-full resize-none rounded-md border border-input bg-background p-2.5 text-[13.5px] leading-[1.55] placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 {...alumnoForm.register("observacionesMedicas")}
               />
+              {alumnoForm.formState.errors.observacionesMedicas && <p className="text-sm text-destructive">{alumnoForm.formState.errors.observacionesMedicas.message}</p>}
             </div>
           </div>
         </Card>
       )}
 
       {paso === 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Datos del padre / tutor</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>¿El padre o tutor ya tiene cuenta en el sistema?</Label>
-              <div className="mt-1.5 flex gap-2">
-                {(
-                  [
-                    ["buscar", "Sí, ya existe"],
-                    ["crear", "No, crear nuevo"],
-                  ] as const
-                ).map(([modo, etiqueta]) => {
-                  const activo = modoPadre === modo;
-                  return (
-                    <button
-                      key={modo}
-                      type="button"
-                      onClick={() => cambiarModoPadre(modo)}
-                      className="flex-1 rounded py-2.5 text-[13px] font-medium transition-all"
-                      style={{
-                        border: `1px solid ${activo ? "var(--brand)" : "var(--border-hex)"}`,
-                        background: activo ? "var(--brand-soft)" : "var(--bg)",
-                        color: activo ? "var(--brand)" : "var(--text)",
-                      }}
-                    >
-                      {etiqueta}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {modoPadre === "buscar" ? (
-              <div className="space-y-3">
-                <div>
-                  <Label>Buscar padre / tutor</Label>
-                  <div className="relative mt-1.5">
-                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }} />
-                    <Input
-                      placeholder="Nombre, email o DNI…"
-                      className="pl-7"
-                      value={busquedaPadre}
-                      onChange={(e) => setBusquedaPadre(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="max-h-[200px] overflow-y-auto rounded border" style={{ borderColor: "var(--border-hex)" }}>
-                  {padresFiltrados.length === 0 && (
-                    <p className="px-4 py-4 text-center text-[12.5px]" style={{ color: "var(--text-faint)" }}>
-                      Sin resultados
-                    </p>
-                  )}
-                  {padresFiltrados.map((padre, i) => {
-                    const seleccionado = padreSeleccionado?.id === padre.id;
-                    const hijos = (alumnos ?? []).filter((a) => a.padreId === padre.id && a.estado === "activo").length;
-                    return (
-                      <button
-                        type="button"
-                        key={padre.id}
-                        onClick={() => setPadreSeleccionado(padre)}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all"
-                        style={{ background: seleccionado ? "var(--brand-soft)" : i % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)" }}
-                      >
-                        <Avatar name={`${padre.nombre} ${padre.apellido}`} size="xs" tone={seleccionado ? "brand" : "neutral"} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-medium" style={{ color: seleccionado ? "var(--brand)" : "var(--text)" }}>
-                            {padre.nombre} {padre.apellido}
-                          </p>
-                          <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
-                            {hijos} hijo{hijos !== 1 ? "s" : ""} inscripto{hijos !== 1 ? "s" : ""} · DNI {formatDni(padre.dni)}
-                          </p>
-                        </div>
-                        {seleccionado && <Check size={13} className="shrink-0" style={{ color: "var(--brand)" }} />}
-                      </button>
-                    );
-                  })}
-                </div>
-                {hermanosDelPadreSeleccionado.length > 0 && (
-                  <div
-                    className="flex items-start gap-2 rounded-md border p-3"
-                    style={{ background: "var(--brand-soft)", borderColor: "var(--brand-border)" }}
-                  >
-                    <p className="text-[12.5px]" style={{ color: "var(--brand)" }}>
-                      Este tutor ya tiene {hermanosDelPadreSeleccionado.length} hijo
-                      {hermanosDelPadreSeleccionado.length !== 1 ? "s" : ""} inscripto
-                      {hermanosDelPadreSeleccionado.length !== 1 ? "s" : ""} (
-                      {hermanosDelPadreSeleccionado.map((h) => h.nombre).join(", ")}). Se aplicará{" "}
-                      <strong>descuento del 10%</strong> sobre la cuota de este alumno.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="padreNombre">Nombre</Label>
-                    <Input id="padreNombre" {...padreForm.register("nombre")} />
-                    {padreForm.formState.errors.nombre && (
-                      <p className="text-sm text-destructive">{padreForm.formState.errors.nombre.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="padreApellido">Apellido</Label>
-                    <Input id="padreApellido" {...padreForm.register("apellido")} />
-                    {padreForm.formState.errors.apellido && (
-                      <p className="text-sm text-destructive">{padreForm.formState.errors.apellido.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="padreDni">DNI</Label>
-                    <Input id="padreDni" placeholder="28456123" {...padreForm.register("dni")} />
-                    <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>7-8 dígitos</p>
-                    {padreForm.formState.errors.dni && (
-                      <p className="text-sm text-destructive">{padreForm.formState.errors.dni.message}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vinculo">Vínculo</Label>
-                    <Select id="vinculo" {...padreForm.register("vinculo")} defaultValue="">
-                      <option value="" disabled>
-                        Elegir…
-                      </option>
-                      {(Object.entries(VINCULO_LABELS) as [VinculoPadre, string][]).map(([valor, etiqueta]) => (
-                        <option key={valor} value={valor}>
-                          {etiqueta}
-                        </option>
-                      ))}
-                    </Select>
-                    {padreForm.formState.errors.vinculo && (
-                      <p className="text-sm text-destructive">{padreForm.formState.errors.vinculo.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="padreTelefono">Teléfono</Label>
-                    <Input id="padreTelefono" placeholder="2664-456789" {...padreForm.register("telefono")} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="padreEmail">Email (login del sistema)</Label>
-                    <Input id="padreEmail" type="email" {...padreForm.register("email")} />
-                    <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>Será el usuario de acceso al sistema</p>
-                    {padreForm.formState.errors.email && (
-                      <p className="text-sm text-destructive">{padreForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-                </div>
-
-                <ModoDeAcceso
-                  valor={modoAcceso}
-                  onCambiar={(m) => {
-                    setModoAcceso(m);
-                    padreForm.clearErrors("password");
-                  }}
-                />
-                {modoAcceso === "contrasena" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="padrePassword">Contraseña de acceso</Label>
-                    <Input id="padrePassword" type="password" {...padreForm.register("password")} />
-                    {padreForm.formState.errors.password && (
-                      <p className="text-sm text-destructive">{padreForm.formState.errors.password.message}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {paso === 3 && (
         <Card>
           <CardHeader>
             <CardTitle>Curso</CardTitle>
@@ -494,9 +327,7 @@ export default function InscribirAlumnoPage() {
             {cursoSeleccionado && (
               <div className="space-y-2 rounded-md border p-4" style={{ background: "var(--bg-subtle)" }}>
                 <div className="flex items-center gap-2">
-                  <span className={`level-pill ${NIVEL_GRUPO[cursoSeleccionado.nivel]}`}>
-                    {NIVEL_LABELS[cursoSeleccionado.nivel]}
-                  </span>
+                  <span className={`level-pill ${NIVEL_GRUPO[cursoSeleccionado.nivel]}`}>{NIVEL_LABELS[cursoSeleccionado.nivel]}</span>
                   <span className="text-sm font-semibold">{cursoSeleccionado.nombre}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
@@ -518,54 +349,64 @@ export default function InscribirAlumnoPage() {
         </Card>
       )}
 
+      {/* El selector se mantiene montado entre pasos: así no pierde lo que ya se eligió o se escribió. */}
+      <div hidden={paso !== 3}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Responsable del alumno</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SelectorDeResponsable
+              ref={selector}
+              padres={padres}
+              alumnos={alumnos}
+              esAdulto={esAdulto}
+              alumno={alumnoParaElSelector}
+              erroresDelServidor={erroresDelServidor}
+              onModificado={setSelectorModificado}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
       {paso === 4 && (
         <Card>
           <CardHeader>
             <CardTitle>Resumen</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-md border p-3" style={{ background: "var(--bg-subtle)" }}>
                 <p className="eyebrow mb-1.5">Alumno</p>
                 <p className="text-sm font-medium">
-                  {datosAlumno.nombre} {datosAlumno.apellido}
+                  {texto(datosAlumno.nombre)} {texto(datosAlumno.apellido)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  DNI {datosAlumno.dni}
+                  DNI {formatDni(normalizarDni(texto(datosAlumno.dni)) ?? undefined)}
                   {edad !== null ? ` · ${edad} años` : ""}
                 </p>
               </div>
               <div className="rounded-md border p-3" style={{ background: "var(--bg-subtle)" }}>
-                <p className="eyebrow mb-1.5">Padre/Madre/Tutor</p>
-                <p className="text-sm font-medium">
-                  {modoPadre === "buscar" && padreSeleccionado
-                    ? `${padreSeleccionado.nombre} ${padreSeleccionado.apellido}`
-                    : `${padreForm.getValues("nombre")} ${padreForm.getValues("apellido")}`}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {modoPadre === "buscar" && padreSeleccionado ? padreSeleccionado.email : padreForm.getValues("email")}
-                </p>
-                {modoPadre === "crear" && (
-                  <p className="text-xs text-muted-foreground">
-                    Acceso: {modoAcceso === "invitacion" ? "invitación por email" : "contraseña asignada"}
-                  </p>
-                )}
+                <p className="eyebrow mb-1.5">Responsable</p>
+                <p className="text-sm font-medium">{responsableResumen.titulo}</p>
+                <p className="text-xs text-muted-foreground">{responsableResumen.detalle}</p>
               </div>
               <div className="col-span-2 rounded-md border p-3" style={{ background: "var(--bg-subtle)" }}>
                 <p className="eyebrow mb-1.5">Curso</p>
                 <p className="text-sm font-medium">{cursoSeleccionado?.nombre ?? "—"}</p>
               </div>
             </div>
+            {pendientes.length > 0 && (
+              <p className="text-[12.5px]" style={{ color: "var(--text-muted)" }}>
+                Quedan para completar después: {pendientes.join(", ")}. El alumno figurará en "Datos incompletos" hasta entonces.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
 
       {errorPaso && <p className="text-sm text-destructive">{errorPaso}</p>}
-      {error && (
-        <p className="text-sm text-destructive">
-          {error instanceof ApiError ? error.message : "No se pudo completar la inscripción"}
-        </p>
-      )}
+      {error && !errorPaso && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex gap-2">
         {paso > 1 && (

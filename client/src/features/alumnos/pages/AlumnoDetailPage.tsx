@@ -38,7 +38,7 @@ import { useObservacionesPorAlumno } from "@/features/observaciones/hooks/useObs
 import { CATEGORIA_LABELS } from "@/features/observaciones/types";
 import { useActualizarPadre } from "@/features/padres/hooks/useActualizarPadre";
 import { usePadres } from "@/features/padres/hooks/usePadres";
-import { VINCULO_LABELS, type VinculoPadre } from "@/features/padres/types";
+import { VINCULO_LABELS } from "@/features/padres/types";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
@@ -219,7 +219,7 @@ export default function AlumnoDetailPage() {
       {
         onSuccess: () => {
           setModalObs(false);
-          mostrarToast("Observación enviada al tutor");
+          mostrarToast("Observación enviada al responsable");
         },
       },
     );
@@ -246,7 +246,7 @@ export default function AlumnoDetailPage() {
     nombre: "", apellido: "", direccion: "", telefono: "", email: "", observacionesMedicas: "",
   });
   const [formPadre, setFormPadre] = useState({
-    nombre: "", apellido: "", direccion: "", telefono: "", email: "", vinculo: "padre" as VinculoPadre,
+    nombre: "", apellido: "", direccion: "", telefono: "", email: "",
   });
   // Cómo estaba el formulario al abrirse: distinto de eso es "sin guardar".
   const [inicialEdicion, setInicialEdicion] = useState("");
@@ -267,7 +267,6 @@ export default function AlumnoDetailPage() {
           direccion: padre.direccion ?? "",
           telefono: padre.telefono ?? "",
           email: padre.email ?? "",
-          vinculo: padre.vinculo,
         }
       : formPadre;
     setFormAlumno(datosAlumno);
@@ -387,7 +386,13 @@ export default function AlumnoDetailPage() {
                 <Campo label="DNI" value={formatDni(alumno.dni)} mono />
                 <Campo
                   label="Fecha de nacimiento"
-                  value={edad !== null ? `${formatFecha(alumno.fechaNacimiento)} · ${edad} años` : formatFecha(alumno.fechaNacimiento)}
+                  value={
+                    alumno.fechaNacimiento
+                      ? edad !== null
+                        ? `${formatFecha(alumno.fechaNacimiento)} · ${edad} años`
+                        : formatFecha(alumno.fechaNacimiento)
+                      : "Sin cargar"
+                  }
                 />
                 <Campo label="Dirección" value={alumno.direccion} />
                 <Campo label="Teléfono" value={alumno.telefono} />
@@ -407,11 +412,11 @@ export default function AlumnoDetailPage() {
               </div>
             </Panel>
 
-            <Panel title="Datos del padre / tutor">
+            <Panel title="Datos del responsable">
               <div className="p-5 pt-1">
                 <Campo label="Nombre" value={padre && `${padre.nombre} ${padre.apellido}`} />
                 <Campo label="DNI" value={padre?.dni && formatDni(padre.dni)} mono />
-                <Campo label="Vínculo" value={padre && VINCULO_LABELS[padre.vinculo]} />
+                <Campo label="Vínculo" value={alumno.vinculoResponsable && VINCULO_LABELS[alumno.vinculoResponsable]} />
                 <Campo label="Dirección" value={padre?.direccion} />
                 <Campo label="Teléfono" value={padre?.telefono} />
                 <Campo label="Email" value={padre?.email} />
@@ -429,7 +434,7 @@ export default function AlumnoDetailPage() {
 
           <Panel
             title="Documentación"
-            action={<span className="text-[11px] text-muted-foreground">La carga inicial la realiza el padre desde su cuenta</span>}
+            action={<span className="text-[11px] text-muted-foreground">La carga inicial la realiza el responsable desde su cuenta</span>}
           >
             <div>
               {ORDEN_DOCUMENTOS.map((tipo, i) => {
@@ -594,7 +599,7 @@ export default function AlumnoDetailPage() {
                 {notaCierrePeriodo.estado === "publicada" ? (
                   <Badge variant="success">Publicada</Badge>
                 ) : (
-                  <Badge variant="warning">Borrador — no visible para el padre</Badge>
+                  <Badge variant="warning">Borrador — no visible para el responsable</Badge>
                 )}
               </CardContent>
             </Card>
@@ -807,7 +812,7 @@ export default function AlumnoDetailPage() {
           }
         >
           <p className="text-[12px] text-muted-foreground">
-            Se enviará al tutor de <strong className="text-foreground">{alumno.nombre} {alumno.apellido}</strong>.
+            Se enviará al responsable de <strong className="text-foreground">{alumno.nombre} {alumno.apellido}</strong>.
           </p>
           <div className="space-y-1.5">
             <Label>Categoría</Label>
@@ -901,7 +906,7 @@ export default function AlumnoDetailPage() {
 
           {padre && (
             <div className="space-y-3 border-t pt-4" style={{ borderColor: "var(--border-hex)" }}>
-              <p className="text-[12.5px] font-semibold">Datos del padre / tutor</p>
+              <p className="text-[12.5px] font-semibold">Datos del responsable</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Nombre</Label>
@@ -911,16 +916,6 @@ export default function AlumnoDetailPage() {
                   <Label>Apellido</Label>
                   <Input value={formPadre.apellido} onChange={(e) => setFormPadre((f) => ({ ...f, apellido: e.target.value }))} />
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Vínculo</Label>
-                <Select value={formPadre.vinculo} onChange={(e) => setFormPadre((f) => ({ ...f, vinculo: e.target.value as VinculoPadre }))}>
-                  {(Object.entries(VINCULO_LABELS) as [VinculoPadre, string][]).map(([valor, etiqueta]) => (
-                    <option key={valor} value={valor}>
-                      {etiqueta}
-                    </option>
-                  ))}
-                </Select>
               </div>
               <div className="space-y-1.5">
                 <Label>Dirección</Label>

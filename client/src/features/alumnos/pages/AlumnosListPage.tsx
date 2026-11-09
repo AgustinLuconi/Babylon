@@ -235,7 +235,7 @@ export default function AlumnosListPage() {
             <TableHead>Alumno</TableHead>
             <TableHead>DNI</TableHead>
             <TableHead>Curso</TableHead>
-            <TableHead>Padre/Madre/Tutor</TableHead>
+            <TableHead>Responsable</TableHead>
             <TableHead>Teléfono</TableHead>
             <TableHead>Cuota</TableHead>
             <TableHead />
@@ -371,7 +371,7 @@ export default function AlumnosListPage() {
               <div className="mt-3 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-[12px]" style={{ borderColor: "var(--border-hex)" }}>
                 <div>{curso && <span className={`level-pill ${NIVEL_GRUPO[curso.nivel]}`}>{curso.nombre}</span>}</div>
                 <div className="text-muted-foreground">
-                  <span className="text-[11px]">Tutor </span>
+                  <span className="text-[11px]">Responsable </span>
                   {padre ? `${padre.nombre} ${padre.apellido}` : "—"}
                 </div>
                 <div className="col-span-2 text-muted-foreground">
