@@ -131,6 +131,12 @@ export class PadreService {
       const propio = sincroniza ? (await this.alumnoRepo.findByPadreId(id, tx)).find((a) => a.vinculoResponsable === "propio") : undefined;
       if (propio) await this.alumnoRepo.bloquear(propio.id, tx);
       await this.padreRepo.bloquear(id, tx);
+      // Con los bloqueos tomados se comprueba que el alumno "propio" siga siendo el mismo: si otro cambio lo movió mientras
+      // tanto, no se escribe sobre un alumno que ya no corresponde.
+      if (sincroniza) {
+        const ahora = (await this.alumnoRepo.findByPadreId(id, tx)).find((a) => a.vinculoResponsable === "propio");
+        if (ahora?.id !== propio?.id) throw new ConflictError("El responsable cambió mientras se guardaba: volvé a intentarlo");
+      }
 
       const actual = await this.padreRepo.findById(id, tx);
       if (!actual) {

@@ -46,8 +46,13 @@ export class PrismaPadreRepository implements PadreRepository {
   }
 
   async create(entidad: Padre, tx?: unknown): Promise<Padre> {
-    const fila = await this.client(tx).padre.create({ data: entidad });
-    return aEntidad(fila);
+    try {
+      const fila = await this.client(tx).padre.create({ data: entidad });
+      return aEntidad(fila);
+    } catch (error) {
+      // Dos altas simultáneas con el mismo DNI: la restricción de la base deja pasar una sola y la otra es un 409.
+      throw traducirErrorDeEscritura(error, "Padre", entidad.id, "responsable");
+    }
   }
 
   async update(id: string, entidad: Padre, tx?: unknown): Promise<Padre> {

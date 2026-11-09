@@ -57,8 +57,13 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
   }
 
   async create(entidad: Alumno, tx?: unknown): Promise<Alumno> {
-    const fila = await this.client(tx).alumno.create({ data: entidad });
-    return aEntidad(fila);
+    try {
+      const fila = await this.client(tx).alumno.create({ data: entidad });
+      return aEntidad(fila);
+    } catch (error) {
+      // Dos altas simultáneas con el mismo DNI: la restricción de la base deja pasar una sola y la otra es un 409.
+      throw traducirErrorDeEscritura(error, "Alumno", entidad.id, "alumno");
+    }
   }
 
   async update(id: string, entidad: Alumno, tx?: unknown): Promise<Alumno> {

@@ -17,7 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Rol } from "@/features/auth/types";
-import { etiquetasDelPanel, type ModoDelPanel } from "@/features/alumnos/modoDelPanel";
+import type { EtiquetasDelPanel } from "./etiquetasDelPanel";
 
 export interface NavItem {
   to: string;
@@ -84,8 +84,7 @@ const NAV_PROFESOR: NavGroup[] = [
 ];
 
 // El menú del responsable: los mismos destinos para todos, con los textos de su modo (familia, adulto solo o adulto con hijos).
-function navDelPadre(modo: ModoDelPanel): NavGroup[] {
-  const { grupo, menu } = etiquetasDelPanel(modo);
+function navDelPadre({ grupo, menu }: EtiquetasDelPanel): NavGroup[] {
   return [
     {
       group: grupo,
@@ -101,7 +100,7 @@ function navDelPadre(modo: ModoDelPanel): NavGroup[] {
   ];
 }
 
-export function navPorRol(rol: Rol, modo: ModoDelPanel = "hijos"): NavGroup[] {
+export function navPorRol(rol: Rol, etiquetasDelPadre: EtiquetasDelPanel): NavGroup[] {
   switch (rol) {
     case "admin":
       return NAV_ADMIN;
@@ -110,7 +109,7 @@ export function navPorRol(rol: Rol, modo: ModoDelPanel = "hijos"): NavGroup[] {
     case "profesor":
       return NAV_PROFESOR;
     case "padre":
-      return navDelPadre(modo);
+      return navDelPadre(etiquetasDelPadre);
   }
 }
 

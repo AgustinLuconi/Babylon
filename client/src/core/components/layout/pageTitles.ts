@@ -1,4 +1,4 @@
-import { etiquetasDelPanel, type EtiquetasDelPanel, type ModoDelPanel } from "@/features/alumnos/modoDelPanel";
+import type { EtiquetasDelPanel } from "./etiquetasDelPanel";
 
 const ANIO_ACTUAL = new Date().getFullYear();
 
@@ -38,11 +38,10 @@ const CLAVE_DEL_RESPONSABLE: Record<string, keyof EtiquetasDelPanel["menu"]> = {
   "/chat": "chat",
 };
 
-export function obtenerTituloPagina(pathname: string, modo: ModoDelPanel = "hijos"): { titulo: string; subtitulo: string } | null {
+export function obtenerTituloPagina(pathname: string, etiquetas: EtiquetasDelPanel): { titulo: string; subtitulo: string } | null {
   const match = TITULOS.filter((t) => pathname.startsWith(t.prefijo)).sort((a, b) => b.prefijo.length - a.prefijo.length)[0];
   if (!match) return null;
   const clave = CLAVE_DEL_RESPONSABLE[match.prefijo];
   if (!clave) return { titulo: match.titulo, subtitulo: match.subtitulo };
-  const etiquetas = etiquetasDelPanel(modo);
   return { titulo: etiquetas.menu[clave], subtitulo: clave === "documentacion" ? etiquetas.subtituloDocumentacion : match.subtitulo };
 }

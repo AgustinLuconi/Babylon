@@ -1,3 +1,4 @@
+import type { EtiquetasDelPanel } from "../../core/components/layout/etiquetasDelPanel";
 import type { VinculoPadre } from "../padres/types";
 
 // El panel de una cuenta de responsable es el mismo para todos, pero sus textos y su selector cambian según las
@@ -9,13 +10,6 @@ export function modoDelPanel(cursadas: { vinculoResponsable?: VinculoPadre }[]):
   const propias = cursadas.filter((c) => c.vinculoResponsable === "propio").length;
   if (propias === 0) return "hijos";
   return propias === cursadas.length ? "propio" : "mixto";
-}
-
-export interface EtiquetasDelPanel {
-  // Título del grupo del menú lateral.
-  grupo: string;
-  menu: Record<"resumen" | "notas" | "asistencia" | "cuotas" | "documentacion" | "chat", string>;
-  subtituloDocumentacion: string;
 }
 
 const ETIQUETAS: Record<ModoDelPanel, EtiquetasDelPanel> = {

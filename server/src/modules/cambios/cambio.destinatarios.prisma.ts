@@ -65,7 +65,8 @@ export class PrismaDestinatariosDeCambios implements DestinatariosDeCambios {
         await sumar(this.padres({ alumnoIds: alumnos }));
         break;
       case "alumnos":
-        await sumar(this.padres({ alumnoIds: alumnos }));
+        // `padreIds`: al cambiar de responsable, la familia anterior también se entera (su hijo dejó de figurar con ella).
+        await sumar(this.padres({ alumnoIds: alumnos, padreIds: ids.padreIds ?? [] }));
         await sumar(this.profesores({ cursoIds: cursos }));
         break;
       case "cursos":
@@ -133,13 +134,24 @@ export class PrismaDestinatariosDeCambios implements DestinatariosDeCambios {
     };
   }
 
-  // Familias de esos alumnos o de los alumnos activos de esos cursos, cada una con sus hijos y los cursos de sus hijos.
-  private async padres({ alumnoIds = [], cursoIds = [] }: { alumnoIds?: string[]; cursoIds?: string[] }): Promise<Alcance[]> {
-    if (alumnoIds.length === 0 && cursoIds.length === 0) return [];
+  // Familias de esos alumnos, las nombradas o las de los alumnos activos de esos cursos, cada una con sus hijos y los cursos de sus hijos.
+  private async padres({
+    alumnoIds = [],
+    cursoIds = [],
+    padreIds = [],
+  }: {
+    alumnoIds?: string[];
+    cursoIds?: string[];
+    padreIds?: string[];
+  }): Promise<Alcance[]> {
+    if (alumnoIds.length === 0 && cursoIds.length === 0 && padreIds.length === 0) return [];
     const padres = await this.prisma.padre.findMany({
       where: {
         usuario: activa("padre"),
-        alumnos: { some: { OR: [{ id: { in: alumnoIds } }, { cursoId: { in: cursoIds }, estado: "activo" }] } },
+        OR: [
+          { alumnos: { some: { OR: [{ id: { in: alumnoIds } }, { cursoId: { in: cursoIds }, estado: "activo" }] } } },
+          { id: { in: padreIds } },
+        ],
       },
       select: { usuarioId: true, alumnos: { select: { id: true, cursoId: true } } },
     });

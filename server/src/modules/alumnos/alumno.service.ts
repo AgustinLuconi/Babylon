@@ -44,6 +44,10 @@ function esMenorDe18(nacimiento: Date): boolean {
   return Date.UTC(anio, mes - 1, dia) < mayoriaDeEdad;
 }
 
+// Para comparar nombres sin mirar mayúsculas, tildes ni espacios de más.
+const normalizarNombre = (nombre: string, apellido: string) =>
+  `${nombre} ${apellido}`.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+
 export class AlumnoService {
   constructor(
     private readonly alumnoRepo: AlumnoRepository,
@@ -118,11 +122,13 @@ export class AlumnoService {
   }
 
   // Quién es el responsable de un alumno, dentro de una transacción en curso. `alumno` son los datos de la persona que
-  // se inscribe (o que ya está inscripta, con `alumnoId`): se usan cuando es responsable de sí misma.
+  // se inscribe (o que ya está inscripta, con `alumnoId`): se usan cuando es responsable de sí misma. `nivelDelCurso` es el
+  // del curso al que va (o en el que está): sin fecha de nacimiento, solo un curso de adultos admite "propio".
   private async resolverResponsable(
     responsable: ResponsableInput,
     alumno: { nombre: string; apellido: string; dni?: string; fechaNacimiento?: Date },
     alumnoId: string | null,
+    nivelDelCurso: string | null,
     tx: unknown,
   ): Promise<ResponsableResuelto> {
     if (responsable.tipo === "existente") {
@@ -138,6 +144,10 @@ export class AlumnoService {
     // Responsable de sí mismo.
     if (alumno.fechaNacimiento && esMenorDe18(alumno.fechaNacimiento)) {
       const mensaje = "Un menor de 18 años no puede ser responsable de sí mismo";
+      throw new ValidationError(mensaje, { fechaNacimiento: [mensaje] });
+    }
+    if (!alumno.fechaNacimiento && !nivelDelCurso?.startsWith("adults_")) {
+      const mensaje = "Sin la fecha de nacimiento, solo un curso de adultos admite que el alumno sea responsable de sí mismo";
       throw new ValidationError(mensaje, { fechaNacimiento: [mensaje] });
     }
     const existente = alumno.dni ? await this.padreRepo.findByDni(alumno.dni, tx) : null;
@@ -182,10 +192,17 @@ export class AlumnoService {
       const curso = await this.cursoRepo.findById(datos.cursoId, tx);
       if (!curso) throw new EntityNotFoundError("Curso", datos.cursoId);
 
-      const responsable = await this.resolverResponsable(datos.responsable, datos, null, tx);
+      const responsable = await this.resolverResponsable(datos.responsable, datos, null, curso.nivel, tx);
+      // Con la ficha bloqueada, dos inscripciones simultáneas del mismo responsable se hacen de a una: la segunda ve a la
+      // primera. Un alumno activo con el mismo nombre a su cargo es el mismo envío repetido (o la misma persona ya cargada).
+      await this.padreRepo.bloquear(responsable.padre.id, tx);
+      const hijos = await this.alumnoRepo.findByPadreId(responsable.padre.id, tx);
+      const hermanosActivos = hijos.filter((h) => h.estado === "activo");
+      const clave = normalizarNombre(responsable.nombre, responsable.apellido);
+      const repetido = hermanosActivos.find((h) => normalizarNombre(h.nombre, h.apellido) === clave);
+      if (repetido) throw new ConflictError(`Ese responsable ya tiene un alumno activo llamado ${repetido.nombre} ${repetido.apellido}`);
       // Descuento del 10% a partir del segundo hijo: si el responsable ya tiene al menos un alumno activo inscripto,
       // este nuevo alumno también lo aplica.
-      const hermanosActivos = (await this.alumnoRepo.findByPadreId(responsable.padre.id, tx)).filter((h) => h.estado === "activo");
       const aplicaDescuentoHermanos = hermanosActivos.length >= 1;
 
       const nuevo: Alumno = {
@@ -244,7 +261,8 @@ export class AlumnoService {
       const actual = await this.alumnoRepo.findById(id, tx);
       if (!actual) throw new EntityNotFoundError("Alumno", id);
 
-      const resuelto = await this.resolverResponsable(responsable, actual, id, tx);
+      const curso = actual.cursoId ? await this.cursoRepo.findById(actual.cursoId, tx) : null;
+      const resuelto = await this.resolverResponsable(responsable, actual, id, curso?.nivel ?? null, tx);
       const guardado = await this.alumnoRepo.actualizarParcial(
         id,
         {
@@ -255,9 +273,11 @@ export class AlumnoService {
         tx,
       );
       await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: id }, tx);
+      // La familia anterior también se entera: su hijo dejó de figurar con ella.
+      const familiaAnterior = actual.padreId && actual.padreId !== resuelto.padre.id ? [actual.padreId] : [];
       await this.anuncios.publicar(
         "datos.cambiaron",
-        { dato: "alumnos", accion: "edicion", ids: { alumnoIds: [id], cursoIds: actual.cursoId ? [actual.cursoId] : [] } },
+        { dato: "alumnos", accion: "edicion", ids: { alumnoIds: [id], cursoIds: actual.cursoId ? [actual.cursoId] : [], padreIds: familiaAnterior } },
         tx,
       );
       return { alumno: guardado, cuenta: resuelto.cuenta };
