@@ -7,7 +7,6 @@ import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
 import { Card, CardContent } from "@/core/components/ui/card";
-import { Input } from "@/core/components/ui/input";
 import { Label } from "@/core/components/ui/label";
 import { Modal } from "@/core/components/ui/modal";
 import { Panel } from "@/core/components/ui/panel";
@@ -36,9 +35,10 @@ import { useCategoriasPersonalizadas } from "@/features/observaciones/hooks/useC
 import { useCrearObservacion } from "@/features/observaciones/hooks/useCrearObservacion";
 import { useObservacionesPorAlumno } from "@/features/observaciones/hooks/useObservacionesPorAlumno";
 import { CATEGORIA_LABELS } from "@/features/observaciones/types";
-import { useActualizarPadre } from "@/features/padres/hooks/useActualizarPadre";
 import { usePadres } from "@/features/padres/hooks/usePadres";
 import { VINCULO_LABELS } from "@/features/padres/types";
+import { CambiarResponsableModal } from "../components/CambiarResponsableModal";
+import { EditarDatosModal } from "../components/EditarDatosModal";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
@@ -238,56 +238,12 @@ export default function AlumnoDetailPage() {
     window.open(doc.urlArchivo, "_blank");
   };
 
-  // Editar datos (modal)
+  // Editar datos y cambiar de responsable (modales propios).
   const actualizarAlumno = useActualizarAlumno();
-  const actualizarPadre = useActualizarPadre();
   const [modalEditar, setModalEditar] = useState(false);
-  const [formAlumno, setFormAlumno] = useState({
-    nombre: "", apellido: "", direccion: "", telefono: "", email: "", observacionesMedicas: "",
-  });
-  const [formPadre, setFormPadre] = useState({
-    nombre: "", apellido: "", direccion: "", telefono: "", email: "",
-  });
-  // Cómo estaba el formulario al abrirse: distinto de eso es "sin guardar".
-  const [inicialEdicion, setInicialEdicion] = useState("");
-  const abrirEditar = () => {
-    if (!alumno) return;
-    const datosAlumno = {
-      nombre: alumno.nombre,
-      apellido: alumno.apellido,
-      direccion: alumno.direccion ?? "",
-      telefono: alumno.telefono ?? "",
-      email: alumno.email ?? "",
-      observacionesMedicas: alumno.observacionesMedicas ?? "",
-    };
-    const datosPadre = padre
-      ? {
-          nombre: padre.nombre,
-          apellido: padre.apellido,
-          direccion: padre.direccion ?? "",
-          telefono: padre.telefono ?? "",
-          email: padre.email ?? "",
-        }
-      : formPadre;
-    setFormAlumno(datosAlumno);
-    setFormPadre(datosPadre);
-    setInicialEdicion(JSON.stringify({ datosAlumno, datosPadre }));
-    setModalEditar(true);
-  };
-  const edicionSinGuardar = modalEditar && JSON.stringify({ datosAlumno: formAlumno, datosPadre: formPadre }) !== inicialEdicion;
+  const [modalResponsable, setModalResponsable] = useState(false);
   const observacionSinGuardar = modalObs && obsTexto.trim() !== "";
-  useSinGuardar(edicionSinGuardar || observacionSinGuardar);
-  const guardandoEdicion = actualizarAlumno.isPending || actualizarPadre.isPending;
-  const errorEdicion = actualizarAlumno.error ?? actualizarPadre.error;
-  const onGuardarEdicion = async () => {
-    if (!alumno) return;
-    await actualizarAlumno.mutateAsync({ id: alumno.id, datos: { ...formAlumno } });
-    if (padre) {
-      await actualizarPadre.mutateAsync({ id: padre.id, datos: { ...formPadre } });
-    }
-    setModalEditar(false);
-    mostrarToast("Datos actualizados");
-  };
+  useSinGuardar(observacionSinGuardar);
 
   // Desactivar / reactivar alumno
   const [confirmarEstado, setConfirmarEstado] = useState(false);
@@ -338,7 +294,7 @@ export default function AlumnoDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
-            <Button variant="outline" size="sm" onClick={abrirEditar}>
+            <Button variant="outline" size="sm" onClick={() => setModalEditar(true)}>
               <Pencil className="mr-1.5" size={14} /> Editar datos
             </Button>
             {puedeGestionar && (
@@ -412,7 +368,14 @@ export default function AlumnoDetailPage() {
               </div>
             </Panel>
 
-            <Panel title="Datos del responsable">
+            <Panel
+              title="Datos del responsable"
+              action={
+                <Button variant="outline" size="sm" onClick={() => setModalResponsable(true)}>
+                  {padre ? "Cambiar responsable" : "Asignar responsable"}
+                </Button>
+              }
+            >
               <div className="p-5 pt-1">
                 <Campo label="Nombre" value={padre && `${padre.nombre} ${padre.apellido}`} />
                 <Campo label="DNI" value={padre?.dni && formatDni(padre.dni)} mono />
@@ -854,92 +817,26 @@ export default function AlumnoDetailPage() {
       )}
 
       {modalEditar && (
-        <Modal
-          title="Editar datos"
-          sinGuardar={edicionSinGuardar}
+        <EditarDatosModal
+          alumno={alumno}
+          padre={padre}
           onClose={() => setModalEditar(false)}
-          footer={
-            <>
-              <Button variant="outline" className="flex-1" onClick={() => setModalEditar(false)}>
-                Cancelar
-              </Button>
-              <Button className="flex-1" disabled={guardandoEdicion} onClick={onGuardarEdicion}>
-                {guardandoEdicion ? "Guardando..." : "Guardar cambios"}
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            <p className="text-[12.5px] font-semibold">Datos del alumno</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Nombre</Label>
-                <Input value={formAlumno.nombre} onChange={(e) => setFormAlumno((f) => ({ ...f, nombre: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Apellido</Label>
-                <Input value={formAlumno.apellido} onChange={(e) => setFormAlumno((f) => ({ ...f, apellido: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Dirección</Label>
-              <Input value={formAlumno.direccion} onChange={(e) => setFormAlumno((f) => ({ ...f, direccion: e.target.value }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Teléfono</Label>
-                <Input value={formAlumno.telefono} onChange={(e) => setFormAlumno((f) => ({ ...f, telefono: e.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Email</Label>
-                <Input type="email" value={formAlumno.email} onChange={(e) => setFormAlumno((f) => ({ ...f, email: e.target.value }))} />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Obs. médicas / alergias</Label>
-              <Input
-                value={formAlumno.observacionesMedicas}
-                onChange={(e) => setFormAlumno((f) => ({ ...f, observacionesMedicas: e.target.value }))}
-              />
-            </div>
-          </div>
+          onGuardado={(mensaje) => {
+            setModalEditar(false);
+            mostrarToast(mensaje);
+          }}
+        />
+      )}
 
-          {padre && (
-            <div className="space-y-3 border-t pt-4" style={{ borderColor: "var(--border-hex)" }}>
-              <p className="text-[12.5px] font-semibold">Datos del responsable</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Nombre</Label>
-                  <Input value={formPadre.nombre} onChange={(e) => setFormPadre((f) => ({ ...f, nombre: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Apellido</Label>
-                  <Input value={formPadre.apellido} onChange={(e) => setFormPadre((f) => ({ ...f, apellido: e.target.value }))} />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Dirección</Label>
-                <Input value={formPadre.direccion} onChange={(e) => setFormPadre((f) => ({ ...f, direccion: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Teléfono</Label>
-                  <Input value={formPadre.telefono} onChange={(e) => setFormPadre((f) => ({ ...f, telefono: e.target.value }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input type="email" value={formPadre.email} onChange={(e) => setFormPadre((f) => ({ ...f, email: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {errorEdicion && (
-            <p className="text-sm text-destructive">
-              {errorEdicion instanceof ApiError ? errorEdicion.message : "No se pudieron guardar los cambios"}
-            </p>
-          )}
-        </Modal>
+      {modalResponsable && (
+        <CambiarResponsableModal
+          alumno={alumno}
+          onClose={() => setModalResponsable(false)}
+          onGuardado={(mensaje) => {
+            setModalResponsable(false);
+            mostrarToast(mensaje);
+          }}
+        />
       )}
 
       {confirmarEstado && (
