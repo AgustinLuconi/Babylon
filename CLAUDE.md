@@ -28,7 +28,10 @@ pnpm prisma:migrate   # crear/aplicar una migración
 pnpm prisma:studio    # explorador visual de la base de datos
 pnpm prisma:seed      # datos de desarrollo (admin/secretario/profesor/padre + curso/alumno/cuota de ejemplo)
 ```
-No hay test runner configurado todavía (ni Jest ni Vitest) — si se agrega, actualizar esta sección.
+```bash
+pnpm test             # pruebas puras versionadas en server/tests/ (ejecutor incluido en Node, vía tsx --test)
+```
+`pnpm test` solo cubre **funciones puras** (validadores, criterios, reconciliaciones): no hay Jest ni Vitest. Los módulos puros del client que lo necesitan se prueban desde `server/tests/` importándolos por ruta relativa (por eso no pueden usar el alias `@/`); la tabla de casos de `server/tests/casos-validacion.ts` corre contra la copia del server **y** la del client de cada regla. Las verificaciones con base de datos o por HTTP siguen siendo scripts `server/scripts/_*.ts` locales y sin versionar.
 
 ### client/ (SPA)
 ```bash

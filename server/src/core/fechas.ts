@@ -43,3 +43,9 @@ export function inicioDeHoyUtc(instante: Date = new Date()): Date {
   const { anio, mes, dia } = fechaHoraEnArgentina(instante);
   return new Date(Date.UTC(anio, mes - 1, dia));
 }
+
+// "Hoy" como AAAA-MM-DD en hora de Argentina (para comparar fechas calendario sin pasar por UTC).
+export function hoyISOEnArgentina(instante: Date = new Date()): string {
+  const { anio, mes, dia } = fechaHoraEnArgentina(instante);
+  return `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
