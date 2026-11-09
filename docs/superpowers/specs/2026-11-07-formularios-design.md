@@ -89,10 +89,15 @@ Cambios al modelo (todas las columnas nuevas o relajadas admiten vacío para que
 - Se marca "es responsable de sí mismo". Mínimo: nombre, apellido, curso y su celular.
 - El sistema crea su ficha de responsable con sus mismos datos (nombre, apellido, DNI, celular, email) y el vínculo `propio`; no se cargan dos veces.
 - Si ya existe una ficha de responsable con ese DNI (por ejemplo una mamá que ya figura por su hijo), se **reutiliza** esa ficha en vez de crear otra, y **la ficha existente manda**: la pantalla muestra la ficha encontrada y avisa que se usarán sus datos; el nombre y el apellido del alumno salen de la ficha; el celular o el email que se hayan escrito solo completan lo que la ficha no tenía, nunca pisan lo que ya tiene. *(Mi llamada.)*
-- Con un DNI desconocido se crea una ficha nueva. No hay búsqueda automática por nombre: sigue valiendo buscar antes de crear, como hoy (ver "Limitaciones conocidas"). *(Mi llamada.)*
+- Con un DNI desconocido se crea una ficha nueva, **después de comprobar que no haya ya una ficha de la misma persona** (ver "Evitar fichas duplicadas" más abajo).
 - Si la fecha de nacimiento está cargada y la persona es menor de 18, no puede ser responsable de sí misma. Sin fecha, se permite. *(Mi llamada.)*
 
 **Una persona, un nombre.** Cuando el vínculo es `propio`, el nombre, el apellido y el DNI del alumno y de su ficha de responsable son los mismos: cambiarlos en una ficha los cambia en la otra, dentro de la misma transacción. El celular y el email son del responsable. Una ficha tiene como máximo **un** alumno `propio` (una persona no es alumna dos veces), así que la sincronización es siempre entre dos filas; se toman los bloqueos en un orden fijo (primero el alumno, después la ficha) para que dos cambios simultáneos no se traben entre sí. *(Mi llamada.)*
+
+**Evitar fichas duplicadas.** Antes de crear una ficha de responsable nueva (en la inscripción de un menor, en la de un adulto `propio`, en el alta de un padre desde Usuarios y al cambiar el responsable desde el legajo), la pantalla busca fichas existentes **parecidas por nombre y apellido** y, si encuentra alguna, las muestra con su DNI (si lo tiene) y su celular: "Ya hay una ficha parecida: Ana Gómez · DNI 33.444.555 · +54 9 351 555-1234. ¿Es la misma persona?". Hay que elegir antes de seguir: **usar esa ficha** (se aplican las reglas de "la ficha existente manda", y si esa ficha no tenía DNI y se escribió uno, se le completa) o **es otra persona** (se crea la nueva). Esto vale haya o no DNI escrito: una ficha vieja sin DNI y una nueva con DNI pueden ser la misma persona.
+- **Qué es "parecida":** el nombre y el apellido, sin tildes, sin mayúsculas y sin espacios de más, son iguales, o uno contiene al otro ("María" y "María José"). Cuánta tolerancia extra se agrega (orden invertido, errores de tipeo) queda a criterio de quien construya; lo importante es que no se escape el caso de la misma persona escrita con otra mayúscula o tilde.
+- **Dónde corre:** en la pantalla, con la lista de responsables que ya se carga para buscar (el servidor no la repite: si se llama a la API sin pasar por la pantalla, no hay esta ayuda). Es una ayuda, no un bloqueo: la decisión siempre es de quien carga. *(Mi llamada.)*
+- Complementa, no reemplaza, el rechazo del servidor por DNI repetido (409).
 
 **Asignar o cambiar el responsable de un alumno ya inscripto.** Desde el legajo se puede asignar un responsable a un alumno que no tiene ninguno, cambiar de responsable y cambiar el vínculo (incluido pasar a `propio` o dejar de serlo). Es el mismo selector de responsable de la inscripción (uno existente, uno nuevo o "es responsable de sí mismo"), con las mismas reglas, y se guarda de forma atómica. Al dejar de ser `propio`, termina la sincronización de nombre, apellido y DNI; la ficha anterior queda como estaba. Sin esto, "responsable" no se podría completar después. *(Mi llamada.)*
 
@@ -161,6 +166,7 @@ Cada error sale en castellano y aparece **al lado del campo** que lo causó, tam
 
 - **Validadores:** una tabla de casos (válidos, inválidos, borde) para cada regla, corrida contra la copia del server y la del client.
 - **Servidor por HTTP, con datos `prueba-`:** altas mínimas (menor y adulto, responsable nuevo y existente, atómicas: si falla el alumno no queda el responsable), `PATCH` parcial con `null`, dos `PATCH` simultáneos de campos distintos que no se pisan, el criterio de datos incompletos, el aviso agrupado y su resolución, la sincronización nombre/apellido/DNI entre alumno y responsable `propio`, `GET /api/alumnos/mios` con vínculo.
+- **Búsqueda de fichas parecidas:** una tabla de casos para la comparación de nombres (tildes, mayúsculas, espacios, "María" y "María José", personas distintas que no deben coincidir); y en el navegador, crear un responsable nuevo con el nombre de una ficha existente muestra la pregunta y no deja seguir sin elegir.
 - **Navegador (Playwright):** inscribir con lo mínimo, la marca y el filtro, editar solo un campo y comprobar que sale solo ese campo, el aviso "Mientras editabas…" con otro usuario cambiando campos distintos y el mismo, el panel de un adulto solo y el de un adulto con hijo, los errores al lado del campo.
 - **Datos reales intactos:** las pruebas de edición se hacen sobre registros `prueba-`, nunca sobre alumnos reales.
 
@@ -178,13 +184,13 @@ Cada error sale en castellano y aparece **al lado del campo** que lo causó, tam
 10. El responsable de un alumno ya inscripto se puede asignar o cambiar desde el legajo, con el mismo selector de la inscripción.
 11. Al reutilizar una ficha por DNI, manda la ficha existente: lo escrito solo completa lo que le faltaba.
 12. Una ficha tiene como máximo un alumno `propio`.
-13. No hay búsqueda automática por nombre para detectar fichas duplicadas de adultos sin DNI.
+13. Antes de crear un responsable nuevo se busca por nombre y apellido si ya hay una ficha parecida, y quien carga tiene que elegir entre usarla o crear otra; la ayuda corre en la pantalla, no en el servidor.
 14. Un responsable creado desde Usuarios puede quedar sin alumnos, como hoy.
 15. El criterio de datos incompletos no incluye el curso e incluye un ítem `vinculo`.
 
 ## Limitaciones conocidas
 
-- **Fichas duplicadas:** si una persona se carga primero sin DNI y después se intenta cargar de nuevo con DNI cuando ya existe otra ficha igual, el sistema avisa del DNI repetido pero no hay una herramienta para unificar las dos fichas.
+- **Fichas duplicadas que ya existen:** la ayuda por nombre evita crear duplicados nuevos, pero si por distraerse o por un nombre escrito muy distinto quedan dos fichas de la misma persona, el sistema solo avisa del DNI repetido (409) cuando se intenta cargar el mismo DNI en las dos; no hay una herramienta para unificarlas.
 - **Los datos viejos** con formatos que no cumplen (teléfonos con letras, fichas sin padre) siguen como están hasta que se corrijan a mano o se borren.
 
 ## Lo que queda a criterio de quien construya
