@@ -2,18 +2,12 @@ import { configurarValidadorDeSesion } from "./core/middlewares/authMiddleware";
 import { prisma } from "./core/database";
 import { PrismaUnitOfWork } from "./core/adapters/PrismaUnitOfWork";
 import { CanalEnMemoria } from "./core/adapters/CanalEnMemoria";
-import { ConsoleMailer } from "./core/adapters/ConsoleMailer";
-import { SmtpMailer } from "./core/adapters/SmtpMailer";
-import { config } from "./core/config";
-import type { Mailer } from "./core/ports";
 import { TableroDeAnuncios } from "./core/eventos";
 import type { EventosDelSistema } from "./eventos";
 
 import { PrismaSesionRepository } from "./modules/usuarios/sesion.repository.prisma";
 import { crearValidadorDeSesion } from "./modules/usuarios/sesion.validador";
 import { PrismaUsuarioRepository } from "./modules/usuarios/usuario.repository.prisma";
-import { InvitacionController } from "./modules/usuarios/invitacion.controller";
-import { InvitacionService } from "./modules/usuarios/invitacion.service";
 import { UsuarioService } from "./modules/usuarios/usuario.service";
 import { UsuarioController } from "./modules/usuarios/usuario.controller";
 
@@ -99,24 +93,11 @@ const unitOfWork = new PrismaUnitOfWork(prisma);
 // Tablero de anuncios entre módulos: los services publican lo que pasa y los avisos se suscriben (ver más abajo).
 const tablero = new TableroDeAnuncios<EventosDelSistema>();
 
-// Correo: SMTP real si está configurado; si no, se escribe en la consola (desarrollo).
-const mailer: Mailer = config.SMTP_HOST
-  ? new SmtpMailer({
-      host: config.SMTP_HOST,
-      port: config.SMTP_PORT,
-      secure: config.SMTP_SECURE,
-      user: config.SMTP_USER ?? "",
-      pass: config.SMTP_PASS ?? "",
-      from: config.MAIL_FROM,
-    })
-  : new ConsoleMailer();
-
 // --- Servicios ---
-const invitacionService = new InvitacionService(usuarioRepository, padreRepository, profesorRepository, unitOfWork, mailer, tablero);
-const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, mailer, invitacionService, tablero);
+const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, tablero);
 const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
-const padreService = new PadreService(padreRepository, usuarioRepository, alumnoRepository, unitOfWork, invitacionService, tablero);
-const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork, invitacionService, tablero);
+const padreService = new PadreService(padreRepository, alumnoRepository, unitOfWork, tablero);
+const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork, tablero);
 const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, cicloRepository, configuracionRepository, unitOfWork, tablero);
 const configuracionService = new ConfiguracionService(configuracionRepository, tablero);
 const alumnoService = new AlumnoService(
@@ -167,11 +148,8 @@ export const container = {
   validadorDeSesion,
   // Expuesto para la depuración diaria de sesiones y para verificar los flujos.
   usuarioService,
-  // Expuesto para verificar el adaptador de correo elegido.
-  mailer,
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
-  invitacionController: new InvitacionController(invitacionService),
   cicloController: new CicloController(cicloService),
   padreController: new PadreController(padreService),
   profesorController: new ProfesorController(profesorService),

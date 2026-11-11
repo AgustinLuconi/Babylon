@@ -21,7 +21,7 @@ export interface MensajesPaginados {
 
 // Si el padre puede leer la conversación: con cuenta activa sí; sin cuenta o con la invitación pendiente, cuando entre;
 // con la cuenta desactivada, no puede entrar al sistema hasta que se reactive.
-export type EstadoCuentaPadre = "activa" | "pendiente" | "inactiva" | "sin-cuenta";
+export type EstadoCuentaPadre = "activa" | "inactiva" | "sin-cuenta";
 
 const MENSAJES_POR_PAGINA = 50;
 
@@ -64,13 +64,7 @@ export class ChatService {
     }
     const chat = await this.obtenerOCrear(padreId);
     const cuenta = padre.usuarioId ? await this.usuarioRepo.findById(padre.usuarioId) : null;
-    const estadoCuenta: EstadoCuentaPadre = !cuenta
-      ? "sin-cuenta"
-      : cuenta.estado === "activo"
-        ? "activa"
-        : cuenta.estado === "inactivo"
-          ? "inactiva"
-          : "pendiente";
+    const estadoCuenta: EstadoCuentaPadre = !cuenta ? "sin-cuenta" : cuenta.estado === "activo" ? "activa" : "inactiva";
     return { ...chat, estadoCuenta };
   }
 

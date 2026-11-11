@@ -38,8 +38,11 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   const alumnoIds = (
     await prisma.alumno.findMany({ where: { OR: [{ id: { startsWith: P } }, { padreId: { in: padreIds } }] }, select: { id: true } })
   ).map((a) => a.id);
+  const profesorIds = (
+    await prisma.profesor.findMany({ where: { OR: [{ id: { startsWith: P } }, { AND: [{ nombre: "Pruebaav" }, { dni: { startsWith: "9940" } }] }] }, select: { id: true } })
+  ).map((x) => x.id);
   const cursoIds = (
-    await prisma.curso.findMany({ where: { OR: [{ id: { startsWith: P } }, { profesorId: { startsWith: P } }] }, select: { id: true } })
+    await prisma.curso.findMany({ where: { OR: [{ id: { startsWith: P } }, { profesorId: { in: profesorIds } }] }, select: { id: true } })
   ).map((c) => c.id);
   const deAlumnos = { alumnoId: { in: alumnoIds } };
   const deCursos = { cursoId: { in: cursoIds } };
@@ -59,7 +62,7 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.mensaje.deleteMany({ where: { chat: { padreId: { in: padreIds } } } });
   await prisma.chat.deleteMany({ where: { padreId: { in: padreIds } } });
   await prisma.padre.deleteMany({ where: { id: { in: padreIds } } });
-  await prisma.profesor.deleteMany({ where: { id: { startsWith: P } } });
+  await prisma.profesor.deleteMany({ where: { id: { in: profesorIds } } });
   await prisma.usuario.deleteMany({ where: { OR: [{ id: { startsWith: P } }, { email: { startsWith: P } }] } });
 }
 

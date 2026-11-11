@@ -23,8 +23,8 @@ export const crearSecretarioSchema = z
   .object({
     nombre: textoRequerido("El nombre", 60),
     email: emailSchema,
-    // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
-    password: passwordNueva.optional(),
+    // La contraseña la escribe el administrador (nadie más cambia contraseñas).
+    password: passwordNueva,
   })
   .strict();
 
@@ -39,20 +39,3 @@ export const cambiarEstadoUsuarioSchema = z.object({
   estado: z.enum(["activo", "inactivo"]),
 });
 export type CambiarEstadoUsuarioInput = z.infer<typeof cambiarEstadoUsuarioSchema>;
-
-export const olvideContrasenaSchema = z.object({
-  email: z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() : v), z.email("Email inválido")),
-});
-
-export const restablecerContrasenaSchema = z.object({
-  token: z.string().min(1, "Falta el enlace"),
-  password: passwordNueva,
-});
-
-export const cambiarContrasenaSchema = z.object({
-  passwordActual: z.string().min(1, "Ingresá tu contraseña actual"),
-  passwordNueva,
-});
-export type CambiarContrasenaInput = z.infer<typeof cambiarContrasenaSchema>;
-
-export const verificarEmailSchema = z.object({ token: z.string().min(1, "Falta el enlace") });

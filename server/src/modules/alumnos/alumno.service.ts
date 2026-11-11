@@ -11,7 +11,6 @@ import type { PadreRepository } from "../padres/padre.repository";
 import type { PadreService } from "../padres/padre.service";
 import type { Padre } from "../padres/padre.entity";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
-import type { CuentaPreparada, EstadoInvitacion } from "../usuarios/invitacion.service";
 import type { AlumnoRepository } from "./alumno.repository";
 import type { Alumno, VinculoResponsable } from "./alumno.entity";
 import type { DatoFaltante } from "./alumno.incompleto";
@@ -25,13 +24,10 @@ export interface HijoConCurso extends Alumno {
   profesorNombre: string | null;
 }
 
-export type AlumnoConInvitacion = Alumno & { invitacion: EstadoInvitacion | null };
-
 // Resultado de resolver quién es el responsable de un alumno (ver `resolverResponsable`).
 interface ResponsableResuelto {
   padre: Padre;
   vinculo: VinculoResponsable;
-  cuenta: CuentaPreparada | null;
   // Nombre y apellido que le corresponden al alumno: con un responsable "propio" que ya existía, manda la ficha.
   nombre: string;
   apellido: string;
@@ -134,11 +130,11 @@ export class AlumnoService {
     if (responsable.tipo === "existente") {
       const padre = await this.padreRepo.findById(responsable.padreId, tx);
       if (!padre) throw new EntityNotFoundError("Padre", responsable.padreId);
-      return { padre, vinculo: responsable.vinculo, cuenta: null, nombre: alumno.nombre, apellido: alumno.apellido };
+      return { padre, vinculo: responsable.vinculo, nombre: alumno.nombre, apellido: alumno.apellido };
     }
     if (responsable.tipo === "nuevo") {
-      const { padre, cuenta } = await this.padreService.crearFichaEnTransaccion(responsable.datos, tx);
-      return { padre, vinculo: responsable.vinculo, cuenta, nombre: alumno.nombre, apellido: alumno.apellido };
+      const { padre } = await this.padreService.crearFichaEnTransaccion(responsable.datos, tx);
+      return { padre, vinculo: responsable.vinculo, nombre: alumno.nombre, apellido: alumno.apellido };
     }
 
     // Responsable de sí mismo.
@@ -163,24 +159,23 @@ export class AlumnoService {
         email: existente.email || !responsable.email ? undefined : responsable.email,
       });
       const padre = Object.keys(faltantes).length > 0 ? await this.padreRepo.actualizarParcial(existente.id, faltantes, tx) : existente;
-      return { padre, vinculo: "propio", cuenta: null, nombre: padre.nombre, apellido: padre.apellido };
+      return { padre, vinculo: "propio", nombre: padre.nombre, apellido: padre.apellido };
     }
-    const { padre, cuenta } = await this.padreService.crearFichaEnTransaccion(
+    const { padre } = await this.padreService.crearFichaEnTransaccion(
       {
         nombre: alumno.nombre,
         apellido: alumno.apellido,
         dni: alumno.dni,
         telefono: responsable.telefono,
         email: responsable.email,
-        password: responsable.password,
       },
       tx,
     );
-    return { padre, vinculo: "propio", cuenta, nombre: alumno.nombre, apellido: alumno.apellido };
+    return { padre, vinculo: "propio", nombre: alumno.nombre, apellido: alumno.apellido };
   }
 
   // La inscripción es una sola operación: el responsable (si es nuevo) y el alumno se crean juntos o no se crea nada.
-  async inscribirAlumno(datos: NuevoAlumnoInput): Promise<AlumnoConInvitacion> {
+  async inscribirAlumno(datos: NuevoAlumnoInput): Promise<Alumno> {
     if (datos.dni && (await this.alumnoRepo.findByDni(datos.dni))) {
       throw new ConflictError(`Ya existe un alumno inscripto con el DNI ${datos.dni}`);
     }
@@ -188,7 +183,7 @@ export class AlumnoService {
     // Además del alta del Alumno, se deja asentada la inscripción del ciclo
     // activo (historial por año) — atómico, para no crear el alumno sin su
     // registro de inscripción si algo falla a mitad de camino.
-    const { alumno, cuenta } = await this.unitOfWork.runInTransaction(async (tx) => {
+    return this.unitOfWork.runInTransaction(async (tx) => {
       const curso = await this.cursoRepo.findById(datos.cursoId, tx);
       if (!curso) throw new EntityNotFoundError("Curso", datos.cursoId);
 
@@ -247,16 +242,15 @@ export class AlumnoService {
         { dato: "alumnos", accion: "inscripcion", ids: { alumnoIds: [creado.id], cursoIds: [datos.cursoId] } },
         tx,
       );
-      return { alumno: creado, cuenta: responsable.cuenta };
+      return creado;
     });
-    return { ...alumno, invitacion: await this.padreService.enviarInvitacion(cuenta) };
   }
 
   // Asigna o cambia el responsable de un alumno ya inscripto (o su vínculo, o pasa a ser responsable de sí mismo).
   // El descuento por hermanos se calcula al inscribir y no se recalcula acá. Al dejar de ser "propio", termina la
   // sincronización de nombre, apellido y DNI y la ficha anterior queda como estaba.
-  async asignarResponsable(id: string, responsable: ResponsableInput): Promise<AlumnoConInvitacion> {
-    const { alumno, cuenta } = await this.unitOfWork.runInTransaction(async (tx) => {
+  async asignarResponsable(id: string, responsable: ResponsableInput): Promise<Alumno> {
+    return this.unitOfWork.runInTransaction(async (tx) => {
       await this.alumnoRepo.bloquear(id, tx);
       const actual = await this.alumnoRepo.findById(id, tx);
       if (!actual) throw new EntityNotFoundError("Alumno", id);
@@ -280,9 +274,8 @@ export class AlumnoService {
         { dato: "alumnos", accion: "edicion", ids: { alumnoIds: [id], cursoIds: actual.cursoId ? [actual.cursoId] : [], padreIds: familiaAnterior } },
         tx,
       );
-      return { alumno: guardado, cuenta: resuelto.cuenta };
+      return guardado;
     });
-    return { ...alumno, invitacion: await this.padreService.enviarInvitacion(cuenta) };
   }
 
   async actualizarAlumno(id: string, datos: ActualizarAlumnoInput): Promise<Alumno> {
