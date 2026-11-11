@@ -10,4 +10,6 @@ export interface PadreRepository extends Repository<Padre> {
   bloquear(id: string, tx?: unknown): Promise<void>;
   // Solo asigna la cuenta de acceso, sin reescribir el resto de la ficha (una edición simultánea no se pisa).
   vincularUsuario(id: string, usuarioId: string, tx?: unknown): Promise<void>;
+  // La ficha vuelve a quedar sin cuenta de acceso (la ficha y lo que tiene a su cargo no se tocan).
+  desvincularUsuario(id: string, tx?: unknown): Promise<void>;
 }

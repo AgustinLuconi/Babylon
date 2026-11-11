@@ -38,6 +38,7 @@ export type MotivoCierre =
   | "cerrada-por-el-usuario"
   | "cerrada-desde-otro-dispositivo"
   | "contrasena-cambiada"
+  | "roles-cambiados"
   | "cuenta-desactivada"
   | "vencida";
 

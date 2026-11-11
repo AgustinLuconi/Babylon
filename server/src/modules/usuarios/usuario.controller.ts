@@ -4,6 +4,7 @@ import {
   cambiarEstadoUsuarioSchema,
   crearAdministradorSchema,
   crearSecretarioSchema,
+  actualizarCuentaSchema,
   credencialesSchema,
   crearCuentaSchema,
   porEmailSchema,
@@ -74,6 +75,12 @@ export class UsuarioController {
   listarUsuarios = async (_req: Request, res: Response) => {
     const usuarios = await this.usuarioService.listarUsuarios();
     res.status(200).json(usuarios);
+  };
+
+  actualizarCuenta = async (req: Request, res: Response) => {
+    const datos = actualizarCuentaSchema.parse(req.body);
+    const usuario = await this.usuarioService.actualizarCuenta(String(req.params.id), datos, { usuarioId: req.auth!.sub, sesionId: req.auth!.sesionId });
+    res.status(200).json(usuario);
   };
 
   cambiarEstado = async (req: Request, res: Response) => {

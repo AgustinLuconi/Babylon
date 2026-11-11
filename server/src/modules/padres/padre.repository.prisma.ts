@@ -78,6 +78,10 @@ export class PrismaPadreRepository implements PadreRepository {
     await this.client(tx).padre.updateMany({ where: { id }, data: { usuarioId } });
   }
 
+  async desvincularUsuario(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).padre.updateMany({ where: { id }, data: { usuarioId: null } });
+  }
+
   async actualizarParcial(id: string, cambios: Cambios<Padre>, tx?: unknown): Promise<Padre> {
     try {
       const fila = await this.client(tx).padre.update({ where: { id }, data: cambios });

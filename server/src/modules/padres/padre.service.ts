@@ -4,6 +4,7 @@ import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
+import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
 import type { ActualizarPadreInput, CrearPadreInput, CrearPadreSinCuentaInput, DatosDeFichaInput } from "./padre.schema";
@@ -13,6 +14,7 @@ import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 export class PadreService {
   constructor(
     private readonly padreRepo: PadreRepository,
+    private readonly usuarioRepo: UsuarioRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
@@ -108,6 +110,15 @@ export class PadreService {
       // El email de la ficha es el de su cuenta de acceso: con cuenta, no se puede dejar sin email.
       if (datos.email === null && actual.usuarioId) {
         throw new ValidationError("Este responsable ya tiene una cuenta de acceso: no se puede borrar su email");
+      }
+
+      // El email de la ficha es el de su cuenta: si cambia, cambia también el de la cuenta (409 si lo usa otra, sin cambiar ninguno).
+      if (typeof datos.email === "string" && datos.email !== actual.email && actual.usuarioId) {
+        await this.usuarioRepo.bloquearCuenta(actual.usuarioId, tx);
+        await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+        const otra = await this.usuarioRepo.findByEmail(datos.email, tx);
+        if (otra && otra.id !== actual.usuarioId) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+        await this.usuarioRepo.actualizarParcial(actual.usuarioId, { email: datos.email }, tx);
       }
 
       // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.

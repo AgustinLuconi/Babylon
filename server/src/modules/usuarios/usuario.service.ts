@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
+import { soloPresentes } from "../../core/cambios";
 import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
@@ -15,9 +16,11 @@ import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
+import { cambioDeRoles, validarCambioDeRoles } from "./usuario.roles";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "./usuario.eventos";
 import type {
+  ActualizarCuentaInput,
   CambiarEstadoUsuarioInput,
   CrearCuentaInput,
   CredencialesInput,
@@ -280,6 +283,95 @@ export class UsuarioService {
 
       const { passwordHash: _passwordHash, ...sinPassword } = usuario;
       return { usuario: sinPassword, vinculada: existente !== null };
+    });
+  }
+
+  // Edita una cuenta: solo se escribe lo que vino. Cambiar la contraseña o los roles cierra las sesiones de esa cuenta (menos la
+  // desde la que se hace el cambio, si el administrador se edita a sí mismo). Agregar `padre`/`profesor` vincula una ficha;
+  // quitarlo la desvincula (la ficha y sus alumnos o cursos no se tocan). El email de las fichas es siempre el de la cuenta.
+  async actualizarCuenta(id: string, datos: ActualizarCuentaInput, actor: { usuarioId: string; sesionId: string }): Promise<UsuarioSinPassword> {
+    const passwordHash = datos.password ? await bcrypt.hash(datos.password, RONDAS_BCRYPT) : undefined;
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(id, tx);
+      const actual = await this.usuarioRepo.findById(id, tx);
+      if (!actual) throw new EntityNotFoundError("Usuario", id);
+      const padreActual = await this.padreRepo.findByUsuarioId(id, tx);
+      const profesorActual = await this.profesorRepo.findByUsuarioId(id, tx);
+
+      const emailCambia = datos.email !== undefined && datos.email !== actual.email;
+      if (emailCambia) {
+        await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+        const otro = await this.usuarioRepo.findByEmail(datos.email as string, tx);
+        if (otro && otro.id !== id) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+      }
+      if (datos.nombre !== undefined && datos.nombre !== actual.nombre && (padreActual || profesorActual)) {
+        const mensaje = "El nombre de una cuenta de responsable o profesor se cambia desde su ficha";
+        throw new ValidationError(mensaje, { nombre: [mensaje] });
+      }
+
+      const finales = datos.roles ?? actual.roles;
+      const { agregados, quitados } = cambioDeRoles(actual.roles, finales);
+      const rolesCambian = agregados.length + quitados.length > 0;
+      if (datos.roles) {
+        const otrosAdminsActivos = (await this.usuarioRepo.findAll(tx)).filter((u) => u.id !== id && u.estado === "activo" && u.roles.includes("admin")).length;
+        validarCambioDeRoles({ cuentaId: id, actorId: actor.usuarioId, actuales: actual.roles, finales, otrosAdminsActivos });
+      }
+      const exigeFicha = (rol: "padre" | "profesor", ref: unknown) => {
+        if (agregados.includes(rol) && !ref) throw new ValidationError("Elegí la ficha", { [rol]: ["Elegí la ficha"] });
+        if (!agregados.includes(rol) && ref) throw new ValidationError("La ficha solo se elige al agregar el rol", { [rol]: ["La ficha solo se elige al agregar el rol"] });
+      };
+      exigeFicha("padre", datos.padre);
+      exigeFicha("profesor", datos.profesor);
+
+      const emailFinal = datos.email ?? actual.email;
+      let padre = padreActual;
+      let profesor = profesorActual;
+      const fichasTocadas: { padre: boolean; profesor: boolean } = { padre: false, profesor: false };
+      if (quitados.includes("padre") && padre) {
+        await this.padreRepo.desvincularUsuario(padre.id, tx);
+        padre = null;
+        fichasTocadas.padre = true;
+      }
+      if (quitados.includes("profesor") && profesor) {
+        await this.profesorRepo.desvincularUsuario(profesor.id, tx);
+        profesor = null;
+        fichasTocadas.profesor = true;
+      }
+      if (datos.padre) {
+        if (padre) throw new ConflictError("Esa cuenta ya tiene un responsable vinculado");
+        padre = await this.fichaDePadre(datos.padre, emailFinal, tx);
+        await this.padreRepo.vincularUsuario(padre.id, id, tx);
+        fichasTocadas.padre = true;
+      }
+      if (datos.profesor) {
+        if (profesor) throw new ConflictError("Esa cuenta ya tiene un profesor vinculado");
+        profesor = await this.fichaDeProfesor(datos.profesor, emailFinal, tx);
+        await this.profesorRepo.vincularUsuario(profesor.id, id, tx);
+        fichasTocadas.profesor = true;
+      }
+      // El email de cada ficha vinculada es el de la cuenta.
+      if (padre && (emailCambia || datos.padre)) await this.padreRepo.actualizarParcial(padre.id, { email: emailFinal }, tx);
+      if (profesor && (emailCambia || datos.profesor)) await this.profesorRepo.actualizarParcial(profesor.id, { email: emailFinal }, tx);
+
+      const cambios = soloPresentes({
+        nombre: datos.nombre !== undefined && datos.nombre !== actual.nombre ? datos.nombre : undefined,
+        email: emailCambia ? datos.email : undefined,
+        passwordHash,
+        roles: rolesCambian ? finales : undefined,
+      });
+      const guardado = Object.keys(cambios).length > 0 ? await this.usuarioRepo.actualizarParcial(id, cambios, tx) : actual;
+
+      if (passwordHash || rolesCambian) {
+        await this.sesionRepo.cerrarTodas(id, new Date(), id === actor.usuarioId ? actor.sesionId : undefined, tx);
+        await this.anuncios.publicar("sesiones.cerradas", { usuarioId: id, motivo: rolesCambian ? "roles-cambiados" : "contrasena-cambiada" }, tx);
+      }
+      if (rolesCambian) await this.anuncios.publicar("cuenta.cambio", { usuarioId: id }, tx);
+      if (padre && (fichasTocadas.padre || emailCambia)) await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [padre.id] } }, tx);
+      if (profesor && (fichasTocadas.profesor || emailCambia)) await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [profesor.id] } }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "edicion", ids: { usuarioIds: [id] } }, tx);
+
+      const { passwordHash: _passwordHash, ...sinPassword } = guardado;
+      return sinPassword;
     });
   }
 

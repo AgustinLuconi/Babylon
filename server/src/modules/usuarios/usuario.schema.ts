@@ -69,3 +69,18 @@ export const crearCuentaSchema = z
 export type CrearCuentaInput = z.infer<typeof crearCuentaSchema>;
 
 export const porEmailSchema = z.object({ email: emailSchema });
+
+// Editar una cuenta (solo el administrador). Todo opcional; `password` vacío no existe (se omite para no tocarla). `roles` es
+// la lista final: los roles `padre`/`profesor` que se agregan traen la ficha que se vincula (`padre`/`profesor`).
+export const actualizarCuentaSchema = z
+  .object({
+    nombre: textoRequerido("El nombre", 60).optional(),
+    email: emailSchema.optional(),
+    password: passwordNueva.optional(),
+    roles: z.array(rolSchema).min(1, "Elegí al menos un rol").optional(),
+    padre: fichaDePadre.optional(),
+    profesor: fichaDeProfesor.optional(),
+  })
+  .strict()
+  .refine((d) => d.roles === undefined || new Set(d.roles).size === d.roles.length, { message: "Hay roles repetidos", path: ["roles"] });
+export type ActualizarCuentaInput = z.infer<typeof actualizarCuentaSchema>;

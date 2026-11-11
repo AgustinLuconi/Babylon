@@ -19,6 +19,7 @@ export function usuarioRoutes(controller: UsuarioController): Router {
   router.post("/cuentas", authMiddleware, requireRole("admin"), controller.crearCuenta);
   router.get("/usuarios/por-email", authMiddleware, requireRole("admin"), controller.buscarPorEmail);
   router.get("/usuarios", authMiddleware, requireRole("admin"), controller.listarUsuarios);
+  router.patch("/usuarios/:id", authMiddleware, requireRole("admin"), controller.actualizarCuenta);
   router.patch("/usuarios/:id/estado", authMiddleware, requireRole("admin"), controller.cambiarEstado);
 
   return router;
