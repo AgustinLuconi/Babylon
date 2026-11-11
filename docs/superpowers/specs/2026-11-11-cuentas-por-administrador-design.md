@@ -18,14 +18,21 @@ no crea accesos) y las familias y profesores (entran con lo que el administrador
    de la inscripción las opciones de contraseña e invitación.
 4. La pestaña "Pendientes" de Usuarios pasa a llamarse **"Sin cuenta"** y lista a los responsables y profesores que todavía
    no tienen cuenta, cada uno con un botón **"Crear cuenta"** (email y contraseña). El formulario **trae el email de la ficha
-   ya completado** (el de la inscripción) si lo hay; si no, queda vacío.
+   ya completado** (el de la inscripción) si lo hay; si no, queda vacío. **Si el email ya pertenece a una cuenta, no falla:**
+   avisa ("Ese email ya tiene cuenta: se le va a agregar el rol de profesor") y **vincula la ficha a esa cuenta**, sin tocar
+   su contraseña.
+4b. **"Crear usuario" sirve para cualquier rol** (administrador, secretario, padre y profesor, y varios a la vez). Para padre
+   o profesor se elige una ficha sin cuenta o se carga una nueva ahí mismo (con los datos mínimos que ya piden las altas de
+   hoy), además del email y la contraseña.
 5. Las cuentas que ya existen no cambian.
 6. La tabla de Cuentas tiene un botón de edición (lápiz por fila). El administrador puede cambiar **nombre, email,
    contraseña y roles**. La contraseña es opcional al editar (vacía = no se toca). Cambiarla **cierra todas las sesiones
    abiertas** de esa persona. Activar/desactivar sigue siendo el interruptor de hoy.
-7. Roles: **administrador y secretario** se agregan o quitan libremente; **padre y profesor** están atados a una ficha: se
-   ven pero no se agregan ni quitan desde la edición (se vinculan al crear la cuenta desde "Sin cuenta"). La cuenta siempre
-   conserva al menos un rol. Un administrador no puede quitarse a sí mismo el rol de administrador.
+7. Una cuenta puede tener **varios roles** y todos se pueden editar. **Administrador y secretario** se agregan o quitan sin
+   más. **Padre y profesor** están atados a una ficha: agregar uno de esos roles es **vincular una ficha** (una ficha sin
+   cuenta que se elige, o una nueva que se carga ahí mismo) y quitarlo es **desvincularla** (la ficha queda "sin cuenta",
+   no se borra). La cuenta siempre conserva al menos un rol. Un administrador no puede quitarse a sí mismo el rol de
+   administrador.
 8. Se elimina la opción de cambiar la propia contraseña en "Mi cuenta": ninguna persona toca su contraseña ni su email.
 
 ## Objetivos
@@ -92,12 +99,14 @@ decisión)* para que se puedan corregir.
   la ficha (si hay).
 - **Nueva operación "Crear cuenta"** (`POST /api/auth/cuentas`, solo admin): recibe `{ tipo: "padre" | "profesor", fichaId,
   email, password }`; crea el `Usuario` (activo, con rol `padre` o `profesor`, nombre tomado de la ficha, contraseña con
-  `passwordNueva`) y lo vincula a la ficha en una sola transacción. Rechaza un email ya usado (409) y una ficha que ya tiene
-  cuenta (409). *(Mi decisión:)* el email de la ficha pasa a ser el de la cuenta (si la ficha no lo tenía o era otro, se
+  `passwordNueva`) y lo vincula a la ficha en una sola transacción. **Si el email ya es de una cuenta, vincula la ficha a esa
+  cuenta** y le agrega el rol (no pide ni cambia la contraseña); es un 409 solo si esa cuenta ya tiene ficha de ese mismo tipo
+  (una cuenta tiene a lo sumo un responsable y un profesor) o si la ficha ya tiene cuenta. *(Mi decisión:)* el email de la ficha pasa a ser el de la cuenta (si la ficha no lo tenía o era otro, se
   actualiza), para que no queden distintos.
-- **Secretario y administrador** (cuentas sin ficha): `POST /api/auth/secretarios` y `/administradores` exigen `password`.
-  *(Mi decisión:)* el modal "Crear usuario" de Usuarios queda solo para esos dos roles; padres y profesores se crean desde
-  "Sin cuenta" (la ficha se da de alta en Inscribir alumno / Profesores).
+- **"Crear usuario"** (modal de Usuarios, solo admin) crea una cuenta con uno o varios roles: `POST /api/auth/secretarios` y
+  `/administradores` exigen `password`; para padre o profesor se elige una ficha sin cuenta o se carga una nueva (ficha +
+  cuenta en una sola transacción). Es la misma operación de vincular ficha que usa "Crear cuenta"; el constructor puede
+  unificar los endpoints. *(Mi decisión.)*
 
 ### Edición de cuentas
 
@@ -109,10 +118,13 @@ decisión)* para que se puedan corregir.
 - Contraseña: `passwordNueva` (mínimo 8, máximo 72 bytes). Al cambiarla se cierran todas las sesiones de esa cuenta
   (`sesiones.cerradas` con motivo `contrasena-cambiada`). *(Mi decisión:)* si el administrador se edita a sí mismo, queda
   abierta la sesión desde la que lo hace y se cierran las demás.
-- Roles: `admin` y `secretario` se agregan o quitan libremente; `padre` y `profesor` no se pueden agregar ni quitar (si el pedido
-  los cambia, 400); la cuenta no puede quedar sin roles (400); un administrador no puede quitarse a sí mismo `admin` (400).
-  *(Mi decisión:)* si cambian los roles de una cuenta, se cierran todas sus sesiones (la persona vuelve a entrar y elige entre
-  los roles que le quedan); si es el propio administrador, se conserva la sesión actual.
+- Roles: se puede cambiar cualquiera. `admin` y `secretario` se agregan o quitan libremente. Agregar `padre` o `profesor`
+  exige elegir una ficha sin cuenta de ese tipo (o cargar una nueva): queda vinculada a la cuenta. Quitarlo la desvincula:
+  la ficha vuelve a "Sin cuenta" (no se borra, y sus cursos o alumnos siguen siendo suyos), y la pantalla pide confirmación
+  ("dejará de ver a sus hijos" / "dejará de tener sus cursos a cargo"). La cuenta no puede quedar sin roles (400) y un
+  administrador no puede quitarse a sí mismo `admin` (400). *(Mi decisión:)* si cambian los roles de una cuenta, se cierran
+  todas sus sesiones (la persona vuelve a entrar y elige entre los roles que le quedan); si es el propio administrador, se
+  conserva la sesión actual.
 - La interfaz: un lápiz en cada fila de la tabla de Cuentas abre un modal con esos campos; contraseña vacía = no se cambia.
   Mientras se edita, rige "Mientras editabas, X cambió…" y la protección de cambios sin guardar como en las demás ediciones.
 - Desactivar/activar sigue en `PATCH /api/auth/usuarios/:id/estado` sin cambios.
@@ -145,8 +157,8 @@ decisión)* para que se puedan corregir.
   en la ficha, solo en `Usuario`. Crear una cuenta con un email que ya usa otra cuenta es 409 con un mensaje claro.
 - **Se conserva la regla "un responsable con cuenta no puede quedar sin email"** y el email del responsable `propio` sigue
   siendo opcional al inscribir (es un dato de contacto; la cuenta se crea después).
-- **Desactivar es la única forma de retirar un acceso**: no hay "borrar cuenta" ni desvincular una ficha. Una cuenta no puede
-  quedar sin roles, así que a quien solo tiene `admin` o `secretario` no se le quita el último: se la desactiva.
+- **No hay "borrar cuenta".** Retirar un acceso por completo es desactivar la cuenta; una cuenta no puede quedar sin roles, así
+  que a quien tiene un solo rol no se le quita ese rol: se la desactiva. Quitar `padre` o `profesor` solo desvincula la ficha.
 
 ## Lo que queda al constructor
 
