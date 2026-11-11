@@ -5,6 +5,8 @@ import {
   crearAdministradorSchema,
   crearSecretarioSchema,
   credencialesSchema,
+  crearCuentaSchema,
+  porEmailSchema,
 } from "./usuario.schema";
 import type { UsuarioService } from "./usuario.service";
 
@@ -53,6 +55,20 @@ export class UsuarioController {
     const datos = crearAdministradorSchema.parse(req.body);
     const administrador = await this.usuarioService.crearAdministrador(datos);
     res.status(201).json(administrador);
+  };
+
+  listarSinCuenta = async (_req: Request, res: Response) => {
+    res.status(200).json(await this.usuarioService.listarSinCuenta());
+  };
+
+  buscarPorEmail = async (req: Request, res: Response) => {
+    const { email } = porEmailSchema.parse(req.query);
+    res.status(200).json(await this.usuarioService.buscarPorEmail(email));
+  };
+
+  crearCuenta = async (req: Request, res: Response) => {
+    const datos = crearCuentaSchema.parse(req.body);
+    res.status(201).json(await this.usuarioService.crearCuenta(datos));
   };
 
   listarUsuarios = async (_req: Request, res: Response) => {

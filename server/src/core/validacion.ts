@@ -10,6 +10,7 @@ export const MAX_BYTES_PASSWORD = 72;
 export const passwordNueva = z
   .string()
   .min(8, "La contraseña debe tener al menos 8 caracteres")
+  .refine((p) => p.trim() !== "", "La contraseña no puede ser solo espacios")
   .refine(
     (p) => Buffer.byteLength(p, "utf8") <= MAX_BYTES_PASSWORD,
     `La contraseña es demasiado larga: el máximo son ${MAX_BYTES_PASSWORD} caracteres (las tildes y la ñ cuentan doble)`,

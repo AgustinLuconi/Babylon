@@ -94,10 +94,10 @@ const unitOfWork = new PrismaUnitOfWork(prisma);
 const tablero = new TableroDeAnuncios<EventosDelSistema>();
 
 // --- Servicios ---
-const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, unitOfWork, tablero);
 const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
 const padreService = new PadreService(padreRepository, alumnoRepository, unitOfWork, tablero);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, unitOfWork, tablero);
+const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, padreRepository, padreService, profesorService, unitOfWork, tablero);
 const cuotaService = new CuotaService(cuotaRepository, alumnoRepository, cicloRepository, configuracionRepository, unitOfWork, tablero);
 const configuracionService = new ConfiguracionService(configuracionRepository, tablero);
 const alumnoService = new AlumnoService(

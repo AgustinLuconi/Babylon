@@ -5,14 +5,27 @@ import { config } from "../../core/config";
 import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
+import type { PadreRepository } from "../padres/padre.repository";
+import type { PadreService } from "../padres/padre.service";
+import type { Padre } from "../padres/padre.entity";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
+import type { ProfesorService } from "../profesores/profesor.service";
+import type { Profesor } from "../profesores/profesor.entity";
 import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "./usuario.eventos";
-import type { CambiarEstadoUsuarioInput, CredencialesInput, CrearAdministradorInput, CrearSecretarioInput } from "./usuario.schema";
+import type {
+  CambiarEstadoUsuarioInput,
+  CrearCuentaInput,
+  CredencialesInput,
+  CrearAdministradorInput,
+  CrearSecretarioInput,
+  FichaDePadreInput,
+  FichaDeProfesorInput,
+} from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
 const DIAS_DE_HISTORIAL_DE_SESIONES = 90;
@@ -20,6 +33,15 @@ const DIAS_DE_HISTORIAL_DE_SESIONES = 90;
 const HASH_DE_RELLENO = bcrypt.hashSync(randomUUID(), RONDAS_BCRYPT);
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
+
+// Una fila de la lista "Sin cuenta": un responsable o un profesor activo que todavía no tiene cuenta de acceso.
+export interface FilaSinCuenta {
+  clave: string; // "padre:<id>" o "profesor:<id>"
+  tipo: "padre" | "profesor";
+  fichaId: string;
+  nombre: string;
+  email: string | null;
+}
 
 // Lo que la persona ve de su propia cuenta (Mi cuenta).
 export interface DatosPropios {
@@ -68,6 +90,9 @@ export class UsuarioService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly sesionRepo: SesionRepository,
     private readonly profesorRepo: ProfesorRepository,
+    private readonly padreRepo: PadreRepository,
+    private readonly padreService: PadreService,
+    private readonly profesorService: ProfesorService,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
@@ -181,6 +206,101 @@ export class UsuarioService {
     });
     const { passwordHash: _passwordHash, ...sinPassword } = usuario;
     return sinPassword;
+  }
+
+  // Los responsables y los profesores activos que todavía no tienen cuenta (el administrador les crea una desde acá).
+  async listarSinCuenta(): Promise<FilaSinCuenta[]> {
+    const [padres, profesores] = await Promise.all([this.padreRepo.findAll(), this.profesorRepo.findAll()]);
+    const fila = (tipo: "padre" | "profesor", f: Padre | Profesor): FilaSinCuenta => ({
+      clave: `${tipo}:${f.id}`,
+      tipo,
+      fichaId: f.id,
+      nombre: `${f.nombre} ${f.apellido ?? ""}`.trim(),
+      email: f.email?.trim() ? f.email.trim() : null,
+    });
+    return [
+      ...padres.filter((p) => !p.usuarioId).map((p) => fila("padre", p)),
+      ...profesores.filter((p) => !p.usuarioId && p.estado === "activo").map((p) => fila("profesor", p)),
+    ].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
+
+  // Para avisarle al administrador, antes de guardar, que ese email ya tiene cuenta (se le va a agregar el rol).
+  async buscarPorEmail(email: string): Promise<{ id: string; nombre: string; roles: Rol[] } | null> {
+    const usuario = await this.usuarioRepo.findByEmail(email);
+    return usuario ? { id: usuario.id, nombre: usuario.nombre, roles: usuario.roles } : null;
+  }
+
+  // Crea una cuenta con uno o varios roles. Si el email ya es de una cuenta, no falla: le agrega los roles pedidos y le
+  // vincula las fichas (sin tocar su contraseña ni su nombre). El email de cada ficha pasa a ser el de la cuenta. Todo en una
+  // transacción: o queda la cuenta con sus fichas o no queda nada.
+  async crearCuenta(datos: CrearCuentaInput): Promise<{ usuario: UsuarioSinPassword; vinculada: boolean }> {
+    // El hash se calcula antes de abrir la transacción (bcrypt tarda ~100 ms y no hace falta tener la cuenta bloqueada).
+    const passwordHash = datos.password ? await bcrypt.hash(datos.password, RONDAS_BCRYPT) : null;
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      // Dos pedidos con el mismo email se hacen de a uno: el segundo ve la cuenta que creó el primero.
+      await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+      const existente = await this.usuarioRepo.findByEmail(datos.email, tx);
+      if (existente) {
+        const repetidos = datos.roles.filter((r) => existente.roles.includes(r));
+        if (repetidos.length > 0) throw new ConflictError(`Esa cuenta ya tiene el rol ${repetidos.join(", ")}`);
+        if (datos.padre && (await this.padreRepo.findByUsuarioId(existente.id, tx))) throw new ConflictError("Esa cuenta ya tiene un responsable vinculado");
+        if (datos.profesor && (await this.profesorRepo.findByUsuarioId(existente.id, tx))) throw new ConflictError("Esa cuenta ya tiene un profesor vinculado");
+      } else if (!passwordHash) {
+        const mensaje = "La contraseña es requerida para crear la cuenta";
+        throw new ValidationError(mensaje, { password: [mensaje] });
+      }
+
+      const padre = datos.padre ? await this.fichaDePadre(datos.padre, datos.email, tx) : null;
+      const profesor = datos.profesor ? await this.fichaDeProfesor(datos.profesor, datos.email, tx) : null;
+
+      let usuario: Usuario;
+      if (existente) {
+        usuario = await this.usuarioRepo.actualizarParcial(existente.id, { roles: [...existente.roles, ...datos.roles] }, tx);
+      } else {
+        // El nombre de una cuenta con ficha es el de la ficha (se cambia desde ella).
+        const nombre = padre ? `${padre.nombre} ${padre.apellido}` : profesor ? `${profesor.nombre} ${profesor.apellido ?? ""}`.trim() : (datos.nombre as string);
+        usuario = await this.usuarioRepo.create(
+          { id: randomUUID(), nombre, email: datos.email, passwordHash: passwordHash as string, roles: datos.roles, estado: "activo", fechaCreacion: new Date() },
+          tx,
+        );
+      }
+
+      if (padre) {
+        await this.padreRepo.vincularUsuario(padre.id, usuario.id, tx);
+        await this.padreRepo.actualizarParcial(padre.id, { email: datos.email }, tx);
+        await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [padre.id] } }, tx);
+      }
+      if (profesor) {
+        await this.profesorRepo.vincularUsuario(profesor.id, usuario.id, tx);
+        await this.profesorRepo.actualizarParcial(profesor.id, { email: datos.email }, tx);
+        await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [profesor.id] } }, tx);
+      }
+      await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: existente ? "edicion" : "alta", ids: { usuarioIds: [usuario.id] } }, tx);
+
+      const { passwordHash: _passwordHash, ...sinPassword } = usuario;
+      return { usuario: sinPassword, vinculada: existente !== null };
+    });
+  }
+
+  // La ficha de responsable que va a tener la cuenta: una sin cuenta (bloqueada mientras dura la transacción) o una nueva.
+  private async fichaDePadre(ref: FichaDePadreInput, email: string, tx: unknown): Promise<Padre> {
+    if ("nueva" in ref) return (await this.padreService.crearFichaEnTransaccion({ ...ref.nueva, email }, tx)).padre;
+    await this.usuarioRepo.bloquearCuenta(`ficha:padre:${ref.fichaId}`, tx);
+    const padre = await this.padreRepo.findById(ref.fichaId, tx);
+    if (!padre) throw new EntityNotFoundError("Padre", ref.fichaId);
+    if (padre.usuarioId) throw new ConflictError("Esa ficha ya tiene una cuenta");
+    return padre;
+  }
+
+  private async fichaDeProfesor(ref: FichaDeProfesorInput, email: string, tx: unknown): Promise<Profesor> {
+    if ("nueva" in ref) return (await this.profesorService.crearFichaEnTransaccion({ ...ref.nueva, email }, tx)).profesor;
+    await this.usuarioRepo.bloquearCuenta(`ficha:profesor:${ref.fichaId}`, tx);
+    const profesor = await this.profesorRepo.findById(ref.fichaId, tx);
+    if (!profesor) throw new EntityNotFoundError("Profesor", ref.fichaId);
+    if (profesor.usuarioId) throw new ConflictError("Esa ficha ya tiene una cuenta");
+    if (profesor.estado !== "activo") throw new ValidationError("El profesor está inactivo: reactivalo antes de crearle una cuenta");
+    return profesor;
   }
 
   async listarUsuarios(): Promise<UsuarioSinPassword[]> {
