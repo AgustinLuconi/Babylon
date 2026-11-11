@@ -1,0 +1,22 @@
+import { crearLectorSse, type SenalEnVivo } from "../../client/src/core/tiempoReal/lectorSse";
+import { ok } from "./_check";
+
+const recibidas: SenalEnVivo[] = [];
+const leer = crearLectorSse((s) => recibidas.push(s));
+leer("event: listo\ndata: {}\n\n");
+ok("una señal completa", JSON.stringify(recibidas.at(-1)), '{"tipo":"listo","datos":{}}');
+leer("event: notificaciones\nda");
+ok("a medias no se entrega", recibidas.length, 1);
+leer('ta: {"noLeidas":3}\n');
+ok("sin la línea en blanco tampoco", recibidas.length, 1);
+leer("\n");
+ok("al completarse se entrega", JSON.stringify(recibidas.at(-1)), '{"tipo":"notificaciones","datos":{"noLeidas":3}}');
+leer(": latido\n\n");
+ok("el latido no es una señal", recibidas.length, 2);
+leer("event: a\ndata: {}\n\nevent: b\ndata: {}\n\n");
+ok("dos señales en un mismo trozo", recibidas.slice(-2).map((s) => s.tipo).join(), "a,b");
+leer("data: texto\n\n");
+ok("sin 'event' es 'message'", recibidas.at(-1)?.tipo, "message");
+ok("datos que no son JSON quedan como texto", recibidas.at(-1)?.datos, "texto");
+leer("event: c\r\ndata: {}\r\n\r\n");
+ok("también con fin de línea \\r\\n", recibidas.at(-1)?.tipo, "c");

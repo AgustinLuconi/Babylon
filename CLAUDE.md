@@ -31,7 +31,7 @@ pnpm prisma:seed      # datos de desarrollo (admin/secretario/profesor/padre + c
 ```bash
 pnpm test             # pruebas puras versionadas en server/tests/ (ejecutor incluido en Node, vía tsx --test)
 ```
-`pnpm test` solo cubre **funciones puras** (validadores, criterios, reconciliaciones): no hay Jest ni Vitest. Los módulos puros del client que lo necesitan se prueban desde `server/tests/` importándolos por ruta relativa (por eso no pueden usar el alias `@/`); la tabla de casos de `server/tests/casos-validacion.ts` corre contra la copia del server **y** la del client de cada regla. Las verificaciones con base de datos o por HTTP siguen siendo scripts `server/scripts/_*.ts` locales y sin versionar.
+Las verificaciones con base de datos y de navegador están versionadas en `pruebas/` (ver `pruebas/README.md`). `pnpm test` solo cubre **funciones puras** (validadores, criterios, reconciliaciones): no hay Jest ni Vitest. Los módulos puros del client que lo necesitan se prueban desde `server/tests/` importándolos por ruta relativa (por eso no pueden usar el alias `@/`); la tabla de casos de `server/tests/casos-validacion.ts` corre contra la copia del server **y** la del client de cada regla. Las verificaciones con base de datos o por HTTP son los scripts `server/scripts/_*.ts` de la batería (versionados con `git add -f`: `.git/info/exclude` los ignora en cada compu) y los recorridos de navegador de `pruebas/recorridos/`.
 
 ### client/ (SPA)
 ```bash
