@@ -66,6 +66,7 @@ reales / restos de prueba / valor de cuota). Debe decir `3/148/0/null`.
 
 | Recorrido | Cubre |
 |---|---|
+| `e2e-cuentas-admin` | Cuentas administradas: Sin cuenta → Crear cuenta (email autocompletado), ingreso de la familia, editar contraseña y roles, Crear usuario, aviso de email existente, y que no queda recuperación ni cambio propio |
 | `e2e-chat-editar` | Corregir y eliminar mensajes del chat, quién puede, plazo de 15 minutos |
 | `e2e-chat-detalles`, `e2e-chat-revision` | Chat en vivo: "Visto", no leídos, reintentos, conversación nueva |
 | `e2e-3bc-vivo` | Lo en vivo de 3b y 3c: avisos del chat y "quién hizo qué" |

@@ -19,7 +19,7 @@ export interface MensajesPaginados {
   anteriores: string | null;
 }
 
-// Si el padre puede leer la conversación: con cuenta activa sí; sin cuenta o con la invitación pendiente, cuando entre;
+// Si el padre puede leer la conversación: con cuenta activa sí; sin cuenta, cuando el administrador se la cree;
 // con la cuenta desactivada, no puede entrar al sistema hasta que se reactive.
 export type EstadoCuentaPadre = "activa" | "inactiva" | "sin-cuenta";
 

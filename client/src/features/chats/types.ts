@@ -11,10 +11,10 @@ export interface ChatConNoLeidos extends Chat {
   noLeidos: number;
 }
 
-// Lo que devuelve "Nueva conversación": si el padre todavía no tiene cuenta activa, va a verla cuando entre.
-// Si el padre puede leer la conversación: con cuenta activa sí; sin cuenta o con la invitación pendiente, cuando entre;
+// Lo que devuelve "Nueva conversación": si el padre todavía no tiene cuenta activa, va a verla cuando tenga acceso.
+// Si el padre puede leer la conversación: con cuenta activa sí; sin cuenta, cuando el administrador se la cree;
 // con la cuenta desactivada no puede entrar al sistema hasta que se reactive.
-export type EstadoCuentaPadre = "activa" | "pendiente" | "inactiva" | "sin-cuenta";
+export type EstadoCuentaPadre = "activa" | "inactiva" | "sin-cuenta";
 
 export interface ConversacionIniciada extends Chat {
   estadoCuenta: EstadoCuentaPadre;
