@@ -43,4 +43,6 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
   // Un mensaje nuevo o una conversación leída cambian los avisos de los dos lados.
   tablero.alPublicarse("chat.mensaje", sincronizar(["mensajes_familia", "mensajes_instituto"]));
   tablero.alPublicarse("chat.leido", sincronizar(["mensajes_familia", "mensajes_instituto"]));
+  // Un mensaje eliminado deja de contar como sin leer.
+  tablero.alPublicarse("chat.eliminado", sincronizar(["mensajes_familia", "mensajes_instituto"]));
 }

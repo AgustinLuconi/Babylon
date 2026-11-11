@@ -8,6 +8,7 @@ import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { BurbujaMensaje } from "../components/BurbujaMensaje";
 import { VerAnteriores } from "../components/VerAnteriores";
 import { useDesplazamientoDelChat } from "../hooks/useDesplazamientoDelChat";
+import { useCorregirMensaje } from "../hooks/useCorregirMensaje";
 import { useEnviarMensaje } from "../hooks/useEnviarMensaje";
 import { useMensajes } from "../hooks/useMensajes";
 import { useMarcarLeidoSiMira } from "../hooks/useMarcarLeidoSiMira";
@@ -18,6 +19,8 @@ export default function ChatPage() {
   const { data: chat } = useMiChat();
   const { mensajes: lista, listo, hayAnteriores, cargarAnteriores, cargandoAnteriores } = useMensajes(chat?.id);
   const enviarMensaje = useEnviarMensaje(chat?.id);
+  const { editar, eliminar } = useCorregirMensaje(chat?.id);
+  const acciones = { editar: (mensajeId: string, texto: string) => editar.mutateAsync({ mensajeId, texto }), eliminar: (mensajeId: string) => eliminar.mutateAsync(mensajeId) };
   const visto = vistoDelUltimo(lista, false);
   useMarcarLeidoSiMira({ chatId: chat?.id, mensajes: lista, soyInstituto: false, hayAnteriores, totalSinVer: chat?.noLeidos ?? 0 });
   const scrollRef = useDesplazamientoDelChat(lista);
@@ -47,7 +50,7 @@ export default function ChatPage() {
         {lista.map((m, i) => {
           const mio = m.rolEmisor === "padre";
           const etiqueta = mio ? undefined : `${m.rolEmisor === "admin" ? "Dirección" : "Secretaría"}${m.emisorNombre ? ` — ${m.emisorNombre}` : ""}`;
-          return <BurbujaMensaje key={m.id} mensaje={m} mio={mio} etiqueta={etiqueta} visto={i === lista.length - 1 ? visto : null} />;
+          return <BurbujaMensaje key={m.id} mensaje={m} mio={mio} etiqueta={etiqueta} visto={i === lista.length - 1 ? visto : null} acciones={acciones} />;
         })}
       </div>
       <div className="flex items-center gap-2 px-4 py-3" style={{ borderTop: "1px solid var(--border-hex)" }}>

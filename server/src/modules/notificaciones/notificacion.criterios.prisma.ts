@@ -291,7 +291,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
   // ── Chat ─────────────────────────────────────────────────────────────────
   // Bandeja compartida: un aviso por conversación con mensajes de la familia sin ver, para cada cuenta del instituto.
   private async mensajesDeFamilias(tx?: unknown): Promise<AvisoEsperado[]> {
-    const grupos = await this.db(tx).mensaje.groupBy({ by: ["chatId"], where: { rolEmisor: "padre", vistoEn: null }, _count: { _all: true } });
+    const grupos = await this.db(tx).mensaje.groupBy({ by: ["chatId"], where: { rolEmisor: "padre", vistoEn: null, eliminadoEn: null }, _count: { _all: true } });
     if (grupos.length === 0) return [];
     const chats = await this.db(tx).chat.findMany({
       where: { id: { in: grupos.map((g) => g.chatId) } },
@@ -319,7 +319,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     const cuentas = await this.cuentasDePadres(tx);
     const grupos = await this.db(tx).mensaje.groupBy({
       by: ["chatId"],
-      where: { rolEmisor: { in: ["admin", "secretario"] }, vistoEn: null, chat: { padreId: { in: [...cuentas.keys()] } } },
+      where: { rolEmisor: { in: ["admin", "secretario"] }, vistoEn: null, eliminadoEn: null, chat: { padreId: { in: [...cuentas.keys()] } } },
       _count: { _all: true },
     });
     if (grupos.length === 0) return [];

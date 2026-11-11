@@ -6,13 +6,13 @@ const esDelInstituto = (m: Mensaje) => m.rolEmisor !== "padre";
 // vio. Devuelve la hora en que se vio (ISO) o null. Cuando el otro responde, el último deja de ser propio y no hay Visto.
 export function vistoDelUltimo(mensajes: Mensaje[], soyInstituto: boolean): string | null {
   const ultimo = mensajes.at(-1);
-  if (!ultimo || esDelInstituto(ultimo) !== soyInstituto) return null;
+  if (!ultimo || ultimo.eliminadoEn || esDelInstituto(ultimo) !== soyInstituto) return null;
   return ultimo.vistoEn;
 }
 
-// Los mensajes del otro lado que quien mira todavía no vio.
+// Los mensajes del otro lado que quien mira todavía no vio (uno eliminado ya no cuenta).
 export function noLeidos(mensajes: Mensaje[], soyInstituto: boolean): Mensaje[] {
-  return mensajes.filter((m) => esDelInstituto(m) !== soyInstituto && m.vistoEn === null);
+  return mensajes.filter((m) => esDelInstituto(m) !== soyInstituto && m.vistoEn === null && !m.eliminadoEn);
 }
 
 // ¿Hay mensajes del otro lado que quien mira todavía no vio?

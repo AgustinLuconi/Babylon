@@ -17,6 +17,9 @@ const aMensaje = (fila: { rolEmisor: string } & Omit<Mensaje, "rolEmisor">): Men
 const delOtroLado = (lector: Lector): Prisma.MensajeWhereInput =>
   lector === "instituto" ? { rolEmisor: "padre" } : { rolEmisor: { in: ["admin", "secretario"] } };
 
+// Lo que todavía hay para leer: del otro lado, sin ver y sin eliminar (uno eliminado ya no cuenta).
+const sinLeer = (lector: Lector): Prisma.MensajeWhereInput => ({ vistoEn: null, eliminadoEn: null, ...delOtroLado(lector) });
+
 export class PrismaChatRepository implements ChatRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -61,6 +64,21 @@ export class PrismaChatRepository implements ChatRepository {
     return aMensaje(fila);
   }
 
+  async findMensajeById(id: string, tx?: unknown): Promise<Mensaje | null> {
+    const fila = await this.client(tx).mensaje.findUnique({ where: { id } });
+    return fila ? aMensaje(fila) : null;
+  }
+
+  async corregirMensaje(id: string, texto: string, ahora: Date, tx?: unknown): Promise<boolean> {
+    const { count } = await this.client(tx).mensaje.updateMany({ where: { id, eliminadoEn: null }, data: { texto, editadoEn: ahora } });
+    return count > 0;
+  }
+
+  async eliminarMensaje(id: string, ahora: Date, tx?: unknown): Promise<boolean> {
+    const { count } = await this.client(tx).mensaje.updateMany({ where: { id, eliminadoEn: null }, data: { texto: "", eliminadoEn: ahora } });
+    return count > 0;
+  }
+
   async findPaginaDeMensajes(chatId: string, { antesDe, limite }: PaginaDeMensajes, tx?: unknown): Promise<Mensaje[]> {
     // Marcador por valor (fecha + id): aunque lleguen mensajes nuevos entre página y página, no se repite ni se saltea.
     const anteriores: Prisma.MensajeWhereInput = antesDe
@@ -86,11 +104,11 @@ export class PrismaChatRepository implements ChatRepository {
   }
 
   async contarNoVistos(chatId: string, lector: Lector, tx?: unknown): Promise<number> {
-    return this.client(tx).mensaje.count({ where: { chatId, vistoEn: null, ...delOtroLado(lector) } });
+    return this.client(tx).mensaje.count({ where: { chatId, ...sinLeer(lector) } });
   }
 
   async contarConversacionesConNoVistos(tx?: unknown): Promise<number> {
-    return this.client(tx).chat.count({ where: { mensajes: { some: { vistoEn: null, ...delOtroLado("instituto") } } } });
+    return this.client(tx).chat.count({ where: { mensajes: { some: sinLeer("instituto") } } });
   }
 
   async findResumenes(tx?: unknown): Promise<ResumenChat[]> {
@@ -102,7 +120,7 @@ export class PrismaChatRepository implements ChatRepository {
           mensajes: { orderBy: { fecha: "desc" }, take: 1 },
         },
       }),
-      db.mensaje.groupBy({ by: ["chatId"], where: { vistoEn: null, ...delOtroLado("instituto") }, _count: { _all: true } }),
+      db.mensaje.groupBy({ by: ["chatId"], where: sinLeer("instituto"), _count: { _all: true } }),
     ]);
     const noLeidos = new Map(sinVer.map((g) => [g.chatId, g._count._all]));
     const resumenes: ResumenChat[] = chats.map((c) => {
@@ -112,7 +130,9 @@ export class PrismaChatRepository implements ChatRepository {
         padreId: c.padreId,
         padreNombre: `${c.padre.nombre} ${c.padre.apellido}`,
         hijos: c.padre.alumnos.map((a) => `${a.nombre} ${a.apellido}`),
-        ultimoMensaje: ultimo ? { texto: ultimo.texto, fecha: ultimo.fecha, delInstituto: ultimo.rolEmisor !== "padre" } : null,
+        ultimoMensaje: ultimo
+          ? { texto: ultimo.texto, fecha: ultimo.fecha, delInstituto: ultimo.rolEmisor !== "padre", eliminado: ultimo.eliminadoEn !== null }
+          : null,
         noLeidos: noLeidos.get(c.id) ?? 0,
         creadoEn: c.creadoEn,
       };

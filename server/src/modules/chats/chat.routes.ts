@@ -13,6 +13,8 @@ export function chatRoutes(controller: ChatController): Router {
   router.get("/no-leidos", authMiddleware, participantes, controller.noLeidos);
   router.get("/:id/mensajes", authMiddleware, participantes, controller.listarMensajes);
   router.post("/:id/mensajes", authMiddleware, participantes, controller.enviarMensaje);
+  router.patch("/:id/mensajes/:mensajeId", authMiddleware, participantes, controller.editarMensaje);
+  router.delete("/:id/mensajes/:mensajeId", authMiddleware, participantes, controller.eliminarMensaje);
   router.post("/:id/leido", authMiddleware, participantes, controller.marcarLeido);
 
   return router;

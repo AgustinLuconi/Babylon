@@ -32,7 +32,8 @@ export interface ResumenChat {
   padreId: string;
   padreNombre: string;
   hijos: string[];
-  ultimoMensaje: { texto: string; fecha: string; delInstituto: boolean } | null;
+  // Un último mensaje eliminado llega sin texto y con `eliminado`.
+  ultimoMensaje: { texto: string; fecha: string; delInstituto: boolean; eliminado: boolean } | null;
   noLeidos: number;
   creadoEn: string;
 }
@@ -52,6 +53,9 @@ export interface Mensaje {
   fecha: string;
   // Cuándo lo vio el otro lado (null = todavía no).
   vistoEn: string | null;
+  // Cuándo se corrigió por última vez / cuándo se eliminó (null = nunca). Uno eliminado llega sin texto.
+  editadoEn: string | null;
+  eliminadoEn: string | null;
   // Solo viene al listar los mensajes de una conversación.
   emisorNombre?: string;
 }

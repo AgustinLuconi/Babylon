@@ -10,7 +10,8 @@ export interface ResumenChat {
   padreId: string;
   padreNombre: string;
   hijos: string[];
-  ultimoMensaje: { texto: string; fecha: Date; delInstituto: boolean } | null;
+  // Un último mensaje eliminado llega sin texto y con `eliminado`.
+  ultimoMensaje: { texto: string; fecha: Date; delInstituto: boolean; eliminado: boolean } | null;
   // Mensajes de la familia que el instituto todavía no vio.
   noLeidos: number;
   creadoEn: Date;

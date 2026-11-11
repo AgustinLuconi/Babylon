@@ -9,7 +9,13 @@ export interface Mensaje {
   fecha: Date;
   // Cuándo lo vio el otro lado (null = todavía no).
   vistoEn: Date | null;
+  // Cuándo se corrigió por última vez y cuándo se eliminó (null = nunca). Un mensaje eliminado queda sin texto.
+  editadoEn: Date | null;
+  eliminadoEn: Date | null;
 }
+
+// Cuánto después de enviarlo se puede corregir o eliminar un mensaje (desde el envío: corregirlo no renueva el plazo).
+export const MINUTOS_PARA_CORREGIR = 15;
 
 // Quién lee una conversación: el instituto (cualquier cuenta de administración o secretaría, bandeja compartida) o la
 // familia. Leer marca solo los mensajes del otro lado.
