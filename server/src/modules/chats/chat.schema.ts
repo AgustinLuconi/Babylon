@@ -3,6 +3,8 @@ import { textoRequerido } from "../../core/validacion";
 
 export const enviarMensajeSchema = z.object({ texto: textoRequerido("El mensaje", 2000) }).strict();
 
+export const corregirMensajeSchema = enviarMensajeSchema;
+
 export const iniciarConversacionSchema = z.object({ padreId: z.string().min(1) }).strict();
 // Lo que quien lee tenía en pantalla: los ids de los mensajes y, si hay páginas anteriores sin cargar, la fecha del más
 // viejo cargado (`antesDe`). Sin nada, se marca todo.

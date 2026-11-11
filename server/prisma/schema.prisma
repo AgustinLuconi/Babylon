@@ -414,6 +414,10 @@ model Mensaje {
   // Cuándo lo vio el otro lado (nulo = todavía no). La bandeja del instituto es compartida: lo marca cualquier cuenta
   // de administración o secretaría que lee la conversación.
   vistoEn   DateTime?
+  // Corregido (cuándo fue la última corrección) o eliminado: al eliminarlo el texto se borra de la base y queda el aviso.
+  // Se puede corregir o eliminar hasta 15 minutos después de `fecha`.
+  editadoEn   DateTime?
+  eliminadoEn DateTime?
 
   chat Chat @relation(fields: [chatId], references: [id])
 

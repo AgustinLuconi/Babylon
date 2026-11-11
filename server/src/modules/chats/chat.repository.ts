@@ -5,6 +5,11 @@ import type { AlcanceLectura, Lector, Mensaje, PaginaDeMensajes } from "./mensaj
 export interface ChatRepository extends Repository<Chat> {
   findByPadreId(padreId: string, tx?: unknown): Promise<Chat | null>;
   agregarMensaje(mensaje: Mensaje, tx?: unknown): Promise<Mensaje>;
+  findMensajeById(id: string, tx?: unknown): Promise<Mensaje | null>;
+  // Cambia el texto de un mensaje que no fue eliminado. Devuelve false si ya estaba eliminado (no escribe nada).
+  corregirMensaje(id: string, texto: string, ahora: Date, tx?: unknown): Promise<boolean>;
+  // Borra el texto y deja la marca de eliminado. Devuelve false si ya estaba eliminado.
+  eliminarMensaje(id: string, ahora: Date, tx?: unknown): Promise<boolean>;
   // Los mensajes de una página, del más reciente al más viejo (por fecha e id).
   findPaginaDeMensajes(chatId: string, pagina: PaginaDeMensajes, tx?: unknown): Promise<Mensaje[]>;
   // Marca vistos (con `ahora`) los mensajes del otro lado que el lector todavía no vio: todos o, con `alcance`, solo los

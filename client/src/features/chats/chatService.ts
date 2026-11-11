@@ -10,6 +10,10 @@ export const chatService = {
   listarMensajes: (chatId: string, antesDe?: string) =>
     apiClient.get<MensajesPaginados>(`/api/chats/${chatId}/mensajes${antesDe ? `?${new URLSearchParams({ antesDe })}` : ""}`),
   enviarMensaje: (chatId: string, datos: EnviarMensajeInput) => apiClient.post<Mensaje>(`/api/chats/${chatId}/mensajes`, datos),
+  editarMensaje: ({ chatId, mensajeId, texto }: { chatId: string; mensajeId: string; texto: string }) =>
+    apiClient.patch<void>(`/api/chats/${chatId}/mensajes/${mensajeId}`, { texto }),
+  eliminarMensaje: ({ chatId, mensajeId }: { chatId: string; mensajeId: string }) =>
+    apiClient.delete<void>(`/api/chats/${chatId}/mensajes/${mensajeId}`),
   // Lo que había en pantalla: los ids de los mensajes sin ver y, si hay páginas anteriores sin cargar, la fecha del más
   // viejo cargado (lo anterior también queda leído). Lo que llegó después no se marca.
   marcarLeido: ({ chatId, ids, antesDe }: { chatId: string; ids: string[]; antesDe?: string }) =>

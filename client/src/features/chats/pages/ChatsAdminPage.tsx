@@ -12,6 +12,7 @@ import { BurbujaMensaje } from "../components/BurbujaMensaje";
 import { VerAnteriores } from "../components/VerAnteriores";
 import { useDesplazamientoDelChat } from "../hooks/useDesplazamientoDelChat";
 import { useChats } from "../hooks/useChats";
+import { useCorregirMensaje } from "../hooks/useCorregirMensaje";
 import { useEnviarMensaje } from "../hooks/useEnviarMensaje";
 import { useMarcarLeidoSiMira } from "../hooks/useMarcarLeidoSiMira";
 import { useMensajes } from "../hooks/useMensajes";
@@ -38,6 +39,8 @@ export default function ChatsAdminPage() {
 
   const { mensajes: lista, listo, hayAnteriores, cargarAnteriores, cargandoAnteriores } = useMensajes(selectedId);
   const enviarMensaje = useEnviarMensaje(selectedId);
+  const { editar, eliminar } = useCorregirMensaje(selectedId);
+  const acciones = { editar: (mensajeId: string, texto: string) => editar.mutateAsync({ mensajeId, texto }), eliminar: (mensajeId: string) => eliminar.mutateAsync(mensajeId) };
   // El borrador es de una conversación: al cambiar a otra no se lleva (un mensaje escrito para una familia nunca debe
   // terminar enviado a otra).
   const [borrador, setBorrador] = useState({ chatId: selectedId, texto: "" });
@@ -94,7 +97,9 @@ export default function ChatsAdminPage() {
                 <p className="mt-0.5 truncate text-[10.5px] text-muted-foreground">{r.hijos.join(" · ") || "—"}</p>
                 <div className="mt-1 flex items-center gap-2">
                   <p className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
-                    {r.ultimoMensaje ? `${r.ultimoMensaje.delInstituto ? "Vos: " : ""}${r.ultimoMensaje.texto}` : "Sin mensajes todavía"}
+                    {r.ultimoMensaje
+                      ? `${r.ultimoMensaje.delInstituto ? "Vos: " : ""}${r.ultimoMensaje.eliminado ? "Se eliminó este mensaje" : r.ultimoMensaje.texto}`
+                      : "Sin mensajes todavía"}
                   </p>
                   {r.noLeidos > 0 && (
                     <span
@@ -144,6 +149,8 @@ export default function ChatsAdminPage() {
                   mio={mio}
                   etiqueta={mio ? undefined : seleccionada.padreNombre}
                   visto={i === lista.length - 1 ? visto : null}
+                  acciones={acciones}
+                  soyInstituto
                 />
               );
             })}

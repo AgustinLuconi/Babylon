@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AuthorizationError, EntityNotFoundError, ValidationError } from "../../core/errors";
+import { AuthorizationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import { sinAnuncios } from "../../core/eventos";
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import type { PadreRepository } from "../padres/padre.repository";
@@ -7,7 +7,7 @@ import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { Chat, ResumenChat } from "./chat.entity";
 import type { EventosChats } from "./chat.eventos";
 import type { ChatRepository } from "./chat.repository";
-import type { AlcanceLectura, Lector, Mensaje, RolEmisorMensaje } from "./mensaje.entity";
+import { MINUTOS_PARA_CORREGIR, type AlcanceLectura, type Lector, type Mensaje, type RolEmisorMensaje } from "./mensaje.entity";
 
 export interface MensajeConEmisor extends Mensaje {
   emisorNombre: string;
@@ -105,12 +105,54 @@ export class ChatService {
   ): Promise<Mensaje> {
     const chat = await this.verificarAccesoAlChat(chatId, padreIdSolicitante);
     const usuarioIdPadre = await this.cuentaDelPadre(chat.padreId);
-    const mensaje: Mensaje = { id: randomUUID(), chatId, emisorId, rolEmisor, texto, fecha: new Date(), vistoEn: null };
+    const mensaje: Mensaje = { id: randomUUID(), chatId, emisorId, rolEmisor, texto, fecha: new Date(), vistoEn: null, editadoEn: null, eliminadoEn: null };
     return this.unitOfWork.runInTransaction(async (tx) => {
       const guardado = await this.chatRepo.agregarMensaje(mensaje, tx);
       await this.anuncios.publicar("chat.mensaje", { chatId, padreId: chat.padreId, usuarioIdPadre }, tx);
       return guardado;
     });
+  }
+
+  // Corrige el texto de un mensaje propio (la familia, el suyo; el instituto, cualquiera del instituto) dentro del plazo.
+  // Si el texto no cambia no hace nada. Se anuncia: la otra parte lo ve cambiar y los avisos se ponen al día.
+  async editarMensaje(chatId: string, mensajeId: string, texto: string, rol: RolEmisorMensaje, padreIdSolicitante?: string): Promise<void> {
+    const chat = await this.verificarAccesoAlChat(chatId, padreIdSolicitante);
+    const usuarioIdPadre = await this.cuentaDelPadre(chat.padreId);
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      const mensaje = await this.mensajeEditable(chatId, mensajeId, rol, tx);
+      if (mensaje.texto === texto) return;
+      if (!(await this.chatRepo.corregirMensaje(mensajeId, texto, new Date(), tx))) throw new ConflictError("El mensaje ya fue eliminado");
+      await this.anuncios.publicar("chat.editado", { chatId, padreId: chat.padreId, usuarioIdPadre }, tx);
+    });
+  }
+
+  // Elimina un mensaje propio dentro del plazo: queda "Se eliminó este mensaje" y el texto se borra. Eliminar uno ya
+  // eliminado no hace nada.
+  async eliminarMensaje(chatId: string, mensajeId: string, rol: RolEmisorMensaje, padreIdSolicitante?: string): Promise<void> {
+    const chat = await this.verificarAccesoAlChat(chatId, padreIdSolicitante);
+    const usuarioIdPadre = await this.cuentaDelPadre(chat.padreId);
+    await this.unitOfWork.runInTransaction(async (tx) => {
+      const mensaje = await this.chatRepo.findMensajeById(mensajeId, tx);
+      if (mensaje?.chatId === chatId && mensaje.eliminadoEn) return;
+      await this.mensajeEditable(chatId, mensajeId, rol, tx);
+      if (await this.chatRepo.eliminarMensaje(mensajeId, new Date(), tx)) {
+        await this.anuncios.publicar("chat.eliminado", { chatId, padreId: chat.padreId, usuarioIdPadre }, tx);
+      }
+    });
+  }
+
+  // El mensaje, si quien pide puede tocarlo: es de esa conversación, es de su lado, no fue eliminado y está en plazo.
+  private async mensajeEditable(chatId: string, mensajeId: string, rol: RolEmisorMensaje, tx: unknown): Promise<Mensaje> {
+    const mensaje = await this.chatRepo.findMensajeById(mensajeId, tx);
+    if (!mensaje || mensaje.chatId !== chatId) throw new EntityNotFoundError("Mensaje", mensajeId);
+    if ((mensaje.rolEmisor === "padre") !== (rol === "padre")) {
+      throw new AuthorizationError("Solo se pueden corregir o eliminar los mensajes de tu lado de la conversación");
+    }
+    if (mensaje.eliminadoEn) throw new ConflictError("El mensaje ya fue eliminado");
+    if (Date.now() - mensaje.fecha.getTime() > MINUTOS_PARA_CORREGIR * 60_000) {
+      throw new ConflictError(`Pasaron más de ${MINUTOS_PARA_CORREGIR} minutos desde que se envió el mensaje`);
+    }
+    return mensaje;
   }
 
   // Marca leídos los mensajes del otro lado: los que quien lee tenía en pantalla (`alcance`; sin él, todos). Si no había

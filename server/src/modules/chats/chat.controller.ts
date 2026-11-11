@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { PadreService } from "../padres/padre.service";
-import { enviarMensajeSchema, iniciarConversacionSchema, marcarLeidoSchema, paginaDeMensajesSchema } from "./chat.schema";
+import { corregirMensajeSchema, enviarMensajeSchema, iniciarConversacionSchema, marcarLeidoSchema, paginaDeMensajesSchema } from "./chat.schema";
 import type { ChatService } from "./chat.service";
 import type { Lector, RolEmisorMensaje } from "./mensaje.entity";
 
@@ -57,6 +57,19 @@ export class ChatController {
     const rolEmisor = req.auth!.rol as RolEmisorMensaje;
     const mensaje = await this.chatService.enviarMensaje(String(req.params.id), datos.texto, req.auth!.sub, rolEmisor, padreId);
     res.status(201).json(mensaje);
+  };
+
+  editarMensaje = async (req: Request, res: Response) => {
+    const { texto } = corregirMensajeSchema.parse(req.body);
+    const padreId = await this.resolverPadreIdSiCorresponde(req);
+    await this.chatService.editarMensaje(String(req.params.id), String(req.params.mensajeId), texto, req.auth!.rol as RolEmisorMensaje, padreId);
+    res.status(204).end();
+  };
+
+  eliminarMensaje = async (req: Request, res: Response) => {
+    const padreId = await this.resolverPadreIdSiCorresponde(req);
+    await this.chatService.eliminarMensaje(String(req.params.id), String(req.params.mensajeId), req.auth!.rol as RolEmisorMensaje, padreId);
+    res.status(204).end();
   };
 
   marcarLeido = async (req: Request, res: Response) => {
