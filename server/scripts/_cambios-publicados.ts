@@ -137,22 +137,24 @@ async function limpiarCreados(): Promise<void> {
   ok("autorización manual", resumen(del(await tras(() => pedir("PATCH", `/api/documentos/alumnos/${m.hijo1}/autorizacion-imagen/manual`, secre)), "documentos")), "documentos/manual alumnoIds=hijo1");
 
   // Padres, profesores, usuarios, configuración y ciclos
-  const padreNuevo = await tras(() => pedir<{ padre: { id: string } }>("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Padrenuevo", dni: "99400092", telefono: "351 555-1234", email: email("padrenuevo"), password: "prueba1234" }));
+  const padreNuevo = await tras(() => pedir<{ padre: { id: string } }>("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Padrenuevo", dni: "99400092", telefono: "351 555-1234", email: email("padrenuevo") }));
   const padreNuevoId = padreNuevo.r.d.padre?.id ?? (padreNuevo.r.d as unknown as { id: string }).id;
   ok("alta de padre", resumen(del(padreNuevo, "padres")), `padres/alta padreIds=${padreNuevoId}`);
   ok("edición de padre", resumen(del(await tras(() => pedir("PATCH", `/api/padres/${padreNuevoId}`, secre, { telefono: "351 555-1234" })), "padres")), `padres/edicion padreIds=${padreNuevoId}`);
-  const profNuevo = await tras(() => pedir<{ profesor: { id: string } }>("POST", "/api/profesores", admin, { nombre: "Pruebaav", apellido: "Profenuevo", dni: "99400093", email: email("profenuevo"), password: "prueba1234" }));
+  const profNuevo = await tras(() => pedir<{ profesor: { id: string } }>("POST", "/api/profesores", admin, { nombre: "Pruebaav", apellido: "Profenuevo", dni: "99400093", email: email("profenuevo") }));
   const profNuevoId = profNuevo.r.d.profesor?.id ?? (profNuevo.r.d as unknown as { id: string }).id;
   ok("alta de profesor", resumen(del(profNuevo, "profesores")), `profesores/alta profesorIds=${profNuevoId}`);
   ok("edición de profesor", resumen(del(await tras(() => pedir("PATCH", `/api/profesores/${profNuevoId}`, admin, { telefono: "351 555-1234" })), "profesores")), `profesores/edicion profesorIds=${profNuevoId}`);
   const secreNueva = await tras(() => pedir<{ id: string }>("POST", "/api/auth/secretarios", admin, { nombre: "Pruebaav Secrenueva", email: email("secrenueva"), password: "prueba1234" }));
   ok("alta de secretaria", resumen(del(secreNueva, "usuarios")), `usuarios/alta usuarioIds=${secreNueva.r.d.id}`);
   ok("cambio de estado de una cuenta", resumen(del(await tras(() => pedir("PATCH", `/api/auth/usuarios/${secreNueva.r.d.id}/estado`, admin, { estado: "inactivo" })), "usuarios")), `usuarios/estado usuarioIds=${secreNueva.r.d.id}`);
-  await prisma.padre.create({ data: { id: `${P}-invitado`, nombre: "Pruebaav", apellido: "Invitado", dni: "99400094", email: email("invitado") } });
-  const inv = await tras(() => pedir<{ resultados: { usuarioId?: string }[] }>("POST", "/api/auth/invitaciones", admin, { padreIds: [`${P}-invitado`] }));
-  ok("invitar", del(inv, "usuarios")?.accion, "invitacion");
-  const invitadoId = (await prisma.padre.findUnique({ where: { id: `${P}-invitado` } }))?.usuarioId as string;
-  ok("cancelar la invitación", resumen(del(await tras(() => pedir("DELETE", `/api/auth/invitaciones/${invitadoId}`, admin)), "usuarios")), `usuarios/invitacion usuarioIds=${invitadoId}`);
+  await prisma.padre.create({ data: { id: `${P}-invitado`, nombre: "Pruebaav", apellido: "Invitado", dni: "99400094", telefono: "+5493515551234", email: email("invitado") } });
+  const cuentaNueva = await tras(() => pedir<{ usuario: { id: string } }>("POST", "/api/auth/cuentas", admin, { email: email("invitado"), password: "prueba1234", roles: ["padre"], padre: { fichaId: `${P}-invitado` } }));
+  const cuentaId = cuentaNueva.r.d.usuario?.id as string;
+  ok("crear cuenta", resumen(del(cuentaNueva, "usuarios")), `usuarios/alta usuarioIds=${cuentaId}`);
+  ok("crear cuenta: la ficha también cambió", resumen(del(cuentaNueva, "padres")), `padres/edicion padreIds=invitado`);
+  const inv = cuentaNueva;
+  ok("editar cuenta", resumen(del(await tras(() => pedir("PATCH", `/api/auth/usuarios/${cuentaId}`, admin, { password: "otraclave123" })), "usuarios")), `usuarios/edicion usuarioIds=${cuentaId}`);
   ok("a la familia no le llega nada de cuentas", inv.alPadre.length, 0);
   ok("configuración", resumen(del(await tras(() => pedir("PATCH", "/api/configuracion", admin, { valorCuota: 1234 })), "configuracion")), "configuracion/edicion ");
   // El valor vuelve a estar vacío enseguida: con un valor cargado, la tarea automática generaría cuotas de prueba.

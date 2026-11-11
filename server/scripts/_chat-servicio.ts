@@ -55,8 +55,6 @@ const rechazo = (p: Promise<unknown>) => p.then(() => "ok", (e: Error) => e.name
   ok("iniciar con un padre sin cuenta", (await servicio.iniciarConversacion(`${P}-sincuenta`)).estadoCuenta, "sin-cuenta");
   await prisma.usuario.update({ where: { id: m.ajeno }, data: { estado: "inactivo" } });
   ok("iniciar con la cuenta desactivada", (await servicio.iniciarConversacion(m.padreAjenoId)).estadoCuenta, "inactiva");
-  await prisma.usuario.update({ where: { id: m.ajeno }, data: { estado: "pendiente" } });
-  ok("iniciar con la invitación pendiente", (await servicio.iniciarConversacion(m.padreAjenoId)).estadoCuenta, "pendiente");
   await prisma.usuario.update({ where: { id: m.ajeno }, data: { estado: "activo" } });
   ok("se anuncia cada conversación creada, una sola vez", creadas, 3);
 

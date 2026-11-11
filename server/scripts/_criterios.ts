@@ -95,7 +95,7 @@ const esperados = (tipo: TipoEstado, ahora = JUEVES_15) => criterios.esperados(t
   ok("asistencia: en diciembre no hay clases", de(await esperados("asistencia_pendiente", JUEVES_3_DIC), m.profe).length, 0);
 
   // Las cuentas que no pueden entrar no reciben avisos
-  for (const estado of ["inactivo", "pendiente"] as const) {
+  for (const estado of ["inactivo"] as const) {
     await prisma.usuario.update({ where: { id: m.ajeno }, data: { estado } });
     ok(`cuenta ${estado}: sin avisos`, de(await esperados("cuota"), m.ajeno).length, 0);
   }

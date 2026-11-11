@@ -9,7 +9,6 @@ import { PrismaPadreRepository } from "../src/modules/padres/padre.repository.pr
 import { PrismaUsuarioRepository } from "../src/modules/usuarios/usuario.repository.prisma";
 import { PrismaUnitOfWork } from "../src/core/adapters/PrismaUnitOfWork";
 import { PadreService } from "../src/modules/padres/padre.service";
-import type { InvitacionService } from "../src/modules/usuarios/invitacion.service";
 
 const API = "http://localhost:4000";
 const prisma = new PrismaClient();
@@ -148,7 +147,7 @@ function escuchar(token: string) {
       return super.bloquear(id, tx);
     }
   }
-  const servicio = new PadreService(new PrismaPadreRepository(prisma), new PrismaUsuarioRepository(prisma), new AlumnoQueCambiaAlBloquear(prisma), new PrismaUnitOfWork(prisma), {} as InvitacionService);
+  const servicio = new PadreService(new PrismaPadreRepository(prisma), new PrismaUsuarioRepository(prisma), new AlumnoQueCambiaAlBloquear(prisma), new PrismaUnitOfWork(prisma));
   let resultado = "sin error";
   try {
     await servicio.actualizarPadre(fichaPropia.id, { nombre: "Cambiado" });

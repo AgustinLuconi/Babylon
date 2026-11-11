@@ -34,7 +34,7 @@ async function pedir<T = Record<string, unknown>>(metodo: string, ruta: string, 
   const [secre, ajeno] = await Promise.all([login("secre"), login("ajeno")]);
   const alumno = (id: string) => prisma.alumno.findUniqueOrThrow({ where: { id } });
   const padre = (id: string) => prisma.padre.findUniqueOrThrow({ where: { id } });
-  const inscribir = (cuerpo: object) => pedir<{ id: string; padreId: string; invitacion: string | null }>("POST", "/api/alumnos", secre, { cursoId: m.cursoId, ...cuerpo });
+  const inscribir = (cuerpo: object) => pedir<{ id: string; padreId: string }>("POST", "/api/alumnos", secre, { cursoId: m.cursoId, ...cuerpo });
   const nuevo = (apellido: string, extra: object = {}, vinculo = "madre") => ({
     tipo: "nuevo",
     vinculo,
@@ -50,17 +50,14 @@ async function pedir<T = Record<string, unknown>>(metodo: string, ruta: string, 
   ok("menor mínimo: vínculo en el alumno", a1.vinculoResponsable, "madre");
   ok("menor mínimo: sin DNI ni fecha de nacimiento", `${a1.dni} ${a1.fechaNacimiento}`, "null null");
   ok("menor mínimo: ficha con celular normalizado, sin DNI, email ni cuenta", `${p1.telefono} ${p1.dni} ${p1.email} ${p1.usuarioId}`, "+5493515551234 null null null");
-  ok("menor mínimo: sin cuenta no hay invitación", r1.d!.invitacion, null);
 
-  // ── Con email: cuenta pendiente e invitación; con contraseña: cuenta activa ──
+  // ── Con email: es un dato de contacto, nunca crea una cuenta ──
   const r2 = await inscribir({ nombre: "Pruebaav", apellido: "Menor2", responsable: nuevo("Resp2", { email: email("resp2") }, "padre") });
   const p2 = await padre((await alumno(r2.d!.id)).padreId!);
-  const u2 = await prisma.usuario.findUniqueOrThrow({ where: { id: p2.usuarioId! } });
-  ok("con email: cuenta pendiente", `${r2.status} ${u2.estado}`, "201 pendiente");
-  ok("con email: sale la invitación", r2.d!.invitacion, "enviada");
+  ok("con email: la ficha lo guarda y no hay cuenta", `${r2.status} ${p2.email === email("resp2")} ${p2.usuarioId}`, "201 true null");
+  ok("con email: no se creó ningún usuario", await prisma.usuario.count({ where: { email: email("resp2") } }), 0);
   const r2b = await inscribir({ nombre: "Pruebaav", apellido: "Menor2b", responsable: nuevo("Resp2b", { email: email("resp2b"), password: "prueba1234" }) });
-  const u2b = await prisma.usuario.findUniqueOrThrow({ where: { id: (await padre((await alumno(r2b.d!.id)).padreId!)).usuarioId! } });
-  ok("con contraseña: cuenta activa y sin invitación", `${u2b.estado} ${r2b.d!.invitacion}`, "activo null");
+  ok("con contraseña: se rechaza (la cuenta la crea el administrador)", r2b.status, 400);
 
   // ── Atomicidad: un curso que no existe no deja ninguna ficha ──
   const antes = await fichasPrueba();
@@ -87,7 +84,7 @@ async function pedir<T = Record<string, unknown>>(metodo: string, ruta: string, 
   const p4 = await padre(a4.padreId!);
   ok("adulto propio: se inscribe con vínculo propio", `${r4.status} ${a4.vinculoResponsable}`, "201 propio");
   ok("adulto propio: la ficha tiene sus mismos datos", `${p4.nombre} ${p4.apellido} ${p4.dni} ${p4.telefono}`, "Pruebaav Adulto1 99400112 +5493515551234");
-  ok("adulto propio: cuenta pendiente con invitación", `${(await prisma.usuario.findUniqueOrThrow({ where: { id: p4.usuarioId! } })).estado} ${r4.d!.invitacion}`, "pendiente enviada");
+  ok("adulto propio: con email, la ficha lo guarda y no hay cuenta", `${p4.email === email("adulto1")} ${p4.usuarioId}`, "true null");
   const diezAnios = `${new Date().getFullYear() - 10}-01-01`;
   const menorPropio = await inscribir({ nombre: "Pruebaav", apellido: "Chico", dni: "99400114", fechaNacimiento: diezAnios, responsable: { tipo: "propio", telefono: "351 555-1234" } });
   ok("propio con menos de 18 años", `${menorPropio.status} ${menorPropio.d?.details && "fechaNacimiento" in menorPropio.d.details}`, "400 true");
@@ -151,12 +148,12 @@ async function pedir<T = Record<string, unknown>>(metodo: string, ruta: string, 
   ok("asignar a un alumno que no existe", (await pedir("PUT", "/api/alumnos/no-existe/responsable", secre, { tipo: "existente", padreId: m.padreId, vinculo: "padre" })).status, 404);
 
   // ── Alta de un responsable desde Usuarios: sin vínculo ni alumno ──
-  const rp = await pedir<{ id: string; usuarioId: string | null; invitacion: string | null }>("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto1", telefono: "351 555-1234" });
-  ok("POST /padres mínimo: ficha sin cuenta", `${rp.status} ${rp.d?.usuarioId ?? null} ${rp.d?.invitacion}`, "201 null null");
-  const rpe = await pedir<{ id: string; usuarioId: string | null; invitacion: string | null }>("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto2", telefono: "351 555-1234", email: email("suelto2") });
-  ok("POST /padres con email: cuenta pendiente e invitación", `${rpe.status} ${rpe.d?.usuarioId !== null} ${rpe.d?.invitacion}`, "201 true enviada");
+  const rp = await pedir<{ id: string; usuarioId: string | null }>("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto1", telefono: "351 555-1234" });
+  ok("POST /padres mínimo: ficha sin cuenta", `${rp.status} ${rp.d?.usuarioId ?? null}`, "201 null");
+  const rpe = await pedir<{ id: string; usuarioId: string | null }>("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto2", telefono: "351 555-1234", email: email("suelto2") });
+  ok("POST /padres con email: ficha sin cuenta", `${rpe.status} ${rpe.d?.usuarioId ?? null}`, "201 null");
   ok("POST /padres sin teléfono", (await pedir("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto3" })).status, 400);
-  ok("POST /padres con contraseña y sin email", (await pedir("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto4", telefono: "351 555-1234", password: "prueba1234" })).status, 400);
+  ok("POST /padres con contraseña: campo desconocido", (await pedir("POST", "/api/padres", secre, { nombre: "Pruebaav", apellido: "Suelto4", telefono: "351 555-1234", password: "prueba1234" })).status, 400);
 
   await limpiarMundo(prisma);
   await prisma.$disconnect();
