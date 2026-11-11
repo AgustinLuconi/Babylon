@@ -108,7 +108,7 @@ async function limpiarCreados(): Promise<void> {
   ok("un cobro fallido (ya pagada) no anuncia", (await tras(() => pedir("POST", "/api/cuotas/pagos", secre, { cuotaIds: [`${P}-cuota-a`], metodo: "efectivo" }))).nuevos.length, 0);
 
   // Evaluaciones, notas y notas de cierre (lo que es borrador nunca le llega al padre)
-  const ev = await tras(() => pedir<{ id: string }>("POST", "/api/calificaciones/evaluaciones", profe, { cursoId: m.cursoId, nombre: "Writing", tipo: "examen", fecha: "2026-10-20", periodo: "noviembre", escala: "numerica" }));
+  const ev = await tras(() => pedir<{ id: string }>("POST", "/api/calificaciones/evaluaciones", profe, { cursoId: m.cursoId, nombre: "Writing", tipo: "examen", fecha: "2026-10-20", periodo: "noviembre" }));
   const evId = ev.r.d.id;
   ok("crear evaluación", resumen(del(ev, "evaluaciones")), `evaluaciones/alta cursoIds=curso evaluacionIds=${evId}`);
   ok("al padre no le llega la evaluación borrador", ev.alPadre.length, 0);

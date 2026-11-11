@@ -407,7 +407,7 @@ export class ReporteService {
 
     const promedioPorAlumnoPeriodo = (alumnoId: string, periodo: "julio" | "noviembre"): number | null => {
       const notas = calificaciones
-        .filter((c) => c.alumnoId === alumnoId && c.evaluacion.periodo === periodo && c.evaluacion.escala === "numerica")
+        .filter((c) => c.alumnoId === alumnoId && c.evaluacion.periodo === periodo)
         .map((c) => Number.parseFloat(c.nota))
         .filter((n) => !Number.isNaN(n));
       if (notas.length === 0) return null;

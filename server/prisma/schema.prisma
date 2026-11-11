@@ -123,11 +123,6 @@ enum PeriodoAcademico {
   noviembre
 }
 
-enum EscalaEvaluacion {
-  numerica
-  conceptual
-}
-
 enum EstadoEvaluacion {
   borrador
   publicada
@@ -319,7 +314,6 @@ model Evaluacion {
   tipo        TipoEvaluacion
   fecha       DateTime
   periodo     PeriodoAcademico
-  escala      EscalaEvaluacion
   estado      EstadoEvaluacion
   // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
   publicadaEn DateTime?

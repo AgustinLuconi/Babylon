@@ -40,7 +40,7 @@ const ids = (r: { ids: Record<string, string[]> }[]) => {
     await prisma.cuota.create({ data: { id: `${P}-${id}`, alumnoId, mes: 9, anio: 2026, montoBase: 1, descuento: 0, montoFinal: 1, vencimiento: new Date("2026-09-10T00:00:00Z"), estado: "vencida" } });
   }
   const obs = await prisma.observacion.create({ data: { id: `${P}-obs`, alumnoId: m.alumnoAjeno, emisorId: m.admin, emisorRol: "admin", fecha: new Date(), texto: "x", categoria: "academico" } });
-  const ev = await prisma.evaluacion.create({ data: { id: `${P}-ev`, cursoId: m.cursoId, nombre: "x", tipo: "examen", fecha: new Date(), periodo: "noviembre", escala: "numerica", estado: "publicada" } });
+  const ev = await prisma.evaluacion.create({ data: { id: `${P}-ev`, cursoId: m.cursoId, nombre: "x", tipo: "examen", fecha: new Date(), periodo: "noviembre", estado: "publicada" } });
   const admin = conectar(m.admin, "admin");
   const padre = conectar(m.padre, "padre");
   const ajeno = conectar(m.ajeno, "padre");

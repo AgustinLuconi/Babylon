@@ -1,6 +1,5 @@
 export type TipoEvaluacion = "examen" | "trabajo_practico" | "oral" | "proyecto";
 export type PeriodoAcademico = "julio" | "noviembre";
-export type EscalaEvaluacion = "numerica" | "conceptual";
 export type EstadoEvaluacion = "borrador" | "publicada";
 
 export const TIPO_EVALUACION_LABELS: Record<TipoEvaluacion, string> = {
@@ -28,11 +27,6 @@ export const PERIODO_CIERRE_CORTO: Record<PeriodoAcademico, string> = {
 // Largo máximo de la observación al padre que acompaña a una nota.
 export const MAX_OBSERVACION_NOTA = 200;
 
-export const ESCALA_LABELS: Record<EscalaEvaluacion, string> = {
-  numerica: "Numérica",
-  conceptual: "Conceptual",
-};
-
 export interface Evaluacion {
   id: string;
   cursoId: string;
@@ -40,7 +34,6 @@ export interface Evaluacion {
   tipo: TipoEvaluacion;
   fecha: string;
   periodo: PeriodoAcademico;
-  escala: EscalaEvaluacion;
   estado: EstadoEvaluacion;
 }
 
@@ -75,7 +68,6 @@ export interface CrearEvaluacionInput {
   tipo: TipoEvaluacion;
   fecha: string;
   periodo: PeriodoAcademico;
-  escala: EscalaEvaluacion;
 }
 
 export interface NotaInput {

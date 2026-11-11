@@ -32,7 +32,7 @@ const esperados = (tipo: TipoEstado, ahora = JUEVES_15) => criterios.esperados(t
   }
   await prisma.documento.create({ data: { id: `${P}-doc-img`, alumnoId: m.hijo1, tipo: "autorizacion_imagen", estado: "autorizado" } });
   const evaluacion = (id: string, cursoId: string, nombre: string, dia: string, estado: "borrador" | "publicada") =>
-    prisma.evaluacion.create({ data: { id: `${P}-${id}`, cursoId, nombre, tipo: "examen", fecha: fecha(dia), periodo: "noviembre", escala: "numerica", estado } });
+    prisma.evaluacion.create({ data: { id: `${P}-${id}`, cursoId, nombre, tipo: "examen", fecha: fecha(dia), periodo: "noviembre", estado } });
   await evaluacion("e1", m.cursoId, "Unit 1", "2026-10-20", "borrador");
   await evaluacion("e2", m.cursoId, "Unit 2", "2026-10-30", "publicada");
   await evaluacion("e3", m.cursoMultiId, "Unit 3", "2026-10-16", "borrador");

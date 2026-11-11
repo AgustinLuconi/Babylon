@@ -22,10 +22,8 @@ import { useNotasCierrePorCurso } from "../hooks/useNotasCierrePorCurso";
 import { usePublicarEvaluacion } from "../hooks/usePublicarEvaluacion";
 import { usePublicarNotasCierre } from "../hooks/usePublicarNotasCierre";
 import {
-  ESCALA_LABELS,
   MAX_OBSERVACION_NOTA, PERIODO_CIERRE_CORTO, PERIODO_CIERRE_LABELS, PERIODO_LABELS,
   TIPO_EVALUACION_LABELS,
-  type EscalaEvaluacion,
   type PeriodoAcademico,
   type TipoEvaluacion,
 } from "../types";
@@ -187,13 +185,12 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
     nombre: "",
     tipo: "examen" as TipoEvaluacion,
     periodo: "julio" as PeriodoAcademico,
-    escala: "numerica" as EscalaEvaluacion,
     fecha: hoyLocalISO(),
   });
   const nuevaEvaluacionSinGuardar = showNewEval && newForm.nombre.trim() !== "";
   useSinGuardar(difiereDeLoGuardado(notas, observaciones, calificacionesExistentes ?? [], alumnos) || nuevaEvaluacionSinGuardar);
 
-  const notasNumericas = evalObj?.escala === "numerica" ? Object.values(notas).map(Number).filter((n) => !Number.isNaN(n)) : [];
+  const notasNumericas = Object.values(notas).map(Number).filter((n) => !Number.isNaN(n));
   const promedio = notasNumericas.length ? (notasNumericas.reduce((a, n) => a + n, 0) / notasNumericas.length).toFixed(1) : "—";
   const aprobados = notasNumericas.filter((n) => n >= 7).length;
   const cargadas = Object.values(notas).filter((v) => v.trim()).length;
@@ -219,7 +216,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
       const creada = await crearEvaluacion.mutateAsync({ ...newForm, cursoId });
       setSelectedEvalId(creada.id);
       setShowNewEval(false);
-      setNewForm({ nombre: "", tipo: "examen", periodo: "julio", escala: "numerica", fecha: hoyLocalISO() });
+      setNewForm({ nombre: "", tipo: "examen", periodo: "julio", fecha: hoyLocalISO() });
     } catch {
       // El motivo se muestra en el formulario (crearEvaluacion.error).
     }
@@ -292,34 +289,32 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
                 <h3 className="text-[15.5px] font-semibold tracking-tight">{evalObj.nombre}</h3>
                 <p className="mt-1 text-[12px] text-muted-foreground">
                   {TIPO_EVALUACION_LABELS[evalObj.tipo]} · <span className="tnum">{formatFecha(evalObj.fecha)}</span> ·{" "}
-                  <span style={{ color: "var(--brand)" }}>{PERIODO_CIERRE_CORTO[evalObj.periodo]}</span> · {ESCALA_LABELS[evalObj.escala]}
+                  <span style={{ color: "var(--brand)" }}>{PERIODO_CIERRE_CORTO[evalObj.periodo]}</span>
                 </p>
               </div>
               {evalObj.estado === "borrador" && <Badge variant="warning">Borrador</Badge>}
             </div>
-            {evalObj.escala === "numerica" && (
-              <div className="mt-5 grid grid-cols-3 border-t pt-5" style={{ borderColor: "var(--border-hex)" }}>
-                <div>
-                  <p className="eyebrow">Promedio</p>
-                  <p className="num-display tnum mt-1.5" style={{ fontSize: 24, color: promedio !== "—" ? colorNota(Number(promedio)) : undefined }}>
-                    {promedio}
-                  </p>
-                </div>
-                <div className="border-l pl-4" style={{ borderColor: "var(--border-hex)" }}>
-                  <p className="eyebrow">Cargadas</p>
-                  <p className="num-display tnum mt-1.5" style={{ fontSize: 24 }}>
-                    {cargadas}
-                    <span className="text-[14px] text-muted-foreground">/{alumnos?.length ?? 0}</span>
-                  </p>
-                </div>
-                <div className="border-l pl-4" style={{ borderColor: "var(--border-hex)" }}>
-                  <p className="eyebrow">≥7</p>
-                  <p className="num-display tnum mt-1.5" style={{ fontSize: 24, color: "var(--brand)" }}>
-                    {aprobados}
-                  </p>
-                </div>
+            <div className="mt-5 grid grid-cols-3 border-t pt-5" style={{ borderColor: "var(--border-hex)" }}>
+              <div>
+                <p className="eyebrow">Promedio</p>
+                <p className="num-display tnum mt-1.5" style={{ fontSize: 24, color: promedio !== "—" ? colorNota(Number(promedio)) : undefined }}>
+                  {promedio}
+                </p>
               </div>
-            )}
+              <div className="border-l pl-4" style={{ borderColor: "var(--border-hex)" }}>
+                <p className="eyebrow">Cargadas</p>
+                <p className="num-display tnum mt-1.5" style={{ fontSize: 24 }}>
+                  {cargadas}
+                  <span className="text-[14px] text-muted-foreground">/{alumnos?.length ?? 0}</span>
+                </p>
+              </div>
+              <div className="border-l pl-4" style={{ borderColor: "var(--border-hex)" }}>
+                <p className="eyebrow">≥7</p>
+                <p className="num-display tnum mt-1.5" style={{ fontSize: 24, color: "var(--brand)" }}>
+                  {aprobados}
+                </p>
+              </div>
+            </div>
           </div>
 
           <Panel title="Notas por alumno">
@@ -327,7 +322,7 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
               const nota = notas[alumno.id] ?? "";
               const tieneNota = nota.trim() !== "";
               const notaNum = Number(nota);
-              const tone = evalObj.escala === "numerica" ? (tieneNota && !Number.isNaN(notaNum) ? colorNota(notaNum) : "var(--text-faint)") : "var(--text)";
+              const tone = tieneNota && !Number.isNaN(notaNum) ? colorNota(notaNum) : "var(--text-faint)";
               return (
                 <div key={alumno.id} data-alumno={alumno.id} className={claseDeFila(estadoFila)} style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}>
                   <div className="flex items-center gap-3 px-5 py-3">
@@ -335,7 +330,6 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
                     <p className="min-w-0 flex-1 truncate text-[13px] font-medium">
                       {alumno.nombre} {alumno.apellido}
                     </p>
-                    {evalObj.escala === "numerica" ? (
                       <div className="flex shrink-0 items-center gap-2">
                         <Input
                           type="number"
@@ -350,19 +344,6 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
                         />
                         <span className="text-[11.5px] text-muted-foreground">/10</span>
                       </div>
-                    ) : (
-                      <Select
-                        value={nota}
-                        onChange={(e) => tipearNota(alumno.id, e.target.value)}
-                        className="h-8 w-32 text-[12.5px]"
-                      >
-                        <option value="">—</option>
-                        <option value="MB">MB · Muy Bueno</option>
-                        <option value="B">B · Bueno</option>
-                        <option value="R">R · Regular</option>
-                        <option value="M">M · Malo</option>
-                      </Select>
-                    )}
                   </div>
                   <div className="px-5 pb-3">
                     <Input
@@ -447,16 +428,6 @@ function SeccionEvaluaciones({ cursoId, soloLectura }: { cursoId: string; soloLe
             <label className="label">Período</label>
             <Select value={newForm.periodo} onChange={(e) => setNewForm((f) => ({ ...f, periodo: e.target.value as PeriodoAcademico }))}>
               {(Object.entries(PERIODO_LABELS) as [PeriodoAcademico, string][]).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="label">Escala de calificación</label>
-            <Select value={newForm.escala} onChange={(e) => setNewForm((f) => ({ ...f, escala: e.target.value as EscalaEvaluacion }))}>
-              {(Object.entries(ESCALA_LABELS) as [EscalaEvaluacion, string][]).map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
                 </option>

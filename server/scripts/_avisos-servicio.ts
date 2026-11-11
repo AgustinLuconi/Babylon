@@ -119,7 +119,7 @@ const observacion = (alumnoId: string, autor: string) =>
   ok("7: un tipo de otro rol se rechaza", await rechazo(servicio.cambiarPreferencia(padre, "cuotas_vencidas", false)), "ValidationError");
 
   // 8) Cuenta con dos roles: avisos y lecturas separados
-  await prisma.evaluacion.create({ data: { id: `${P}-e3`, cursoId: m.cursoMultiId, nombre: "Unit 3", tipo: "examen", fecha: new Date("2026-11-20T00:00:00Z"), periodo: "noviembre", escala: "numerica", estado: "borrador" } });
+  await prisma.evaluacion.create({ data: { id: `${P}-e3`, cursoId: m.cursoMultiId, nombre: "Unit 3", tipo: "examen", fecha: new Date("2026-11-20T00:00:00Z"), periodo: "noviembre", estado: "borrador" } });
   await prisma.calificacion.create({ data: { id: `${P}-cal3`, evaluacionId: `${P}-e3`, alumnoId: m.alumnoAjeno, nota: "7" } });
   await sync(["cuotas_vencidas", "notas_sin_publicar"]);
   const comoAdmin = await fila(m.multi, "cuotas-vencidas", "admin");
