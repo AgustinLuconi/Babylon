@@ -1,4 +1,3 @@
-import type { EstadoInvitacion } from "@/features/usuarios/types";
 
 // El vínculo vive en el alumno (Alumno.vinculoResponsable): la misma persona puede ser madre de un alumno y "propio" de
 // otro (una mamá que también estudia).
@@ -26,8 +25,8 @@ export interface Padre {
   email?: string;
 }
 
-// Lo mínimo es nombre, apellido y celular; el DNI, el email y la dirección se completan después. Con email se crea la
-// cuenta (sin contraseña, queda pendiente y se manda una invitación); sin email no hay cuenta.
+// Lo mínimo es nombre, apellido y celular; el DNI, el email (de contacto) y la dirección se completan después. La cuenta de
+// acceso la crea el administrador.
 export interface DatosDeFicha {
   nombre: string;
   apellido: string;
@@ -35,7 +34,6 @@ export interface DatosDeFicha {
   dni?: string;
   email?: string;
   direccion?: string;
-  password?: string;
 }
 
 export type CrearPadreInput = DatosDeFicha;
@@ -50,10 +48,8 @@ export interface ActualizarPadreInput {
   email?: string | null;
 }
 
-export type PadreCreado = Padre & { invitacion: EstadoInvitacion | null };
-
 // Quién es el responsable de un alumno al inscribirlo o al cambiarlo (igual a `responsableSchema` del servidor).
 export type ResponsableElegido =
   | { tipo: "existente"; padreId: string; vinculo: VinculoDeOtraPersona }
   | { tipo: "nuevo"; vinculo: VinculoDeOtraPersona; datos: DatosDeFicha }
-  | { tipo: "propio"; telefono: string; email?: string; password?: string };
+  | { tipo: "propio"; telefono: string; email?: string };

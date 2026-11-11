@@ -10,7 +10,7 @@ export function useActualizarPadre() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["padres"] });
       // Corregir el email de un padre con la invitación pendiente cambia lo que muestra Pendientes.
-      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
+      queryClient.invalidateQueries({ queryKey: ["sin-cuenta"] });
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
     },
   });

@@ -12,6 +12,7 @@ export const bytesUtf8 = (texto: string) => new TextEncoder().encode(texto).leng
 export const passwordNueva = z
   .string()
   .min(8, "La contraseña debe tener al menos 8 caracteres")
+  .refine((p) => p.trim() !== "", "La contraseña no puede ser solo espacios")
   .refine((p) => bytesUtf8(p) <= MAX_BYTES_PASSWORD, MENSAJE_PASSWORD_LARGA);
 
 // ── Reglas de validación de datos de formularios ──────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,11 +20,10 @@ type LoginForm = z.infer<typeof loginSchema>;
 // Avisos que llegan por ?motivo= desde otras pantallas.
 const MENSAJES_MOTIVO: Record<string, { texto: string; tono: "warning" | "success" }> = {
   "sesion-vencida": { texto: "Tu sesión venció, ingresá de nuevo.", tono: "warning" },
-  "contrasena-actualizada": { texto: "Contraseña actualizada, ya podés ingresar.", tono: "success" },
-  "cuenta-activada": { texto: "Cuenta activada. Ingresá con tu email y contraseña.", tono: "success" },
   "cerrada-por-el-usuario": { texto: "Cerraste la sesión en otra pestaña.", tono: "warning" },
   "cerrada-desde-otro-dispositivo": { texto: "Tu sesión se cerró desde otro dispositivo.", tono: "warning" },
   "contrasena-cambiada": { texto: "Tu contraseña cambió: ingresá con la nueva.", tono: "warning" },
+  "roles-cambiados": { texto: "Tus permisos cambiaron: ingresá de nuevo.", tono: "warning" },
   "cuenta-desactivada": { texto: "Tu cuenta fue desactivada. Consultá con el instituto.", tono: "warning" },
 };
 
@@ -159,9 +158,6 @@ export default function LoginPage() {
               <input type="checkbox" className="h-3.5 w-3.5 accent-[var(--brand)]" {...register("recordarme")} />
               Mantener sesión iniciada
             </label>
-            <Link to="/olvide-contrasena" className="text-[12.5px] font-medium hover:underline" style={{ color: "var(--brand)" }}>
-              ¿Olvidaste tu contraseña?
-            </Link>
           </div>
 
           {error && (
@@ -199,7 +195,7 @@ export default function LoginPage() {
       <div className="my-8" style={{ height: 1, background: "var(--border-hex)" }} />
 
       <p className="text-center text-[12px] leading-relaxed" style={{ color: "var(--text-faint)" }}>
-        Si no tenés cuenta, comunicate con la administración del instituto.
+        Si no tenés cuenta o olvidaste tu contraseña, pedísela a la administración del instituto.
       </p>
     </AuthLayout>
   );

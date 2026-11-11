@@ -8,10 +8,9 @@ import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Label } from "@/core/components/ui/label";
 import { Select } from "@/core/components/ui/select";
-import { celularSchema, dniSchema, emailSchema, opcional, passwordNueva, textoRequerido } from "@/core/lib/validacion";
+import { celularSchema, dniSchema, emailSchema, opcional, textoRequerido } from "@/core/lib/validacion";
 import { formatDni, normalizarTexto } from "@/core/lib/utils";
 import type { Alumno } from "@/features/alumnos/types";
-import { ModoDeAcceso, type ModoAcceso } from "@/features/usuarios/components/ModoDeAcceso";
 import { fichasParecidas } from "../fichasParecidas";
 import { VINCULO_LABELS, VINCULOS_DE_OTRA_PERSONA, type Padre, type ResponsableElegido, type VinculoDeOtraPersona } from "../types";
 
@@ -24,7 +23,6 @@ const nuevoSchema = z.object({
   dni: opcional(dniSchema),
   email: opcional(emailSchema),
   vinculo: z.enum(VINCULOS_DE_OTRA_PERSONA as [VinculoDeOtraPersona, ...VinculoDeOtraPersona[]], { error: "Elegí el vínculo con el alumno" }),
-  password: z.string().optional(),
 });
 type NuevoForm = z.input<typeof nuevoSchema>;
 
@@ -66,8 +64,7 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
   const [seleccionado, setSeleccionado] = useState<Padre | null>(null);
   const [vinculoExistente, setVinculoExistente] = useState<VinculoDeOtraPersona | "">("");
   const [dniParaCompletar, setDniParaCompletar] = useState<{ padreId: string; dni: string } | null>(null);
-  const [modoAcceso, setModoAcceso] = useState<ModoAcceso>("invitacion");
-  const [propio, setPropio] = useState({ telefono: "", email: "", password: "" });
+  const [propio, setPropio] = useState({ telefono: "", email: "" });
   const [errores, setErrores] = useState<Record<string, string>>({});
   // La elección frente a fichas parecidas vale para esa lista de fichas: si cambian los nombres, hay que volver a elegir.
   const [decision, setDecision] = useState<{ clave: string } | null>(null);
@@ -155,19 +152,12 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
       if (modo === "nuevo") {
         if (!(await nuevo.trigger())) return null;
         const v = nuevoSchema.parse(nuevo.getValues());
-        if (v.email && modoAcceso === "contrasena") {
-          const r = passwordNueva.safeParse(v.password ?? "");
-          if (!r.success) {
-            nuevo.setError("password", { message: r.error.issues[0].message });
-            return null;
-          }
-        }
         if (parecidas.length > 0 && !decidido) return fallo("parecidas", "Elegí si es la misma persona que una ficha que ya existe");
         return {
           responsable: {
             tipo: "nuevo",
             vinculo: v.vinculo,
-            datos: { nombre: v.nombre, apellido: v.apellido, telefono: v.telefono, dni: v.dni, email: v.email, password: v.email && modoAcceso === "contrasena" ? v.password : undefined },
+            datos: { nombre: v.nombre, apellido: v.apellido, telefono: v.telefono, dni: v.dni, email: v.email },
           },
         };
       }
@@ -176,10 +166,6 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
       if (!telefono.success) return fallo("telefono", propio.telefono.trim() ? MENSAJE_CELULAR : "El celular es requerido");
       const email = propio.email.trim() ? emailSchema.safeParse(propio.email) : null;
       if (email && !email.success) return fallo("email", "Email inválido");
-      if (email?.success && modoAcceso === "contrasena") {
-        const r = passwordNueva.safeParse(propio.password);
-        if (!r.success) return fallo("password", r.error.issues[0].message);
-      }
       if (fichaPorDni && !nombreCoincide && fichaConfirmada !== fichaPorDni.id) {
         return fallo("fichaPorDni", "Confirmá que es la misma persona o corregí el DNI del alumno");
       }
@@ -189,7 +175,6 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
           tipo: "propio",
           telefono: telefono.data,
           email: email?.success ? email.data : undefined,
-          password: email?.success && modoAcceso === "contrasena" ? propio.password : undefined,
         },
         completarDni: dniParaCompletar ?? undefined,
       };
@@ -355,23 +340,11 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
               </Label>
               <Input id="responsableEmail" type="email" {...nuevo.register("email")} />
               <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
-                Con email puede entrar al sistema; sin email queda sin cuenta
+                Es un dato de contacto: el acceso al sistema lo crea la administración
               </p>
               <Mensaje mensaje={nuevo.formState.errors.email?.message} />
             </div>
           </div>
-          {String(valoresNuevo.email ?? "").trim() && (
-            <>
-              <ModoDeAcceso valor={modoAcceso} onCambiar={setModoAcceso} nombre="modo-acceso-responsable" />
-              {modoAcceso === "contrasena" && (
-                <div className="space-y-2">
-                  <Label htmlFor="responsablePassword">Contraseña de acceso</Label>
-                  <Input id="responsablePassword" type="password" {...nuevo.register("password")} />
-                  <Mensaje mensaje={nuevo.formState.errors.password?.message} />
-                </div>
-              )}
-            </>
-          )}
         </div>
       )}
 
@@ -392,23 +365,11 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
               </Label>
               <Input id="propioEmail" type="email" value={propio.email} onChange={(e) => setPropio((p) => ({ ...p, email: e.target.value }))} />
               <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
-                Con email puede entrar al sistema a ver su cursada
+                Es un dato de contacto: el acceso al sistema lo crea la administración
               </p>
               <Mensaje mensaje={errores.email} />
             </div>
           </div>
-          {propio.email.trim() && (
-            <>
-              <ModoDeAcceso valor={modoAcceso} onCambiar={setModoAcceso} nombre="modo-acceso-propio" />
-              {modoAcceso === "contrasena" && (
-                <div className="space-y-2">
-                  <Label htmlFor="propioPassword">Contraseña de acceso</Label>
-                  <Input id="propioPassword" type="password" value={propio.password} onChange={(e) => setPropio((p) => ({ ...p, password: e.target.value }))} />
-                  <Mensaje mensaje={errores.password} />
-                </div>
-              )}
-            </>
-          )}
         </div>
       )}
 

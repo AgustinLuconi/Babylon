@@ -11,7 +11,7 @@ export function useAsignarResponsable() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["alumnos"] });
       queryClient.invalidateQueries({ queryKey: ["padres"] });
-      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
+      queryClient.invalidateQueries({ queryKey: ["sin-cuenta"] });
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
     },
   });

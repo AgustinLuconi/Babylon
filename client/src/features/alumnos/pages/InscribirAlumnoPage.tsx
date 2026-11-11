@@ -62,9 +62,6 @@ const alumnoSchema = z
 type AlumnoForm = z.input<typeof alumnoSchema>;
 const CAMPOS_DEL_ALUMNO = ["nombre", "apellido", "dni", "fechaNacimiento", "direccion", "telefono", "email", "observacionesMedicas"];
 
-const AVISO_INVITACION_NO_ENVIADA =
-  "La inscripción quedó hecha, pero no se pudo enviar el correo de invitación al responsable. Se puede reenviar desde Usuarios → Pendientes.";
-
 function Opcional() {
   return <span style={{ color: "var(--text-faint)", fontWeight: 400 }}>· opcional</span>;
 }
@@ -138,10 +135,10 @@ export default function InscribirAlumnoPage() {
       if (resultado.completarDni) {
         await actualizarPadre.mutateAsync({ id: resultado.completarDni.padreId, datos: { dni: resultado.completarDni.dni } });
       }
-      const inscripto = await inscribirAlumno.mutateAsync({ ...resto, direccion, cursoId, responsable: resultado.responsable });
+      await inscribirAlumno.mutateAsync({ ...resto, direccion, cursoId, responsable: resultado.responsable });
       // Ya se guardó: esta salida no pregunta.
       descartarCambiosSinGuardar();
-      navigate("/alumnos", inscripto.invitacion === "no-enviada" ? { state: { aviso: AVISO_INVITACION_NO_ENVIADA } } : undefined);
+      navigate("/alumnos");
     } catch (error) {
       repartirErrores(error);
     } finally {
@@ -185,11 +182,10 @@ export default function InscribirAlumnoPage() {
       const ficha = padres?.find((p) => p.id === r.padreId);
       return { titulo: ficha ? `${ficha.nombre} ${ficha.apellido}` : "—", detalle: VINCULO_LABELS[r.vinculo] };
     }
-    const acceso = (email?: string, password?: string) => (!email ? "Sin cuenta (sin email)" : password ? "Acceso: contraseña asignada" : "Acceso: invitación por email");
     if (r.tipo === "nuevo") {
-      return { titulo: `${r.datos.nombre} ${r.datos.apellido}`, detalle: `${VINCULO_LABELS[r.vinculo]} · ${acceso(r.datos.email, r.datos.password)}` };
+      return { titulo: `${r.datos.nombre} ${r.datos.apellido}`, detalle: VINCULO_LABELS[r.vinculo] };
     }
-    return { titulo: `${texto(datosAlumno.nombre)} ${texto(datosAlumno.apellido)}`, detalle: `${VINCULO_LABELS.propio} · ${acceso(r.email, r.password)}` };
+    return { titulo: `${texto(datosAlumno.nombre)} ${texto(datosAlumno.apellido)}`, detalle: VINCULO_LABELS.propio };
   })();
 
   const error = erroresDeCampo(inscribirAlumno.error).general;
