@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fechaDeEvaluacionSchema, textoOpcional, textoRequerido } from "../../core/validacion";
+import { fechaDeEvaluacionSchema, notaNumericaSchema, textoOpcional, textoRequerido } from "../../core/validacion";
 
 export const crearEvaluacionSchema = z
   .object({
@@ -8,7 +8,6 @@ export const crearEvaluacionSchema = z
     tipo: z.enum(["examen", "trabajo_practico", "oral", "proyecto"]),
     fecha: fechaDeEvaluacionSchema,
     periodo: z.enum(["julio", "noviembre"]),
-    escala: z.enum(["numerica", "conceptual"]),
   })
   .strict();
 
@@ -21,7 +20,7 @@ export const cargarCalificacionesSchema = z
         z
           .object({
             alumnoId: z.string().min(1),
-            nota: textoRequerido("La nota", 20),
+            nota: notaNumericaSchema(0),
             observacion: textoOpcional(200),
           })
           .strict(),
@@ -37,7 +36,7 @@ export const cargarNotaCierreSchema = z
     alumnoId: z.string().min(1),
     cursoId: z.string().min(1),
     periodo: z.enum(["julio", "noviembre"]),
-    nota: textoRequerido("La nota", 20),
+    nota: notaNumericaSchema(1),
     observacion: textoOpcional(200),
   })
   .strict();

@@ -87,7 +87,7 @@ const si = (b: boolean) => (b ? "sí" : "no");
   await esperar(500);
   const enTresDias = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
   await pedir("POST", "/api/calificaciones/evaluaciones", profeToken, {
-    cursoId: m.cursoId, nombre: "Unit Vivo", tipo: "examen", fecha: enTresDias, periodo: "noviembre", escala: "numerica",
+    cursoId: m.cursoId, nombre: "Unit Vivo", tipo: "examen", fecha: enTresDias, periodo: "noviembre",
   });
   await esperar(500);
   ok("4: le llega como admin", si(multiAdmin.texto().includes("event: notificaciones")), "sí");

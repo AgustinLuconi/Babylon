@@ -38,7 +38,7 @@ const pedir = async (metodo, ruta, token, cuerpo) => {
   ok("después de una baja siguen publicadas (no vuelven a borrador)", await nota1.isDisabled(), true);
 
   await pedir("PATCH", `/api/alumnos/${P}-hijo2`, secreTk, { estado: "activo" });
-  const ev = await pedir("POST", "/api/calificaciones/evaluaciones", profeTk, { cursoId: `${P}-curso`, nombre: "Reading", tipo: "examen", fecha: "2026-10-21", periodo: "noviembre", escala: "numerica" });
+  const ev = await pedir("POST", "/api/calificaciones/evaluaciones", profeTk, { cursoId: `${P}-curso`, nombre: "Reading", tipo: "examen", fecha: "2026-10-21", periodo: "noviembre" });
   await p.goto(`${BASE}/calificaciones?curso=${P}-curso&evaluacion=${ev.id}`);
   const nota2 = p.locator(`[data-alumno="${P}-hijo2"] input[type="number"]`);
   await nota2.waitFor();
