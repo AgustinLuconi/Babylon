@@ -4,6 +4,7 @@ import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
+import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
@@ -15,6 +16,7 @@ export class PadreService {
   constructor(
     private readonly padreRepo: PadreRepository,
     private readonly usuarioRepo: UsuarioRepository,
+    private readonly profesorRepo: ProfesorRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
@@ -112,13 +114,31 @@ export class PadreService {
         throw new ValidationError("Este responsable ya tiene una cuenta de acceso: no se puede borrar su email");
       }
 
-      // El email de la ficha es el de su cuenta: si cambia, cambia también el de la cuenta (409 si lo usa otra, sin cambiar ninguno).
-      if (typeof datos.email === "string" && datos.email !== actual.email && actual.usuarioId) {
+      // El email y el nombre de la ficha son los de su cuenta: si cambian, cambian también en la cuenta (409 si el email lo usa
+      // otra, sin cambiar ninguno), y el email también en la otra ficha de la cuenta si la hay (profesor).
+      const emailCambia = typeof datos.email === "string" && datos.email !== actual.email;
+      const nombreCambia = (datos.nombre !== undefined && datos.nombre !== actual.nombre) || (datos.apellido !== undefined && datos.apellido !== actual.apellido);
+      if (actual.usuarioId && (emailCambia || nombreCambia)) {
         await this.usuarioRepo.bloquearCuenta(actual.usuarioId, tx);
-        await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
-        const otra = await this.usuarioRepo.findByEmail(datos.email, tx);
-        if (otra && otra.id !== actual.usuarioId) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
-        await this.usuarioRepo.actualizarParcial(actual.usuarioId, { email: datos.email }, tx);
+        if (emailCambia) {
+          await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+          const otra = await this.usuarioRepo.findByEmail(datos.email as string, tx);
+          if (otra && otra.id !== actual.usuarioId) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+          const comoProfesor = await this.profesorRepo.findByUsuarioId(actual.usuarioId, tx);
+          if (comoProfesor) {
+            await this.profesorRepo.actualizarParcial(comoProfesor.id, { email: datos.email as string }, tx);
+            await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [comoProfesor.id] } }, tx);
+          }
+        }
+        await this.usuarioRepo.actualizarParcial(
+          actual.usuarioId,
+          {
+            ...(emailCambia ? { email: datos.email as string } : {}),
+            ...(nombreCambia ? { nombre: `${datos.nombre ?? actual.nombre} ${datos.apellido ?? actual.apellido}`.trim() } : {}),
+          },
+          tx,
+        );
+        await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "edicion", ids: { usuarioIds: [actual.usuarioId] } }, tx);
       }
 
       // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.

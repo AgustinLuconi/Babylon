@@ -365,7 +365,7 @@ export class UsuarioService {
         await this.sesionRepo.cerrarTodas(id, new Date(), id === actor.usuarioId ? actor.sesionId : undefined, tx);
         await this.anuncios.publicar("sesiones.cerradas", { usuarioId: id, motivo: rolesCambian ? "roles-cambiados" : "contrasena-cambiada" }, tx);
       }
-      if (rolesCambian) await this.anuncios.publicar("cuenta.cambio", { usuarioId: id }, tx);
+      if (rolesCambian) await this.anuncios.publicar("cuenta.cambio", { usuarioId: id, rolesQuitados: quitados }, tx);
       if (padre && (fichasTocadas.padre || emailCambia)) await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [padre.id] } }, tx);
       if (profesor && (fichasTocadas.profesor || emailCambia)) await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [profesor.id] } }, tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "edicion", ids: { usuarioIds: [id] } }, tx);

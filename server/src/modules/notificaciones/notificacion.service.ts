@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { alConfirmar } from "../../core/alConfirmar";
 import { EntityNotFoundError, ValidationError } from "../../core/errors";
-import type { CanalEnVivo, UnitOfWork } from "../../core/ports";
+import type { CanalEnVivo, Rol, UnitOfWork } from "../../core/ports";
 import type { CriteriosDeAvisos } from "./notificacion.criterios";
 import type {
   AvisoEsperado,
@@ -69,6 +69,11 @@ export class NotificacionService {
     private readonly canal: CanalEnVivo,
     private readonly unitOfWork: UnitOfWork,
   ) {}
+
+  // La cuenta perdió esos roles: se borran sus avisos (también del historial).
+  async borrarDeRoles(usuarioId: string, roles: Rol[], tx: unknown): Promise<void> {
+    await this.repo.borrarDeRoles(usuarioId, roles, tx);
+  }
 
   // Cada tipo queda bloqueado hasta el final de la transacción: dos operaciones que sincronizan el mismo tipo a la vez
   // van de a una (si no, las dos crearían la misma fila y una fallaría por la clave única).

@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Rol } from "../../core/ports";
 import type { Destinatario, Notificacion, RecursoAviso, TipoNotificacion } from "./notificacion.entity";
 import type { NotificacionRepository, OpcionesHistorial } from "./notificacion.repository";
 
@@ -84,6 +85,10 @@ export class PrismaNotificacionRepository implements NotificacionRepository {
 
   async findDesactivadasDe({ usuarioId, rol }: Destinatario, tx?: unknown): Promise<TipoNotificacion[]> {
     return (await this.client(tx).notificacionDesactivada.findMany({ where: { usuarioId, rol }, select: { tipo: true } })).map((f) => f.tipo);
+  }
+
+  async borrarDeRoles(usuarioId: string, roles: Rol[], tx?: unknown): Promise<void> {
+    await this.client(tx).notificacion.deleteMany({ where: { usuarioId, rol: { in: roles } } });
   }
 
   async desactivar({ usuarioId, rol }: Destinatario, tipo: TipoNotificacion, tx?: unknown): Promise<void> {

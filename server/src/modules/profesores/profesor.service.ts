@@ -3,6 +3,7 @@ import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
+import type { PadreRepository } from "../padres/padre.repository";
 import type { SesionRepository } from "../usuarios/sesion.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { ProfesorRepository } from "./profesor.repository";
@@ -16,6 +17,7 @@ export class ProfesorService {
     private readonly profesorRepo: ProfesorRepository,
     private readonly usuarioRepo: UsuarioRepository,
     private readonly sesionRepo: SesionRepository,
+    private readonly padreRepo: PadreRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
@@ -122,22 +124,36 @@ export class ProfesorService {
               throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
             }
           }
+          // El estado de la ficha solo pasa a la cuenta si el pedido lo cambia Y la cuenta es solo de profesor: una cuenta con
+          // más roles (por ejemplo, administración) no se desactiva —ni se deja afuera a su dueño— por desactivar la ficha; eso
+          // se hace a propósito desde Usuarios. Editar otros datos nunca toca el estado de la cuenta.
+          const cambiaElEstado = datos.estado !== undefined && datos.estado !== profesor.estado;
+          const cuentaSoloProfesor = usuario.roles.length === 1 && usuario.roles[0] === "profesor";
+          const sincronizaEstado = cambiaElEstado && cuentaSoloProfesor;
           // Solo los campos que cambian (no se reescribe la fila).
           await this.usuarioRepo.actualizarParcial(
             usuario.id,
             {
               nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
               ...(datos.email ? { email: datos.email } : {}),
-              estado: actualizado.estado,
+              ...(sincronizaEstado ? { estado: actualizado.estado } : {}),
             },
             tx,
           );
-          // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
-          if (actualizado.estado === "inactivo") {
-            await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
-            await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cuenta-desactivada" }, tx);
+          // El email es el mismo en todas las fichas de la cuenta: si hay también una de responsable, la acompaña.
+          if (datos.email) {
+            const comoPadre = await this.padreRepo.findByUsuarioId(usuario.id, tx);
+            if (comoPadre && comoPadre.email !== datos.email) {
+              await this.padreRepo.actualizarParcial(comoPadre.id, { email: datos.email }, tx);
+              await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [comoPadre.id] } }, tx);
+            }
           }
-          if (actualizado.estado !== profesor.estado) {
+          if (sincronizaEstado) {
+            // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
+            if (actualizado.estado === "inactivo") {
+              await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
+              await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cuenta-desactivada" }, tx);
+            }
             await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
             await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "estado", ids: { usuarioIds: [usuario.id] } }, tx);
           }

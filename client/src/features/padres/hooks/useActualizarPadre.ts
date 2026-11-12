@@ -9,7 +9,7 @@ export function useActualizarPadre() {
     mutationFn: ({ id, datos }: { id: string; datos: ActualizarPadreInput }) => padreService.actualizar(id, datos),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["padres"] });
-      // Corregir el email de un padre con la invitación pendiente cambia lo que muestra Pendientes.
+      // Corregir el email o el nombre de un responsable cambia lo que muestra "Sin cuenta" y la cuenta vinculada.
       queryClient.invalidateQueries({ queryKey: ["sin-cuenta"] });
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
     },

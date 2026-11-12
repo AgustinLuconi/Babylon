@@ -77,8 +77,8 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
       return `${quien} creó una cuenta`;
     case "usuarios/estado":
       return `${quien} cambió el estado de una cuenta`;
-    case "usuarios/invitacion":
-      return `${quien} actualizó las invitaciones`;
+    case "usuarios/edicion":
+      return `${quien} actualizó una cuenta`;
     case "configuracion/edicion":
       return `${quien} cambió la configuración`;
     case "ciclos/alta":
