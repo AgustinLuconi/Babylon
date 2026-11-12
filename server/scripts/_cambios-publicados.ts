@@ -145,9 +145,9 @@ async function limpiarCreados(): Promise<void> {
   const profNuevoId = profNuevo.r.d.profesor?.id ?? (profNuevo.r.d as unknown as { id: string }).id;
   ok("alta de profesor", resumen(del(profNuevo, "profesores")), `profesores/alta profesorIds=${profNuevoId}`);
   ok("edición de profesor", resumen(del(await tras(() => pedir("PATCH", `/api/profesores/${profNuevoId}`, admin, { telefono: "351 555-1234" })), "profesores")), `profesores/edicion profesorIds=${profNuevoId}`);
-  const secreNueva = await tras(() => pedir<{ id: string }>("POST", "/api/auth/secretarios", admin, { nombre: "Pruebaav Secrenueva", email: email("secrenueva"), password: "prueba1234" }));
-  ok("alta de secretaria", resumen(del(secreNueva, "usuarios")), `usuarios/alta usuarioIds=${secreNueva.r.d.id}`);
-  ok("cambio de estado de una cuenta", resumen(del(await tras(() => pedir("PATCH", `/api/auth/usuarios/${secreNueva.r.d.id}/estado`, admin, { estado: "inactivo" })), "usuarios")), `usuarios/estado usuarioIds=${secreNueva.r.d.id}`);
+  const secreNueva = await tras(() => pedir<{ usuario: { id: string } }>("POST", "/api/auth/cuentas", admin, { nombre: "Pruebaav Secrenueva", email: email("secrenueva"), roles: ["secretario"], password: "prueba1234" }));
+  ok("alta de secretaria", resumen(del(secreNueva, "usuarios")), `usuarios/alta usuarioIds=${secreNueva.r.d.usuario.id}`);
+  ok("cambio de estado de una cuenta", resumen(del(await tras(() => pedir("PATCH", `/api/auth/usuarios/${secreNueva.r.d.usuario.id}/estado`, admin, { estado: "inactivo" })), "usuarios")), `usuarios/estado usuarioIds=${secreNueva.r.d.usuario.id}`);
   await prisma.padre.create({ data: { id: `${P}-invitado`, nombre: "Pruebaav", apellido: "Invitado", dni: "99400094", telefono: "+5493515551234", email: email("invitado") } });
   const cuentaNueva = await tras(() => pedir<{ usuario: { id: string } }>("POST", "/api/auth/cuentas", admin, { email: email("invitado"), password: "prueba1234", roles: ["padre"], padre: { fichaId: `${P}-invitado` } }));
   const cuentaId = cuentaNueva.r.d.usuario?.id as string;

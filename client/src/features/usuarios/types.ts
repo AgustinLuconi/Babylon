@@ -26,6 +26,7 @@ export interface CuentaPorEmail {
   id: string;
   nombre: string;
   roles: Rol[];
+  estado: "activo" | "inactivo";
 }
 
 // La ficha de una cuenta con rol padre o profesor: una que ya existe (sin cuenta) o una nueva. El email de la ficha es el de la cuenta.

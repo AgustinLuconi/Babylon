@@ -38,6 +38,8 @@ async function pedir(metodo: string, ruta: string, token: string | null, cuerpo?
     ["POST", "/api/auth/invitaciones/reenviar"],
     ["DELETE", `/api/auth/invitaciones/${m.secre}`],
     ["GET", "/api/auth/pendientes"],
+    ["POST", "/api/auth/secretarios"],
+    ["POST", "/api/auth/administradores"],
   ];
   for (const [metodo, ruta] of eliminadas) ok(`${metodo} ${ruta} ya no existe`, (await pedir(metodo, ruta, admin, {})).status, 404);
 
@@ -46,16 +48,16 @@ async function pedir(metodo: string, ruta: string, token: string | null, cuerpo?
   ok("GET /yo trae lo básico", Object.keys(yo.d ?? {}).sort().join(","), "email,id,nombre,rol");
 
   // Secretario y administrador: la contraseña es obligatoria.
-  const nuevoSecre = (extra: object) => pedir("POST", "/api/auth/secretarios", admin, { nombre: "Pruebaav Nueva", email: email("secre-nueva"), ...extra });
+  const nuevoSecre = (extra: object) => pedir("POST", "/api/auth/cuentas", admin, { nombre: "Pruebaav Nueva", email: email("secre-nueva"), roles: ["secretario"], ...extra });
   ok("secretario sin contraseña", (await nuevoSecre({})).status, 400);
   ok("secretario con contraseña de 7 caracteres", (await nuevoSecre({ password: "abcdefg" })).status, 400);
   const creado = await nuevoSecre({ password: "clavenueva1" });
   ok("secretario con contraseña válida", creado.status, 201);
-  ok("la respuesta no trae el hash ni la invitación", `${"passwordHash" in (creado.d ?? {})} ${"invitacion" in (creado.d ?? {})}`, "false false");
+  ok("la respuesta no trae el hash ni la invitación", `${"passwordHash" in (creado.d?.usuario ?? {})} ${"invitacion" in (creado.d ?? {})}`, "false false");
   const entra = await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email("secre-nueva"), password: "clavenueva1" }) });
   ok("el secretario nuevo inicia sesión", entra.status, 200);
-  ok("administrador sin contraseña", (await pedir("POST", "/api/auth/administradores", admin, { nombre: "Pruebaav Adm", email: email("adm-nuevo") })).status, 400);
-  ok("administrador con contraseña", (await pedir("POST", "/api/auth/administradores", admin, { nombre: "Pruebaav Adm", email: email("adm-nuevo"), password: "clavenueva1" })).status, 201);
+  ok("administrador sin contraseña", (await pedir("POST", "/api/auth/cuentas", admin, { nombre: "Pruebaav Adm", email: email("adm-nuevo"), roles: ["admin"] })).status, 400);
+  ok("administrador con contraseña", (await pedir("POST", "/api/auth/cuentas", admin, { nombre: "Pruebaav Adm", email: email("adm-nuevo"), roles: ["admin"], password: "clavenueva1" })).status, 201);
 
   // Las altas de fichas no crean cuentas ni aceptan contraseña.
   const ficha = { nombre: "Pruebaav", apellido: "Sincuenta", telefono: "351 555-1234", email: email("ficha-padre") };

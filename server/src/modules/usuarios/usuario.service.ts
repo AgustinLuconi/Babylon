@@ -16,7 +16,7 @@ import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
-import { cambioDeRoles, validarCambioDeRoles } from "./usuario.roles";
+import { BLOQUEO_DE_ADMINISTRADORES, cambioDeRoles, contarOtrosAdminsActivos, validarCambioDeRoles } from "./usuario.roles";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "./usuario.eventos";
 import type {
@@ -24,8 +24,6 @@ import type {
   CambiarEstadoUsuarioInput,
   CrearCuentaInput,
   CredencialesInput,
-  CrearAdministradorInput,
-  CrearSecretarioInput,
   FichaDePadreInput,
   FichaDeProfesorInput,
 } from "./usuario.schema";
@@ -178,39 +176,6 @@ export class UsuarioService {
     };
   }
 
-  // Secretario no tiene entidad propia (a diferencia de Padre/Profesor): no
-  // guarda ningún dato que Usuario no tenga ya, así que el alta es directa acá.
-  async crearSecretario(datos: CrearSecretarioInput): Promise<UsuarioSinPassword> {
-    return this.crearUsuarioSimple(datos, "secretario");
-  }
-
-  // Mismo criterio que Secretario: sin entidad propia, es solo un Usuario.
-  async crearAdministrador(datos: CrearAdministradorInput): Promise<UsuarioSinPassword> {
-    return this.crearUsuarioSimple(datos, "admin");
-  }
-
-  private async crearUsuarioSimple(datos: CrearSecretarioInput, rol: Rol): Promise<UsuarioSinPassword> {
-    const usuario: Usuario = {
-      id: randomUUID(),
-      nombre: datos.nombre,
-      email: datos.email,
-      passwordHash: await bcrypt.hash(datos.password, RONDAS_BCRYPT),
-      roles: [rol],
-      estado: "activo",
-      fechaCreacion: new Date(),
-    };
-    await this.unitOfWork.runInTransaction(async (tx) => {
-      // El mismo bloqueo por email que usa `crearCuenta`: dos pedidos con el mismo email se hacen de a uno.
-      await this.usuarioRepo.bloquearCuenta(`email:${usuario.email}`, tx);
-      if (await this.usuarioRepo.findByEmail(usuario.email, tx)) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
-      await this.usuarioRepo.create(usuario, tx);
-      await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
-      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuario.id] } }, tx);
-    });
-    const { passwordHash: _passwordHash, ...sinPassword } = usuario;
-    return sinPassword;
-  }
-
   // Los responsables y los profesores activos que todavía no tienen cuenta (el administrador les crea una desde acá).
   async listarSinCuenta(): Promise<FilaSinCuenta[]> {
     const [padres, profesores] = await Promise.all([this.padreRepo.findAll(), this.profesorRepo.findAll()]);
@@ -228,23 +193,29 @@ export class UsuarioService {
   }
 
   // Para avisarle al administrador, antes de guardar, que ese email ya tiene cuenta (se le va a agregar el rol).
-  async buscarPorEmail(email: string): Promise<{ id: string; nombre: string; roles: Rol[] } | null> {
+  async buscarPorEmail(email: string): Promise<{ id: string; nombre: string; roles: Rol[]; estado: Usuario["estado"] } | null> {
     const usuario = await this.usuarioRepo.findByEmail(email);
-    return usuario ? { id: usuario.id, nombre: usuario.nombre, roles: usuario.roles } : null;
+    return usuario ? { id: usuario.id, nombre: usuario.nombre, roles: usuario.roles, estado: usuario.estado } : null;
   }
 
   // Crea una cuenta con uno o varios roles. Si el email ya es de una cuenta, no falla: le agrega los roles pedidos y le
   // vincula las fichas (sin tocar su contraseña ni su nombre). El email de cada ficha pasa a ser el de la cuenta. Todo en una
   // transacción: o queda la cuenta con sus fichas o no queda nada.
-  async crearCuenta(datos: CrearCuentaInput): Promise<{ usuario: UsuarioSinPassword; vinculada: boolean }> {
+  async crearCuenta(datos: CrearCuentaInput, actor: { usuarioId: string; sesionId: string }): Promise<{ usuario: UsuarioSinPassword; vinculada: boolean }> {
     // El hash se calcula antes de abrir la transacción (bcrypt tarda ~100 ms y no hace falta tener la cuenta bloqueada).
     const passwordHash = datos.password ? await bcrypt.hash(datos.password, RONDAS_BCRYPT) : null;
     return this.unitOfWork.runInTransaction(async (tx) => {
       // Dos pedidos con el mismo email se hacen de a uno: el segundo ve la cuenta que creó el primero.
       await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
-      const existente = await this.usuarioRepo.findByEmail(datos.email, tx);
+      let existente = await this.usuarioRepo.findByEmail(datos.email, tx);
       if (existente) {
-        const repetidos = datos.roles.filter((r) => existente.roles.includes(r));
+        // Con la cuenta bloqueada (como al editarla) y releída: si otro administrador le cambió los roles hace un instante, se parte
+        // de lo último guardado y no se pisa.
+        await this.usuarioRepo.bloquearCuenta(existente.id, tx);
+        existente = await this.usuarioRepo.findById(existente.id, tx);
+        if (!existente) throw new EntityNotFoundError("Usuario", datos.email);
+        const rolesActuales = existente.roles;
+        const repetidos = datos.roles.filter((r) => rolesActuales.includes(r));
         if (repetidos.length > 0) throw new ConflictError(`Esa cuenta ya tiene el rol ${repetidos.join(", ")}`);
         if (datos.padre && (await this.padreRepo.findByUsuarioId(existente.id, tx))) throw new ConflictError("Esa cuenta ya tiene un responsable vinculado");
         if (datos.profesor && (await this.profesorRepo.findByUsuarioId(existente.id, tx))) throw new ConflictError("Esa cuenta ya tiene un profesor vinculado");
@@ -277,6 +248,12 @@ export class UsuarioService {
         await this.profesorRepo.vincularUsuario(profesor.id, usuario.id, tx);
         await this.profesorRepo.actualizarParcial(profesor.id, { email: datos.email }, tx);
         await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [profesor.id] } }, tx);
+      }
+      // Agregar roles a una cuenta que ya existe cierra sus sesiones (igual que al editar sus roles); la del propio administrador
+      // que lo hace se conserva.
+      if (existente) {
+        await this.sesionRepo.cerrarTodas(usuario.id, new Date(), usuario.id === actor.usuarioId ? actor.sesionId : undefined, tx);
+        await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "roles-cambiados" }, tx);
       }
       await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: existente ? "edicion" : "alta", ids: { usuarioIds: [usuario.id] } }, tx);
@@ -313,7 +290,10 @@ export class UsuarioService {
       const { agregados, quitados } = cambioDeRoles(actual.roles, finales);
       const rolesCambian = agregados.length + quitados.length > 0;
       if (datos.roles) {
-        const otrosAdminsActivos = (await this.usuarioRepo.findAll(tx)).filter((u) => u.id !== id && u.estado === "activo" && u.roles.includes("admin")).length;
+        // Quitar el rol de administrador: bloqueo global para que dos administradores que se lo quitan entre sí a la vez no dejen al
+        // sistema sin ninguno (el segundo cuenta ya sin el primero).
+        if (quitados.includes("admin")) await this.usuarioRepo.bloquearCuenta(BLOQUEO_DE_ADMINISTRADORES, tx);
+        const otrosAdminsActivos = contarOtrosAdminsActivos(await this.usuarioRepo.findAll(tx), id);
         validarCambioDeRoles({ cuentaId: id, actorId: actor.usuarioId, actuales: actual.roles, finales, otrosAdminsActivos });
       }
       const exigeFicha = (rol: "padre" | "profesor", ref: unknown) => {
@@ -414,6 +394,14 @@ export class UsuarioService {
       await this.usuarioRepo.bloquearCuenta(id, tx);
       const actual = await this.usuarioRepo.findById(id, tx);
       if (!actual) throw new EntityNotFoundError("Usuario", id);
+      // Desactivar a un administrador: bloqueo global y el sistema no puede quedarse sin ningún administrador activo (dos que se
+      // desactivan entre sí a la vez: el segundo ya no cuenta al primero).
+      if (estado === "inactivo" && actual.roles.includes("admin")) {
+        await this.usuarioRepo.bloquearCuenta(BLOQUEO_DE_ADMINISTRADORES, tx);
+        if (contarOtrosAdminsActivos(await this.usuarioRepo.findAll(tx), id) === 0) {
+          throw new ValidationError("No se puede desactivar: el sistema se quedaría sin ningún administrador activo");
+        }
+      }
       // Solo cambia el estado (no se reescribe la fila).
       const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
       // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.

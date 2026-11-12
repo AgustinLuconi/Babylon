@@ -1,5 +1,6 @@
 import { Input } from "@/core/components/ui/input";
 import { Select } from "@/core/components/ui/select";
+import { fichasParecidas } from "@/features/padres/fichasParecidas";
 import { FICHA_NUEVA_VACIA, type FichaElegida } from "../fichas";
 import type { FilaSinCuenta } from "../types";
 
@@ -21,6 +22,8 @@ export function SelectorDeFicha({ tipo, valor, onCambiar, fichas, errores }: Pro
   const etiqueta = tipo === "padre" ? "responsable" : "profesor";
   const nueva = valor.modo === "nueva" ? valor : { ...FICHA_NUEVA_VACIA };
   const cambiar = (campo: "nombre" | "apellido" | "telefono" | "dni", texto: string) => onCambiar({ ...nueva, [campo]: texto } as FichaElegida);
+  // Ayuda para no duplicar: fichas sin cuenta con el mismo nombre y apellido (la decisión es de quien carga).
+  const parecidas = valor.modo === "nueva" ? fichasParecidas({ nombre: nueva.nombre, apellido: nueva.apellido }, fichas.map((f) => ({ ...f, nombre: f.nombre, apellido: f.nombre }))) : [];
   return (
     <div className="space-y-3 rounded-md border p-3" style={{ borderColor: "var(--border-hex)" }}>
       <p className="text-[12px] font-medium">Ficha de {etiqueta}</p>
@@ -64,6 +67,11 @@ export function SelectorDeFicha({ tipo, valor, onCambiar, fichas, errores }: Pro
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
+          {parecidas.length > 0 && (
+            <p data-ficha-parecida className="col-span-2 rounded-md px-3 py-2.5 text-[12.5px]" style={{ background: "var(--warning-soft)", border: "1px solid var(--warning)" }}>
+              Ya hay {etiqueta === "profesor" ? "un profesor" : "un responsable"} sin cuenta que se parece: {parecidas.map((f) => f.nombre).join(", ")}. Si es la misma persona, elegí "Una que ya existe" para no duplicar la ficha.
+            </p>
+          )}
           <div className="space-y-1.5">
             <label className="label">Nombre</label>
             <Input value={nueva.nombre} onChange={(e) => cambiar("nombre", e.target.value)} />

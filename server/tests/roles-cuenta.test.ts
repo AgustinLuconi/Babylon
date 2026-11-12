@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { ValidationError } from "../src/core/errors";
-import { cambioDeRoles, validarCambioDeRoles } from "../src/modules/usuarios/usuario.roles";
+import { cambioDeRoles, contarOtrosAdminsActivos, validarCambioDeRoles } from "../src/modules/usuarios/usuario.roles";
 
 describe("cambioDeRoles", () => {
   test("agregados y quitados", () => {
@@ -37,4 +37,16 @@ describe("validarCambioDeRoles", () => {
     assert.equal(mensaje(() => validarCambioDeRoles({ ...base, actuales: [...base.actuales], otrosAdminsActivos: 2, finales: ["secretario"] })), "ok");
   });
   test("sin cambios no valida nada", () => assert.equal(mensaje(() => validarCambioDeRoles({ ...base, actuales: ["secretario"], otrosAdminsActivos: 0, finales: ["secretario"] })), "ok"));
+});
+
+describe("contarOtrosAdminsActivos", () => {
+  const cuentas = [
+    { id: "a", estado: "activo" as const, roles: ["admin" as const] },
+    { id: "b", estado: "activo" as const, roles: ["admin" as const, "profesor" as const] },
+    { id: "c", estado: "inactivo" as const, roles: ["admin" as const] },
+    { id: "d", estado: "activo" as const, roles: ["secretario" as const] },
+  ];
+  test("no cuenta a la propia cuenta, a las inactivas ni a quien no es administrador", () => assert.equal(contarOtrosAdminsActivos(cuentas, "a"), 1));
+  test("con una sola administradora activa, las otras son 0", () => assert.equal(contarOtrosAdminsActivos(cuentas.filter((c) => c.id !== "b"), "a"), 0));
+  test("sin lista, 0", () => assert.equal(contarOtrosAdminsActivos([], "a"), 0));
 });

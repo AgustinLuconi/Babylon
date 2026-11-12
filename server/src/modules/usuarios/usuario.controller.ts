@@ -2,8 +2,6 @@ import type { Request, Response } from "express";
 import { describirDispositivo } from "../../core/dispositivo";
 import {
   cambiarEstadoUsuarioSchema,
-  crearAdministradorSchema,
-  crearSecretarioSchema,
   actualizarCuentaSchema,
   credencialesSchema,
   crearCuentaSchema,
@@ -46,18 +44,6 @@ export class UsuarioController {
     res.status(200).json({ cerradas });
   };
 
-  crearSecretario = async (req: Request, res: Response) => {
-    const datos = crearSecretarioSchema.parse(req.body);
-    const secretario = await this.usuarioService.crearSecretario(datos);
-    res.status(201).json(secretario);
-  };
-
-  crearAdministrador = async (req: Request, res: Response) => {
-    const datos = crearAdministradorSchema.parse(req.body);
-    const administrador = await this.usuarioService.crearAdministrador(datos);
-    res.status(201).json(administrador);
-  };
-
   listarSinCuenta = async (_req: Request, res: Response) => {
     res.status(200).json(await this.usuarioService.listarSinCuenta());
   };
@@ -69,7 +55,7 @@ export class UsuarioController {
 
   crearCuenta = async (req: Request, res: Response) => {
     const datos = crearCuentaSchema.parse(req.body);
-    res.status(201).json(await this.usuarioService.crearCuenta(datos));
+    res.status(201).json(await this.usuarioService.crearCuenta(datos, { usuarioId: req.auth!.sub, sesionId: req.auth!.sesionId }));
   };
 
   listarUsuarios = async (_req: Request, res: Response) => {

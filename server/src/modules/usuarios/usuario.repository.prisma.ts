@@ -15,6 +15,10 @@ function esEmailRepetido(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
+// Prisma avisa con P2025 que la fila no existe. Cualquier otro error (una caída de la base, un bloqueo abortado) no es "no existe":
+// se deja pasar tal cual para que se vea como lo que es.
+const noExiste = (error: unknown) => error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
+
 function aEntidad(fila: FilaUsuario): Usuario {
   return { ...fila, roles: fila.roles as Rol[] };
 }
@@ -60,7 +64,8 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
       return aEntidad(fila);
     } catch (error) {
       if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${entidad.email}`);
-      throw new EntityNotFoundError("Usuario", id);
+      if (noExiste(error)) throw new EntityNotFoundError("Usuario", id);
+      throw error;
     }
   }
 
@@ -81,7 +86,8 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
       return aEntidad(fila);
     } catch (error) {
       if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${cambios.email}`);
-      throw new EntityNotFoundError("Usuario", id);
+      if (noExiste(error)) throw new EntityNotFoundError("Usuario", id);
+      throw error;
     }
   }
 

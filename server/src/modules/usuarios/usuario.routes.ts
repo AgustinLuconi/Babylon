@@ -13,8 +13,6 @@ export function usuarioRoutes(controller: UsuarioController): Router {
   router.get("/sesiones", authMiddleware, controller.listarSesiones);
   router.post("/sesiones/cerrar-otras", authMiddleware, controller.cerrarOtrasSesiones);
   router.delete("/sesiones/:id", authMiddleware, controller.cerrarSesionAjena);
-  router.post("/secretarios", authMiddleware, requireRole("admin"), controller.crearSecretario);
-  router.post("/administradores", authMiddleware, requireRole("admin"), controller.crearAdministrador);
   router.get("/sin-cuenta", authMiddleware, requireRole("admin"), controller.listarSinCuenta);
   router.post("/cuentas", authMiddleware, requireRole("admin"), controller.crearCuenta);
   router.get("/usuarios/por-email", authMiddleware, requireRole("admin"), controller.buscarPorEmail);

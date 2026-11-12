@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Modal } from "@/core/components/ui/modal";
 import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
 import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
 import { erroresDeCampo } from "@/core/lib/erroresDeCampo";
-import { emailSchema, passwordNueva } from "@/core/lib/validacion";
+import { emailSchema, passwordNueva, textoRequerido } from "@/core/lib/validacion";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ROL_LABELS, type Rol } from "@/features/auth/types";
@@ -47,6 +47,18 @@ export function EditarCuentaModal({ cuenta, onCerrar, onGuardada }: Props) {
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
 
+  // Si otra persona cambia los roles de la cuenta mientras se edita: lo que no se tocó se pone al día; lo tocado se conserva
+  // (agregados y quitados se calculan contra los roles actuales del servidor).
+  const rolesDelServidor = cuenta.roles.join(",");
+  const rolesPrevios = useRef(cuenta.roles);
+  useEffect(() => {
+    const previos = rolesPrevios.current;
+    rolesPrevios.current = cuenta.roles;
+    if (previos.join(",") === rolesDelServidor) return;
+    setRoles((actuales) => (actuales.length === previos.length && actuales.every((r) => previos.includes(r)) ? cuenta.roles : actuales));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolesDelServidor]);
+
   const esPropia = cuenta.id === sesion?.id;
   // El nombre de una cuenta con ficha se cambia desde la ficha (así no quedan distintos).
   const nombreDeFicha = cuenta.roles.includes("padre") || cuenta.roles.includes("profesor");
@@ -86,6 +98,8 @@ export function EditarCuentaModal({ cuenta, onCerrar, onGuardada }: Props) {
     const e: Record<string, string> = {};
     const emailNormalizado = emailSchema.safeParse(email);
     if (!emailNormalizado.success) e.email = "Email inválido";
+    const nombreValido = textoRequerido("El nombre", 60).safeParse(nombre);
+    if (!nombreDeFicha && nombre !== base.nombre && !nombreValido.success) e.nombre = nombreValido.error.issues[0].message;
     if (password !== "") {
       const p = passwordNueva.safeParse(password);
       if (!p.success) e.password = p.error.issues[0].message;

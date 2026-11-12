@@ -1,5 +1,14 @@
 import { ValidationError } from "../../core/errors";
 import type { Rol } from "../../core/ports";
+import type { Usuario } from "./usuario.entity";
+
+// Clave del bloqueo que serializa lo que puede dejar al sistema sin administradores (quitar el rol o desactivar a uno).
+export const BLOQUEO_DE_ADMINISTRADORES = "administradores";
+
+// Cuántas OTRAS cuentas activas son administradoras.
+export function contarOtrosAdminsActivos(usuarios: readonly Pick<Usuario, "id" | "estado" | "roles">[], cuentaId: string): number {
+  return usuarios.filter((u) => u.id !== cuentaId && u.estado === "activo" && u.roles.includes("admin")).length;
+}
 
 // Qué roles se agregan y cuáles se quitan al pasar de los roles actuales a los finales (el orden no importa).
 export function cambioDeRoles(actuales: readonly Rol[], finales: readonly Rol[]): { agregados: Rol[]; quitados: Rol[] } {

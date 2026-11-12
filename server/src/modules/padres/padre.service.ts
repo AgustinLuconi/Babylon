@@ -84,12 +84,20 @@ export class PadreService {
 
   async actualizarPadre(id: string, datos: ActualizarPadreInput): Promise<Padre> {
     return this.unitOfWork.runInTransaction(async (tx) => {
+      // Orden de los bloqueos, siempre el mismo (así dos pedidos simultáneos no se traban entre sí): primero la cuenta (si la
+      // ficha tiene una: editar la cuenta toma ese mismo bloqueo antes de escribir la ficha), después el alumno y por último la
+      // ficha.
+      const previo = await this.padreRepo.findById(id, tx);
+      if (previo?.usuarioId) await this.usuarioRepo.bloquearCuenta(previo.usuarioId, tx);
       // Si es el responsable "propio" de un alumno (una persona = un nombre), nombre, apellido y DNI se cambian en las dos
-      // fichas a la vez. Bloqueos siempre en el mismo orden: primero el alumno, después la ficha.
+      // fichas a la vez.
       const sincroniza = datos.nombre !== undefined || datos.apellido !== undefined || datos.dni !== undefined;
       const propio = sincroniza ? (await this.alumnoRepo.findByPadreId(id, tx)).find((a) => a.vinculoResponsable === "propio") : undefined;
       if (propio) await this.alumnoRepo.bloquear(propio.id, tx);
       await this.padreRepo.bloquear(id, tx);
+      if (previo && (await this.padreRepo.findById(id, tx))?.usuarioId !== previo.usuarioId) {
+        throw new ConflictError("El responsable cambió mientras se guardaba: volvé a intentarlo");
+      }
       // Con los bloqueos tomados se comprueba que el alumno "propio" siga siendo el mismo: si otro cambio lo movió mientras
       // tanto, no se escribe sobre un alumno que ya no corresponde.
       if (sincroniza) {
@@ -119,7 +127,6 @@ export class PadreService {
       const emailCambia = typeof datos.email === "string" && datos.email !== actual.email;
       const nombreCambia = (datos.nombre !== undefined && datos.nombre !== actual.nombre) || (datos.apellido !== undefined && datos.apellido !== actual.apellido);
       if (actual.usuarioId && (emailCambia || nombreCambia)) {
-        await this.usuarioRepo.bloquearCuenta(actual.usuarioId, tx);
         if (emailCambia) {
           await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
           const otra = await this.usuarioRepo.findByEmail(datos.email as string, tx);

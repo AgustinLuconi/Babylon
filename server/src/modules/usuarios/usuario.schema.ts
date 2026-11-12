@@ -21,22 +21,6 @@ export const credencialesSchema = z.object({
 
 export type CredencialesInput = z.infer<typeof credencialesSchema>;
 
-export const crearSecretarioSchema = z
-  .object({
-    nombre: textoRequerido("El nombre", 60),
-    email: emailSchema,
-    // La contraseña la escribe el administrador (nadie más cambia contraseñas).
-    password: passwordNueva,
-  })
-  .strict();
-
-export type CrearSecretarioInput = z.infer<typeof crearSecretarioSchema>;
-
-// Mismos campos que el secretario: Administrador tampoco tiene ningún dato
-// propio que Usuario no tenga ya.
-export const crearAdministradorSchema = crearSecretarioSchema;
-export type CrearAdministradorInput = CrearSecretarioInput;
-
 export const cambiarEstadoUsuarioSchema = z.object({
   estado: z.enum(["activo", "inactivo"]),
 });

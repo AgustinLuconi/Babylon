@@ -125,6 +125,41 @@ const CLAVE = "prueba1234";
     ok("avisa que ese email ya tiene cuenta", (await admin.locator("[data-aviso-existente]").textContent()).includes("ya tiene cuenta"), true);
     ok("y no pide contraseña", await admin.locator("#cuentaPassword").count(), 0);
 
+    // ── Menores: cuenta desactivada, nombre vacío al editar y ficha parecida ──
+    const adminToken = await token("admin");
+    const cuentas = await (await fetch(`${API}/api/auth/usuarios`, { headers: { Authorization: `Bearer ${adminToken}` } })).json();
+    const secreNueva = cuentas.find((c) => c.email === email("secre-e2e"));
+    const baja = await fetch(`${API}/api/auth/usuarios/${secreNueva.id}/estado`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ estado: "inactivo" }) });
+    ok("se desactiva la cuenta de prueba", baja.status < 300, true);
+    await admin.goto(`${BASE}/usuarios`);
+    await admin.locator("[data-crear-usuario]").click();
+    await admin.waitForSelector("[data-rol=profesor]");
+    await admin.locator("[data-rol=profesor]").check();
+    await admin.locator("[data-email]").fill(email("secre-e2e"));
+    await admin.locator("[data-aviso-existente]").waitFor({ timeout: 8000 });
+    const avisoInactiva = await admin.locator("[data-aviso-existente]").textContent();
+    ok("el aviso dice que la cuenta está desactivada", avisoInactiva.includes("desactivada") && avisoInactiva.includes("sigue desactivada"), true);
+    await admin.keyboard.press("Escape");
+    await admin.goto(`${BASE}/usuarios`);
+    const filaSecre = admin.locator("[data-cuenta]", { hasText: email("secre-e2e") });
+    await filaSecre.waitFor();
+    await filaSecre.locator("[data-editar-cuenta]").click();
+    await admin.waitForSelector("[data-nombre]");
+    await admin.locator("[data-nombre]").fill("   ");
+    await admin.locator("[data-guardar-cuenta]").click();
+    await esperarTexto(admin, "requerido");
+    ok("un nombre vacío se rechaza en pantalla antes de enviar", (await texto(admin)).includes("requerido"), true);
+    await admin.locator("[data-nombre]").fill("Pruebaav Secrenueva");
+    await admin.locator("[data-rol=padre]").check();
+    await admin.locator("[data-ficha-modo=nueva]").click();
+    await admin.locator("[data-ficha-parecida]").waitFor({ state: "detached", timeout: 2000 }).catch(() => undefined);
+    ok("sin nombre escrito no hay aviso de ficha parecida", await admin.locator("[data-ficha-parecida]").count(), 0);
+    const campos = admin.locator("div.grid input");
+    await campos.nth(0).fill("Pruebaav");
+    await campos.nth(1).fill("Fichae2e");
+    await admin.locator("[data-ficha-parecida]").waitFor({ timeout: 4000 });
+    ok("con el nombre de una ficha sin cuenta avisa que se parece", (await admin.locator("[data-ficha-parecida]").textContent()).includes("Fichae2e"), true);
+
     // ── Lo que ya no existe ──
     const anonimo = await nueva();
     for (const ruta of ["/olvide-contrasena", "/restablecer-contrasena?token=x", "/activar-cuenta?token=x", "/verificar-email?token=x"]) {

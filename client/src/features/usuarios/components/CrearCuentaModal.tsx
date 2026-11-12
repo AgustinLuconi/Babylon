@@ -202,7 +202,7 @@ export function CrearCuentaModal({ ficha, onCerrar, onCreada }: Props) {
 
         {hayExistente && existente ? (
           <p data-aviso-existente className="rounded-md px-3 py-2.5 text-[12.5px]" style={{ background: "var(--warning-soft)", border: "1px solid var(--warning)" }}>
-            Ese email ya tiene cuenta ({existente.nombre}): se le va a agregar {rolesAAgregar.length > 0 ? rolesAAgregar.map((r) => `el rol de ${ROL_LABELS[r].toLowerCase()}`).join(" y ") : "lo que elijas"}. Su contraseña no cambia.
+            Ese email ya tiene cuenta ({existente.nombre}{existente.estado === "inactivo" ? ", desactivada" : ""}): se le va a agregar {rolesAAgregar.length > 0 ? rolesAAgregar.map((r) => `el rol de ${ROL_LABELS[r].toLowerCase()}`).join(" y ") : "lo que elijas"}. Su contraseña no cambia.{existente.estado === "inactivo" && " La cuenta sigue desactivada: no podrá entrar hasta que la reactives desde Cuentas."}
           </p>
         ) : (
           <div className="space-y-1.5">

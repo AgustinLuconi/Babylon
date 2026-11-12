@@ -27,7 +27,8 @@ async function pedir(metodo: string, ruta: string, token: string | null, cuerpo?
 
 (async () => {
   const m = await crearMundo(prisma);
-  const [admin, secre] = await Promise.all([login("admin"), login("secre")]);
+  const admin = await login("admin");
+  let secre = await login("secre");
   const ficha = (id: string, dni: string, correo: string | null) =>
     prisma.padre.create({ data: { id: `${P}-${id}`, nombre: "Pruebaav", apellido: id.toUpperCase(), dni, telefono: "+5493515551234", email: correo } });
   const f1 = await ficha("f1", "99400201", email("f1-contacto"));
@@ -119,6 +120,8 @@ async function pedir(metodo: string, ruta: string, token: string | null, cuerpo?
   ok("por-email: un email inválido", (await pedir("GET", "/api/auth/usuarios/por-email?email=xx", admin)).status, 400);
 
   // ── Permisos ──
+  // Agregarle un rol cerró sus sesiones: vuelve a entrar, ahora eligiendo con cuál.
+  secre = ((await (await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email("secre"), password: CLAVE, rolElegido: "secretario" }) })).json()) as { token: string }).token;
   ok("Sin cuenta: la secretaria no entra", (await pedir("GET", "/api/auth/sin-cuenta", secre)).status, 403);
   ok("Crear cuenta: la secretaria no entra", (await pedir("POST", "/api/auth/cuentas", secre, { ...cuenta(email("x")), roles: ["padre"], padre: { fichaId: f3.id } })).status, 403);
   ok("por-email: la secretaria no entra", (await pedir("GET", `/api/auth/usuarios/por-email?email=${encodeURIComponent(email("secre"))}`, secre)).status, 403);
