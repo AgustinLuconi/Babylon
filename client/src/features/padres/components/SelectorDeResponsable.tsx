@@ -11,7 +11,7 @@ import { Select } from "@/core/components/ui/select";
 import { celularSchema, dniSchema, emailSchema, opcional, textoRequerido } from "@/core/lib/validacion";
 import { formatDni, normalizarTexto } from "@/core/lib/utils";
 import type { Alumno } from "@/features/alumnos/types";
-import { fichasParecidas } from "../fichasParecidas";
+import { fichasCoincidentes, fichasParecidas, type MotivoDeCoincidencia } from "../fichasParecidas";
 import { VINCULO_LABELS, VINCULOS_DE_OTRA_PERSONA, type Padre, type ResponsableElegido, type VinculoDeOtraPersona } from "../types";
 
 type Modo = "existente" | "nuevo" | "propio";
@@ -102,13 +102,22 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
 
   // Fichas que podrían ser la misma persona que la que se va a crear (con el mismo DNI del alumno propio, el servidor
   // reutiliza la ficha solo: no hace falta preguntar).
+  // Con el mismo DNI, celular o email casi seguro es la misma persona: no se ofrece "es otra persona" (hay que usar esa
+  // ficha o corregir el dato). Se calcula mientras se escribe.
+  const coincidentes = useMemo(
+    () => (modo === "nuevo" ? fichasCoincidentes({ dni: String(valoresNuevo.dni ?? ""), telefono: valoresNuevo.telefono, email: String(valoresNuevo.email ?? "") }, padres ?? []) : []),
+    [modo, valoresNuevo.dni, valoresNuevo.telefono, valoresNuevo.email, padres],
+  );
   const parecidas = useMemo(() => {
-    if (modo === "nuevo") return fichasParecidas({ nombre: valoresNuevo.nombre ?? "", apellido: valoresNuevo.apellido ?? "" }, padres ?? []);
+    if (modo === "nuevo") {
+      const yaMostradas = new Set(coincidentes.map((c) => c.ficha.id));
+      return fichasParecidas({ nombre: valoresNuevo.nombre ?? "", apellido: valoresNuevo.apellido ?? "" }, padres ?? []).filter((f) => !yaMostradas.has(f.id));
+    }
     if (modo === "propio") {
       return fichasParecidas(alumno, padres ?? []).filter((f) => !alumno.dni || normalizarDniSimple(f.dni) !== normalizarDniSimple(alumno.dni));
     }
     return [];
-  }, [modo, valoresNuevo.nombre, valoresNuevo.apellido, alumno, padres]);
+  }, [modo, valoresNuevo.nombre, valoresNuevo.apellido, alumno, padres, coincidentes]);
   // Un adulto "propio" cuyo DNI ya es de una ficha: el servidor reutiliza esa ficha y manda ella (el alumno toma su nombre).
   // Se muestra cuál es y, si el nombre no se parece (un DNI mal tipeado daría con otra persona), hay que confirmarlo.
   const fichaPorDni = useMemo(() => {
@@ -152,6 +161,7 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
       if (modo === "nuevo") {
         if (!(await nuevo.trigger())) return null;
         const v = nuevoSchema.parse(nuevo.getValues());
+        if (coincidentes.length > 0) return fallo("coincidentes", "Ya hay un responsable con esos datos: usá esa ficha o corregí el dato repetido");
         if (parecidas.length > 0 && !decidido) return fallo("parecidas", "Elegí si es la misma persona que una ficha que ya existe");
         return {
           responsable: {
@@ -392,6 +402,30 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
         </div>
       )}
 
+      {coincidentes.length > 0 && (
+        <div role="alert" data-ficha-coincide className="space-y-2 rounded-md border p-3" style={{ background: "var(--warning-soft)", borderColor: "var(--warning)" }}>
+          <p className="text-[12.5px] font-medium">Ese responsable ya está registrado. Usá su ficha en lugar de crear otra.</p>
+          {coincidentes.map(({ ficha: f, motivos }) => {
+            const hijos = hijosDe(f.id);
+            return (
+              <div key={f.id} data-coincidente={f.id} className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                <div className="min-w-0 flex-1">
+                  <p>{ficha(f)}</p>
+                  <p className="text-[11.5px]" style={{ color: "var(--text-muted)" }}>
+                    Coincide el {textoDeMotivos(motivos)} ·{" "}
+                    {hijos.length > 0 ? `hijos: ${hijos.map((h) => `${h.nombre} ${h.apellido}`).join(", ")}` : "todavía sin alumnos inscriptos"}
+                  </p>
+                </div>
+                <Button type="button" size="sm" data-usar-ficha onClick={() => usarFicha(f)}>
+                  Usar esa ficha
+                </Button>
+              </div>
+            );
+          })}
+          <Mensaje mensaje={errores.coincidentes} />
+        </div>
+      )}
+
       {parecidas.length > 0 && (
         <div role="alert" data-fichas-parecidas className="space-y-2 rounded-md border p-3" style={{ background: "var(--warning-soft)", borderColor: "var(--warning)" }}>
           <p className="text-[12.5px] font-medium">
@@ -422,3 +456,6 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
 }
 
 const normalizarDniSimple = (dni: string | undefined) => (dni ?? "").replace(/\D/g, "");
+
+const TEXTO_DE_MOTIVO: Record<MotivoDeCoincidencia, string> = { dni: "DNI", celular: "celular", email: "email" };
+const textoDeMotivos = (motivos: MotivoDeCoincidencia[]) => motivos.map((m) => TEXTO_DE_MOTIVO[m]).join(", ").replace(/, ([^,]*)$/, " y $1");
