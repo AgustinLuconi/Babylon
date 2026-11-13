@@ -1,30 +1,22 @@
 import { create } from "zustand";
-import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { Usuario } from "@/features/auth/types";
 
 const CLAVE = "babylon-session";
 
-// Con "Mantener sesión iniciada" la sesión vive en localStorage (sobrevive al
-// cierre del navegador); sin él, en sessionStorage (se borra al cerrarlo). Al
-// recargar, la sesión está en el que corresponda a como se inició.
-let recordarSesion = localStorage.getItem(CLAVE) !== null;
-
-const almacenamientoSesion: StateStorage = {
-  getItem: (nombre) => localStorage.getItem(nombre) ?? sessionStorage.getItem(nombre),
-  setItem: (nombre, valor) => {
-    (recordarSesion ? localStorage : sessionStorage).setItem(nombre, valor);
-    (recordarSesion ? sessionStorage : localStorage).removeItem(nombre);
-  },
-  removeItem: (nombre) => {
-    localStorage.removeItem(nombre);
-    sessionStorage.removeItem(nombre);
-  },
-};
+// La sesión vive en sessionStorage: es de cada pestaña. Recargar la conserva; cerrar la pestaña la termina; otra pestaña
+// (aunque sea del mismo navegador) tiene la suya y puede estar con otra cuenta. No hay "mantener sesión iniciada".
+// Una sesión recordada por una versión anterior ya no sirve (el servidor la sigue validando, pero acá no se usa): se descarta.
+try {
+  localStorage.removeItem(CLAVE);
+} catch {
+  // sin acceso al almacenamiento: nada que limpiar
+}
 
 interface SessionState {
   token: string | null;
   usuario: Usuario | null;
-  iniciarSesion: (token: string, usuario: Usuario, recordar: boolean) => void;
+  iniciarSesion: (token: string, usuario: Usuario) => void;
   cerrarSesion: () => void;
 }
 
@@ -33,12 +25,9 @@ export const useSessionStore = create<SessionState>()(
     (set) => ({
       token: null,
       usuario: null,
-      iniciarSesion: (token, usuario, recordar) => {
-        recordarSesion = recordar;
-        set({ token, usuario });
-      },
+      iniciarSesion: (token, usuario) => set({ token, usuario }),
       cerrarSesion: () => set({ token: null, usuario: null }),
     }),
-    { name: CLAVE, storage: createJSONStorage(() => almacenamientoSesion) },
+    { name: CLAVE, storage: createJSONStorage(() => sessionStorage) },
   ),
 );

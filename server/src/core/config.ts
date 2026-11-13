@@ -8,7 +8,6 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, "JWT_SECRET es requerida"),
   JWT_EXPIRES_IN: z.string().default("8h"),
   // Duración del token cuando se marca "Mantener sesión iniciada".
-  JWT_EXPIRES_IN_RECORDAR: z.string().default("30d"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   // Detrás de un proxy o plataforma de despliegue: la cantidad de saltos ("1") o "false". Sin esto todos los usuarios compartirían la IP del
   // proxy y se bloquearían entre sí en los límites de pedidos.

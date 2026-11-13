@@ -13,7 +13,7 @@ const prisma = new PrismaClient();
 const U = "prueba-tmp-carrera";
 const EMAIL = "prueba-tmp-carrera@x.test";
 const ctx = { dispositivo: "x", ip: null };
-const creds = (password: string) => ({ email: EMAIL, password, recordarme: false });
+const creds = (password: string) => ({ email: EMAIL, password });
 // Quien cambia la contraseña es un administrador (no tiene sesión en esta cuenta).
 const actor = { usuarioId: "otro-admin", sesionId: "ninguna" };
 const abiertas = () => prisma.sesion.count({ where: { usuarioId: U, cerradaEn: null, expiraEn: { gt: new Date() } } });

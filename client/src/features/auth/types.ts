@@ -35,5 +35,4 @@ export interface CredencialesInput {
   password: string;
   rolElegido?: Rol;
   // "Mantener sesión iniciada".
-  recordarme?: boolean;
 }

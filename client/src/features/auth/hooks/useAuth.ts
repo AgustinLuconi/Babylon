@@ -11,7 +11,7 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: (credenciales: CredencialesInput) => authService.login(credenciales),
-    onSuccess: (resultado, credenciales) => {
+    onSuccess: (resultado) => {
       // Si la cuenta tiene más de un rol y todavía no se eligió ninguno, el
       // backend no manda token — hay que esperar a que el usuario elija.
       if (resultado.requiereSeleccionRol) return;
@@ -19,7 +19,7 @@ export function useLogin() {
       // La caché de consultas es del navegador, no del usuario: se vacía para que nadie vea, ni por un
       // instante, datos de la sesión anterior (avisos, listados de otra familia, etc.).
       queryClient.clear();
-      iniciarSesion(resultado.token, resultado.usuario, credenciales.recordarme ?? false);
+      iniciarSesion(resultado.token, resultado.usuario);
       navigate("/dashboard", { replace: true });
     },
   });
