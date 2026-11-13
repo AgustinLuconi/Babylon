@@ -12,7 +12,6 @@ import { ROL_LABELS, type Rol } from "../types";
 const loginSchema = z.object({
   email: z.email("Ingresá un email válido"),
   password: z.string().min(1, "La contraseña es requerida"),
-  recordarme: z.boolean().optional(),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -32,7 +31,7 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { recordarme: false } });
+  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
   const [params] = useSearchParams();
   const aviso = MENSAJES_MOTIVO[params.get("motivo") ?? ""];
 
@@ -151,13 +150,6 @@ export default function LoginPage() {
               </button>
             </div>
             {errors.password && <p className="mt-1.5 text-[12px] text-destructive">{errors.password.message}</p>}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px]" style={{ color: "var(--text-muted)" }}>
-              <input type="checkbox" className="h-3.5 w-3.5 accent-[var(--brand)]" {...register("recordarme")} />
-              Mantener sesión iniciada
-            </label>
           </div>
 
           {error && (

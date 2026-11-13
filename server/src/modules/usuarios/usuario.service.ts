@@ -99,7 +99,7 @@ export class UsuarioService {
   ) {}
 
   async autenticar(
-    { email, password, rolElegido, recordarme }: CredencialesInput,
+    { email, password, rolElegido }: CredencialesInput,
     contexto: ContextoDeAcceso,
   ): Promise<ResultadoAutenticacion> {
     const usuario = await this.usuarioRepo.findByEmail(email);
@@ -125,7 +125,7 @@ export class UsuarioService {
 
     const sesionId = randomUUID();
     const token = jwt.sign({ sub: usuario.id, rol: rolActivo, sid: sesionId }, config.JWT_SECRET, {
-      expiresIn: (recordarme ? config.JWT_EXPIRES_IN_RECORDAR : config.JWT_EXPIRES_IN) as jwt.SignOptions["expiresIn"],
+      expiresIn: config.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
     });
     // La sesión vence cuando vence el token.
     const { exp } = jwt.decode(token) as { exp: number };
