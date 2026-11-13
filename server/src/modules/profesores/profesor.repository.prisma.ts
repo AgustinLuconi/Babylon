@@ -73,6 +73,10 @@ export class PrismaProfesorRepository implements ProfesorRepository {
     await this.client(tx).profesor.updateMany({ where: { id }, data: { usuarioId } });
   }
 
+  async desvincularUsuario(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).profesor.updateMany({ where: { id }, data: { usuarioId: null } });
+  }
+
   async actualizarParcial(id: string, cambios: Cambios<Profesor>, tx?: unknown): Promise<Profesor> {
     try {
       const fila = await this.client(tx).profesor.update({ where: { id }, data: cambios });

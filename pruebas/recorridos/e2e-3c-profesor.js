@@ -35,7 +35,7 @@ const nota = (p, alumno) => p.locator(`[data-alumno="${P}-${alumno}"] input[type
 
 (async () => {
   const profeTk = await loginApi("profe");
-  const ev = await pedir("POST", "/api/calificaciones/evaluaciones", profeTk, { cursoId: `${P}-curso`, nombre: "Listening", tipo: "examen", fecha: "2026-10-20", periodo: "noviembre", escala: "numerica" });
+  const ev = await pedir("POST", "/api/calificaciones/evaluaciones", profeTk, { cursoId: `${P}-curso`, nombre: "Listening", tipo: "examen", fecha: "2026-10-20", periodo: "noviembre" });
   const navegador = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
   const profe = await navegador.newPage({ viewport: { width: 1280, height: 900 } });
   await entrar(profe, "profe");

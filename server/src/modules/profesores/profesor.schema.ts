@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { borrable, celularSchema, dniSchema, emailSchema, opcional, passwordNueva, textoRequerido } from "../../core/validacion";
+import { borrable, celularSchema, dniSchema, emailSchema, opcional, textoRequerido } from "../../core/validacion";
 
 export const crearProfesorSchema = z
   .object({
@@ -8,8 +8,6 @@ export const crearProfesorSchema = z
     dni: dniSchema,
     telefono: opcional(celularSchema),
     email: emailSchema,
-    // Sin contraseña, la cuenta se crea pendiente y se manda una invitación por email.
-    password: passwordNueva.optional(),
   })
   .strict();
 

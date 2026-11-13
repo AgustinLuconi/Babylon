@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import logoTintaBlanca from "@/assets/babylon-logo-tinta-blanca.png";
 
-// Armazón de las pantallas públicas de acceso (login y recuperación de
-// contraseña): panel institucional verde a la izquierda y el contenido centrado
+// Armazón de las pantallas públicas de acceso (el ingreso): panel institucional verde a la izquierda y el contenido centrado
 // a la derecha; en móvil, una franja verde con el logo arriba.
 function BrandPanel() {
   return (

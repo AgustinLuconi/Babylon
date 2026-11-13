@@ -1,4 +1,4 @@
-import type { Repository } from "../../core/ports";
+import type { Repository, Rol } from "../../core/ports";
 import type { Destinatario, Notificacion, TipoNotificacion } from "./notificacion.entity";
 
 export type FiltroHistorial = "todas" | "no-leidas" | "pendientes";
@@ -23,6 +23,8 @@ export interface NotificacionRepository extends Repository<Notificacion> {
   crearEventos(avisos: Notificacion[], tx?: unknown): Promise<Destinatario[]>;
   findDesactivadas(tipo: TipoNotificacion, tx?: unknown): Promise<Destinatario[]>;
   findDesactivadasDe(d: Destinatario, tx?: unknown): Promise<TipoNotificacion[]>;
+  // Borra todos los avisos de esa cuenta en esos roles (la cuenta perdió el rol).
+  borrarDeRoles(usuarioId: string, roles: Rol[], tx?: unknown): Promise<void>;
   // Apaga el tipo para esa cuenta y rol y borra sus avisos de ese tipo (también del historial).
   desactivar(d: Destinatario, tipo: TipoNotificacion, tx?: unknown): Promise<void>;
   activar(d: Destinatario, tipo: TipoNotificacion, tx?: unknown): Promise<void>;

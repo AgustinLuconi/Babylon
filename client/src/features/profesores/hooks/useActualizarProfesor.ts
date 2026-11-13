@@ -10,8 +10,8 @@ export function useActualizarProfesor() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profesores"] });
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      // Activar o desactivar a un profesor sin cuenta lo agrega o lo saca de la lista de Pendientes.
-      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
+      // Activar o desactivar a un profesor sin cuenta lo agrega o lo saca de la lista "Sin cuenta".
+      queryClient.invalidateQueries({ queryKey: ["sin-cuenta"] });
     },
   });
 }

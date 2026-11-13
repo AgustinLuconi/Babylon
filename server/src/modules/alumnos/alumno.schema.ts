@@ -9,9 +9,8 @@ import {
   texto,
   textoOpcional,
   textoRequerido,
-  passwordNueva,
 } from "../../core/validacion";
-import { datosDeFichaSchema, MENSAJE_PASSWORD_SIN_EMAIL, sinContrasenaSinEmail } from "../padres/padre.schema";
+import { datosDeFichaSchema } from "../padres/padre.schema";
 
 // La fecha de nacimiento llega como AAAA-MM-DD y se guarda como medianoche UTC.
 const fechaNacimiento = fechaNacimientoSchema.transform((s) => new Date(`${s}T00:00:00.000Z`));
@@ -28,10 +27,8 @@ export const responsableSchema = z.discriminatedUnion("tipo", [
       tipo: z.literal("propio"),
       telefono: celularSchema,
       email: opcional(emailSchema),
-      password: passwordNueva.optional(),
     })
-    .strict()
-    .refine(sinContrasenaSinEmail, MENSAJE_PASSWORD_SIN_EMAIL),
+    .strict(),
 ]);
 
 export type ResponsableInput = z.infer<typeof responsableSchema>;

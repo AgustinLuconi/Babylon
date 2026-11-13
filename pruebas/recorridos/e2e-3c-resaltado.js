@@ -62,7 +62,7 @@ const cuota = (id, alumno, mes) =>
   await entrar(padre, "padre");
   await padre.goto(`${BASE}/mis-hijos/calificaciones?hijo=prueba-tmp-av-hijo1`);
   await padre.waitForTimeout(2000);
-  const ev = await pedir("POST", "/api/calificaciones/evaluaciones", profe, { cursoId: "prueba-tmp-av-curso", nombre: "Speaking", tipo: "oral", fecha: "2026-10-20", periodo: "noviembre", escala: "numerica" });
+  const ev = await pedir("POST", "/api/calificaciones/evaluaciones", profe, { cursoId: "prueba-tmp-av-curso", nombre: "Speaking", tipo: "oral", fecha: "2026-10-20", periodo: "noviembre" });
   await pedir("POST", `/api/calificaciones/evaluaciones/${ev.id}/calificaciones`, profe, { notas: [{ alumnoId: "prueba-tmp-av-hijo1", nota: "9" }] });
   await pedir("PATCH", `/api/calificaciones/evaluaciones/${ev.id}/publicar`, profe);
   await padre.waitForTimeout(1500);

@@ -2,47 +2,47 @@ import { randomUUID } from "node:crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { config } from "../../core/config";
-import {
-  AuthenticationError,
-  ConflictError,
-  DemasiadosPedidosError,
-  EntityNotFoundError,
-  ServicioNoDisponibleError,
-  ValidationError,
-} from "../../core/errors";
-import type { Mailer, Publicador, Rol, UnitOfWork } from "../../core/ports";
+import { soloPresentes } from "../../core/cambios";
+import { AuthenticationError, ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
+import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
+import type { PadreRepository } from "../padres/padre.repository";
+import type { PadreService } from "../padres/padre.service";
+import type { Padre } from "../padres/padre.entity";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
-import { correoRecuperacion } from "./correoRecuperacion";
-import { correoVerificacion } from "./correoVerificacion";
-import { enlaceVigente, hashDeToken, nuevoEnlace } from "./enlaces";
-import { ENLACE_NO_VALIDO, type EstadoInvitacion, type InvitacionService } from "./invitacion.service";
-import { PasswordActualIncorrectaError } from "./usuario.errors";
+import type { ProfesorService } from "../profesores/profesor.service";
+import type { Profesor } from "../profesores/profesor.entity";
 import { MAX_SESIONES_ACTIVAS } from "./sesion.entity";
 import type { SesionRepository } from "./sesion.repository";
 import type { UsuarioRepository } from "./usuario.repository";
 import type { Usuario } from "./usuario.entity";
+import { BLOQUEO_DE_ADMINISTRADORES, cambioDeRoles, contarOtrosAdminsActivos, validarCambioDeRoles } from "./usuario.roles";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "./usuario.eventos";
 import type {
-  CambiarContrasenaInput,
+  ActualizarCuentaInput,
   CambiarEstadoUsuarioInput,
+  CrearCuentaInput,
   CredencialesInput,
-  CrearAdministradorInput,
-  CrearSecretarioInput,
+  FichaDePadreInput,
+  FichaDeProfesorInput,
 } from "./usuario.schema";
 
 const RONDAS_BCRYPT = 10;
 const DIAS_DE_HISTORIAL_DE_SESIONES = 90;
 // Hash de una contraseña que nadie conoce: para gastar el mismo tiempo cuando la cuenta no existe.
 const HASH_DE_RELLENO = bcrypt.hashSync(randomUUID(), RONDAS_BCRYPT);
-const UNA_HORA_MS = 60 * 60 * 1000;
-const MAX_ENLACES_POR_HORA = 3;
-const ESPERA_ENTRE_ENLACES_MS = 60 * 1000;
-const ENLACE_INVALIDO = "El enlace no es válido o ya venció. Pedí uno nuevo.";
 
 export type UsuarioSinPassword = Omit<Usuario, "passwordHash">;
-export type UsuarioCreado = UsuarioSinPassword & { invitacion: EstadoInvitacion | null };
+
+// Una fila de la lista "Sin cuenta": un responsable o un profesor activo que todavía no tiene cuenta de acceso.
+export interface FilaSinCuenta {
+  clave: string; // "padre:<id>" o "profesor:<id>"
+  tipo: "padre" | "profesor";
+  fichaId: string;
+  nombre: string;
+  email: string | null;
+}
 
 // Lo que la persona ve de su propia cuenta (Mi cuenta).
 export interface DatosPropios {
@@ -50,7 +50,6 @@ export interface DatosPropios {
   nombre: string;
   email: string;
   rol: Rol;
-  emailVerificado: boolean;
 }
 
 // Datos del pedido de login que se guardan en la sesión (los arma el controller a partir de la request).
@@ -92,9 +91,10 @@ export class UsuarioService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly sesionRepo: SesionRepository,
     private readonly profesorRepo: ProfesorRepository,
+    private readonly padreRepo: PadreRepository,
+    private readonly padreService: PadreService,
+    private readonly profesorService: ProfesorService,
     private readonly unitOfWork: UnitOfWork,
-    private readonly mailer: Mailer,
-    private readonly invitaciones: InvitacionService,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
@@ -176,62 +176,208 @@ export class UsuarioService {
     };
   }
 
-  // Secretario no tiene entidad propia (a diferencia de Padre/Profesor): no
-  // guarda ningún dato que Usuario no tenga ya, así que el alta es directa acá.
-  async crearSecretario(datos: CrearSecretarioInput): Promise<UsuarioCreado> {
-    return this.crearUsuarioSimple(datos, "secretario");
-  }
-
-  // Mismo criterio que Secretario: sin entidad propia, es solo un Usuario.
-  async crearAdministrador(datos: CrearAdministradorInput): Promise<UsuarioCreado> {
-    return this.crearUsuarioSimple(datos, "admin");
-  }
-
-  private async crearUsuarioSimple(datos: CrearSecretarioInput, rol: Rol): Promise<UsuarioCreado> {
-    const emailExistente = await this.usuarioRepo.findByEmail(datos.email);
-    if (emailExistente) {
-      throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
-    }
-    const ahora = new Date();
-
-    if (!datos.password) {
-      // Sin contraseña: cuenta pendiente e invitación por email (enviada después de confirmar la transacción).
-      const cuenta = await this.unitOfWork.runInTransaction(async (tx) => {
-        const preparada = await this.invitaciones.prepararCuentaPendiente({ nombre: datos.nombre, email: datos.email, roles: [rol] }, ahora, tx);
-        await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [preparada.usuario.id] } }, tx);
-        return preparada;
-      });
-      const enviada = await this.invitaciones.enviarInvitacion(cuenta);
-      const { passwordHash: _passwordHash, ...sinPassword } = cuenta.usuario;
-      return { ...sinPassword, invitacion: enviada ? "enviada" : "no-enviada" };
-    }
-
-    const usuario: Usuario = {
-      id: randomUUID(),
-      nombre: datos.nombre,
-      email: datos.email,
-      passwordHash: await bcrypt.hash(datos.password, RONDAS_BCRYPT),
-      roles: [rol],
-      estado: "activo",
-      fechaCreacion: ahora,
-      emailVerificadoEn: null,
-    };
-    // Con contraseña la cuenta nace activa: ya le corresponden avisos.
-    await this.unitOfWork.runInTransaction(async (tx) => {
-      await this.usuarioRepo.create(usuario, tx);
-      await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
-      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuario.id] } }, tx);
+  // Los responsables y los profesores activos que todavía no tienen cuenta (el administrador les crea una desde acá).
+  async listarSinCuenta(): Promise<FilaSinCuenta[]> {
+    const [padres, profesores] = await Promise.all([this.padreRepo.findAll(), this.profesorRepo.findAll()]);
+    const fila = (tipo: "padre" | "profesor", f: Padre | Profesor): FilaSinCuenta => ({
+      clave: `${tipo}:${f.id}`,
+      tipo,
+      fichaId: f.id,
+      nombre: `${f.nombre} ${f.apellido ?? ""}`.trim(),
+      email: f.email?.trim() ? f.email.trim() : null,
     });
+    return [
+      ...padres.filter((p) => !p.usuarioId).map((p) => fila("padre", p)),
+      ...profesores.filter((p) => !p.usuarioId && p.estado === "activo").map((p) => fila("profesor", p)),
+    ].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
 
-    const { passwordHash: _passwordHash, ...sinPassword } = usuario;
-    return { ...sinPassword, invitacion: null };
+  // Para avisarle al administrador, antes de guardar, que ese email ya tiene cuenta (se le va a agregar el rol).
+  async buscarPorEmail(email: string): Promise<{ id: string; nombre: string; roles: Rol[]; estado: Usuario["estado"] } | null> {
+    const usuario = await this.usuarioRepo.findByEmail(email);
+    return usuario ? { id: usuario.id, nombre: usuario.nombre, roles: usuario.roles, estado: usuario.estado } : null;
+  }
+
+  // Crea una cuenta con uno o varios roles. Si el email ya es de una cuenta, no falla: le agrega los roles pedidos y le
+  // vincula las fichas (sin tocar su contraseña ni su nombre). El email de cada ficha pasa a ser el de la cuenta. Todo en una
+  // transacción: o queda la cuenta con sus fichas o no queda nada.
+  async crearCuenta(datos: CrearCuentaInput, actor: { usuarioId: string; sesionId: string }): Promise<{ usuario: UsuarioSinPassword; vinculada: boolean }> {
+    // El hash se calcula antes de abrir la transacción (bcrypt tarda ~100 ms y no hace falta tener la cuenta bloqueada).
+    const passwordHash = datos.password ? await bcrypt.hash(datos.password, RONDAS_BCRYPT) : null;
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      // Dos pedidos con el mismo email se hacen de a uno: el segundo ve la cuenta que creó el primero.
+      await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+      let existente = await this.usuarioRepo.findByEmail(datos.email, tx);
+      if (existente) {
+        // Con la cuenta bloqueada (como al editarla) y releída: si otro administrador le cambió los roles hace un instante, se parte
+        // de lo último guardado y no se pisa.
+        await this.usuarioRepo.bloquearCuenta(existente.id, tx);
+        existente = await this.usuarioRepo.findById(existente.id, tx);
+        if (!existente) throw new EntityNotFoundError("Usuario", datos.email);
+        const rolesActuales = existente.roles;
+        const repetidos = datos.roles.filter((r) => rolesActuales.includes(r));
+        if (repetidos.length > 0) throw new ConflictError(`Esa cuenta ya tiene el rol ${repetidos.join(", ")}`);
+        if (datos.padre && (await this.padreRepo.findByUsuarioId(existente.id, tx))) throw new ConflictError("Esa cuenta ya tiene un responsable vinculado");
+        if (datos.profesor && (await this.profesorRepo.findByUsuarioId(existente.id, tx))) throw new ConflictError("Esa cuenta ya tiene un profesor vinculado");
+      } else if (!passwordHash) {
+        const mensaje = "La contraseña es requerida para crear la cuenta";
+        throw new ValidationError(mensaje, { password: [mensaje] });
+      }
+
+      const padre = datos.padre ? await this.fichaDePadre(datos.padre, datos.email, tx) : null;
+      const profesor = datos.profesor ? await this.fichaDeProfesor(datos.profesor, datos.email, tx) : null;
+
+      let usuario: Usuario;
+      if (existente) {
+        usuario = await this.usuarioRepo.actualizarParcial(existente.id, { roles: [...existente.roles, ...datos.roles] }, tx);
+      } else {
+        // El nombre de una cuenta con ficha es el de la ficha (se cambia desde ella).
+        const nombre = padre ? `${padre.nombre} ${padre.apellido}` : profesor ? `${profesor.nombre} ${profesor.apellido ?? ""}`.trim() : (datos.nombre as string);
+        usuario = await this.usuarioRepo.create(
+          { id: randomUUID(), nombre, email: datos.email, passwordHash: passwordHash as string, roles: datos.roles, estado: "activo", fechaCreacion: new Date() },
+          tx,
+        );
+      }
+
+      if (padre) {
+        await this.padreRepo.vincularUsuario(padre.id, usuario.id, tx);
+        await this.padreRepo.actualizarParcial(padre.id, { email: datos.email }, tx);
+        await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [padre.id] } }, tx);
+      }
+      if (profesor) {
+        await this.profesorRepo.vincularUsuario(profesor.id, usuario.id, tx);
+        await this.profesorRepo.actualizarParcial(profesor.id, { email: datos.email }, tx);
+        await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [profesor.id] } }, tx);
+      }
+      // Agregar roles a una cuenta que ya existe cierra sus sesiones (igual que al editar sus roles); la del propio administrador
+      // que lo hace se conserva.
+      if (existente) {
+        await this.sesionRepo.cerrarTodas(usuario.id, new Date(), usuario.id === actor.usuarioId ? actor.sesionId : undefined, tx);
+        await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "roles-cambiados" }, tx);
+      }
+      await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: existente ? "edicion" : "alta", ids: { usuarioIds: [usuario.id] } }, tx);
+
+      const { passwordHash: _passwordHash, ...sinPassword } = usuario;
+      return { usuario: sinPassword, vinculada: existente !== null };
+    });
+  }
+
+  // Edita una cuenta: solo se escribe lo que vino. Cambiar la contraseña o los roles cierra las sesiones de esa cuenta (menos la
+  // desde la que se hace el cambio, si el administrador se edita a sí mismo). Agregar `padre`/`profesor` vincula una ficha;
+  // quitarlo la desvincula (la ficha y sus alumnos o cursos no se tocan). El email de las fichas es siempre el de la cuenta.
+  async actualizarCuenta(id: string, datos: ActualizarCuentaInput, actor: { usuarioId: string; sesionId: string }): Promise<UsuarioSinPassword> {
+    const passwordHash = datos.password ? await bcrypt.hash(datos.password, RONDAS_BCRYPT) : undefined;
+    return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.usuarioRepo.bloquearCuenta(id, tx);
+      const actual = await this.usuarioRepo.findById(id, tx);
+      if (!actual) throw new EntityNotFoundError("Usuario", id);
+      const padreActual = await this.padreRepo.findByUsuarioId(id, tx);
+      const profesorActual = await this.profesorRepo.findByUsuarioId(id, tx);
+
+      const emailCambia = datos.email !== undefined && datos.email !== actual.email;
+      if (emailCambia) {
+        await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+        const otro = await this.usuarioRepo.findByEmail(datos.email as string, tx);
+        if (otro && otro.id !== id) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+      }
+      if (datos.nombre !== undefined && datos.nombre !== actual.nombre && (padreActual || profesorActual)) {
+        const mensaje = "El nombre de una cuenta de responsable o profesor se cambia desde su ficha";
+        throw new ValidationError(mensaje, { nombre: [mensaje] });
+      }
+
+      const finales = datos.roles ?? actual.roles;
+      const { agregados, quitados } = cambioDeRoles(actual.roles, finales);
+      const rolesCambian = agregados.length + quitados.length > 0;
+      if (datos.roles) {
+        // Quitar el rol de administrador: bloqueo global para que dos administradores que se lo quitan entre sí a la vez no dejen al
+        // sistema sin ninguno (el segundo cuenta ya sin el primero).
+        if (quitados.includes("admin")) await this.usuarioRepo.bloquearCuenta(BLOQUEO_DE_ADMINISTRADORES, tx);
+        const otrosAdminsActivos = contarOtrosAdminsActivos(await this.usuarioRepo.findAll(tx), id);
+        validarCambioDeRoles({ cuentaId: id, actorId: actor.usuarioId, actuales: actual.roles, finales, otrosAdminsActivos });
+      }
+      const exigeFicha = (rol: "padre" | "profesor", ref: unknown) => {
+        if (agregados.includes(rol) && !ref) throw new ValidationError("Elegí la ficha", { [rol]: ["Elegí la ficha"] });
+        if (!agregados.includes(rol) && ref) throw new ValidationError("La ficha solo se elige al agregar el rol", { [rol]: ["La ficha solo se elige al agregar el rol"] });
+      };
+      exigeFicha("padre", datos.padre);
+      exigeFicha("profesor", datos.profesor);
+
+      const emailFinal = datos.email ?? actual.email;
+      let padre = padreActual;
+      let profesor = profesorActual;
+      const fichasTocadas: { padre: boolean; profesor: boolean } = { padre: false, profesor: false };
+      if (quitados.includes("padre") && padre) {
+        await this.padreRepo.desvincularUsuario(padre.id, tx);
+        padre = null;
+        fichasTocadas.padre = true;
+      }
+      if (quitados.includes("profesor") && profesor) {
+        await this.profesorRepo.desvincularUsuario(profesor.id, tx);
+        profesor = null;
+        fichasTocadas.profesor = true;
+      }
+      if (datos.padre) {
+        if (padre) throw new ConflictError("Esa cuenta ya tiene un responsable vinculado");
+        padre = await this.fichaDePadre(datos.padre, emailFinal, tx);
+        await this.padreRepo.vincularUsuario(padre.id, id, tx);
+        fichasTocadas.padre = true;
+      }
+      if (datos.profesor) {
+        if (profesor) throw new ConflictError("Esa cuenta ya tiene un profesor vinculado");
+        profesor = await this.fichaDeProfesor(datos.profesor, emailFinal, tx);
+        await this.profesorRepo.vincularUsuario(profesor.id, id, tx);
+        fichasTocadas.profesor = true;
+      }
+      // El email de cada ficha vinculada es el de la cuenta.
+      if (padre && (emailCambia || datos.padre)) await this.padreRepo.actualizarParcial(padre.id, { email: emailFinal }, tx);
+      if (profesor && (emailCambia || datos.profesor)) await this.profesorRepo.actualizarParcial(profesor.id, { email: emailFinal }, tx);
+
+      const cambios = soloPresentes({
+        nombre: datos.nombre !== undefined && datos.nombre !== actual.nombre ? datos.nombre : undefined,
+        email: emailCambia ? datos.email : undefined,
+        passwordHash,
+        roles: rolesCambian ? finales : undefined,
+      });
+      const guardado = Object.keys(cambios).length > 0 ? await this.usuarioRepo.actualizarParcial(id, cambios, tx) : actual;
+
+      if (passwordHash || rolesCambian) {
+        await this.sesionRepo.cerrarTodas(id, new Date(), id === actor.usuarioId ? actor.sesionId : undefined, tx);
+        await this.anuncios.publicar("sesiones.cerradas", { usuarioId: id, motivo: rolesCambian ? "roles-cambiados" : "contrasena-cambiada" }, tx);
+      }
+      if (rolesCambian) await this.anuncios.publicar("cuenta.cambio", { usuarioId: id, rolesQuitados: quitados }, tx);
+      if (padre && (fichasTocadas.padre || emailCambia)) await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [padre.id] } }, tx);
+      if (profesor && (fichasTocadas.profesor || emailCambia)) await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [profesor.id] } }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "edicion", ids: { usuarioIds: [id] } }, tx);
+
+      const { passwordHash: _passwordHash, ...sinPassword } = guardado;
+      return sinPassword;
+    });
+  }
+
+  // La ficha de responsable que va a tener la cuenta: una sin cuenta (bloqueada mientras dura la transacción) o una nueva.
+  private async fichaDePadre(ref: FichaDePadreInput, email: string, tx: unknown): Promise<Padre> {
+    if ("nueva" in ref) return (await this.padreService.crearFichaEnTransaccion({ ...ref.nueva, email }, tx)).padre;
+    await this.usuarioRepo.bloquearCuenta(`ficha:padre:${ref.fichaId}`, tx);
+    const padre = await this.padreRepo.findById(ref.fichaId, tx);
+    if (!padre) throw new EntityNotFoundError("Padre", ref.fichaId);
+    if (padre.usuarioId) throw new ConflictError("Esa ficha ya tiene una cuenta");
+    return padre;
+  }
+
+  private async fichaDeProfesor(ref: FichaDeProfesorInput, email: string, tx: unknown): Promise<Profesor> {
+    if ("nueva" in ref) return (await this.profesorService.crearFichaEnTransaccion({ ...ref.nueva, email }, tx)).profesor;
+    await this.usuarioRepo.bloquearCuenta(`ficha:profesor:${ref.fichaId}`, tx);
+    const profesor = await this.profesorRepo.findById(ref.fichaId, tx);
+    if (!profesor) throw new EntityNotFoundError("Profesor", ref.fichaId);
+    if (profesor.usuarioId) throw new ConflictError("Esa ficha ya tiene una cuenta");
+    if (profesor.estado !== "activo") throw new ValidationError("El profesor está inactivo: reactivalo antes de crearle una cuenta");
+    return profesor;
   }
 
   async listarUsuarios(): Promise<UsuarioSinPassword[]> {
     const usuarios = await this.usuarioRepo.findAll();
     return usuarios
-      // Las pendientes (invitación sin aceptar) se ven en la pestaña Pendientes, no acá.
-      .filter((u) => u.estado !== "pendiente")
       .map(({ passwordHash: _passwordHash, ...usuarioSinPassword }) => usuarioSinPassword)
       .sort((a, b) => a.fechaCreacion.getTime() - b.fechaCreacion.getTime());
   }
@@ -248,8 +394,14 @@ export class UsuarioService {
       await this.usuarioRepo.bloquearCuenta(id, tx);
       const actual = await this.usuarioRepo.findById(id, tx);
       if (!actual) throw new EntityNotFoundError("Usuario", id);
-      // Una invitación sin aceptar se gestiona desde Pendientes (reenviar o cancelar), no con el interruptor de estado.
-      if (actual.estado === "pendiente") throw new ValidationError("La cuenta todavía no fue activada");
+      // Desactivar a un administrador: bloqueo global y el sistema no puede quedarse sin ningún administrador activo (dos que se
+      // desactivan entre sí a la vez: el segundo ya no cuenta al primero).
+      if (estado === "inactivo" && actual.roles.includes("admin")) {
+        await this.usuarioRepo.bloquearCuenta(BLOQUEO_DE_ADMINISTRADORES, tx);
+        if (contarOtrosAdminsActivos(await this.usuarioRepo.findAll(tx), id) === 0) {
+          throw new ValidationError("No se puede desactivar: el sistema se quedaría sin ningún administrador activo");
+        }
+      }
       // Solo cambia el estado (no se reescribe la fila).
       const resultado = await this.usuarioRepo.actualizarParcial(id, { estado }, tx);
       // Al desactivar se cierran todas las sesiones de la cuenta: reactivarla más tarde no las revive.
@@ -268,35 +420,6 @@ export class UsuarioService {
 
     const { passwordHash: _passwordHash, ...usuarioSinPassword } = actualizado;
     return usuarioSinPassword;
-  }
-
-  // Con la sesión abierta: exige la contraseña actual (400 si no coincide, no 401: la sesión sigue válida), la nueva
-  // tiene que ser distinta, y se cierran las demás sesiones; la actual sigue abierta.
-  async cambiarContrasena(usuarioId: string, sesionActualId: string, datos: CambiarContrasenaInput): Promise<void> {
-    const usuario = await this.usuarioRepo.findById(usuarioId);
-    if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
-    if (!(await bcrypt.compare(datos.passwordActual, usuario.passwordHash))) {
-      throw new PasswordActualIncorrectaError("La contraseña actual no es correcta");
-    }
-    if (datos.passwordActual === datos.passwordNueva) {
-      throw new ValidationError("La contraseña nueva debe ser distinta de la actual");
-    }
-    const passwordHash = await bcrypt.hash(datos.passwordNueva, RONDAS_BCRYPT);
-    const ahora = new Date();
-    await this.unitOfWork.runInTransaction(async (tx) => {
-      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
-      // Con el bloqueo tomado se vuelve a comprobar que la sesión desde la que se pide siga abierta: si la cerraron
-      // desde otro dispositivo justo ahora, el cambio no se aplica (y no cerraría la sesión de su verdadero dueño).
-      const abiertas = await this.sesionRepo.findActivasByUsuario(usuarioId, ahora, tx);
-      if (!abiertas.some((s) => s.id === sesionActualId)) {
-        throw new AuthenticationError("Tu sesión ya no es válida, ingresá de nuevo");
-      }
-      await this.usuarioRepo.actualizarParcial(usuarioId, { passwordHash }, tx);
-      await this.sesionRepo.cerrarTodas(usuarioId, ahora, sesionActualId, tx);
-      await this.anuncios.publicar("sesiones.cerradas", { usuarioId, motivo: "contrasena-cambiada" }, tx);
-      // Un enlace de recuperación pedido antes ya no debe poder cambiar la contraseña.
-      await this.usuarioRepo.invalidarTokens(usuarioId, "recuperacion", ahora, tx);
-    });
   }
 
   // Borra las sesiones terminadas (cerradas o vencidas) hace más de 90 días, de cualquier cuenta. Las activas no se tocan.
@@ -345,115 +468,6 @@ export class UsuarioService {
   async yo(usuarioId: string, rol: Rol): Promise<DatosPropios> {
     const usuario = await this.usuarioRepo.findById(usuarioId);
     if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
-    return { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol, emailVerificado: usuario.emailVerificadoEn !== null };
-  }
-
-  // Manda el enlace de verificación (24 h). Límites por cuenta: 1 minuto entre envíos y 3 por hora.
-  async enviarVerificacion(usuarioId: string, ahora: Date = new Date()): Promise<void> {
-    const { usuario, token, tokenId } = await this.unitOfWork.runInTransaction(async (tx) => {
-      await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
-      const usuario = await this.usuarioRepo.findById(usuarioId, tx);
-      if (!usuario) throw new EntityNotFoundError("Usuario", usuarioId);
-      if (usuario.emailVerificadoEn) throw new ValidationError("Tu email ya está verificado");
-      const recientes = await this.usuarioRepo.findTokensDesde(usuarioId, "verificacion_email", new Date(ahora.getTime() - UNA_HORA_MS), tx);
-      if (recientes.length >= MAX_ENLACES_POR_HORA || recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) {
-        throw new DemasiadosPedidosError("Ya te enviamos un enlace hace poco, probá de nuevo en unos minutos");
-      }
-      await this.usuarioRepo.invalidarTokens(usuarioId, "verificacion_email", ahora, tx);
-      const enlace = nuevoEnlace(usuarioId, "verificacion_email", ahora);
-      await this.usuarioRepo.crearToken(enlace.registro, tx);
-      return { usuario, token: enlace.token, tokenId: enlace.registro.id };
-    });
-    try {
-      await this.mailer.enviar(correoVerificacion(usuario.nombre, usuario.email, `${config.APP_URL}/verificar-email?token=${token}`));
-    } catch (error) {
-      console.error(`[correo] no se pudo enviar la verificación a ${usuario.email}:`, error);
-      // El enlace nunca llegó: se borra para que reintentar no choque con el límite de envíos.
-      await this.usuarioRepo.eliminarToken(tokenId).catch((e) => console.error("[correo] no se pudo borrar el enlace sin enviar:", e));
-      throw new ServicioNoDisponibleError("No pudimos enviar el correo, probá de nuevo en unos minutos");
-    }
-  }
-
-  async verificarEmail(token: string, ahora: Date = new Date()): Promise<void> {
-    await this.unitOfWork.runInTransaction(async (tx) => {
-      const registro = await this.usuarioRepo.findTokenPorHash(hashDeToken(token), tx);
-      if (!registro || registro.tipo !== "verificacion_email" || !enlaceVigente(registro, ahora)) throw new ValidationError(ENLACE_NO_VALIDO);
-      await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
-      if (!(await this.usuarioRepo.marcarTokenUsado(registro.id, ahora, tx))) throw new ValidationError(ENLACE_NO_VALIDO);
-      const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
-      if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_NO_VALIDO);
-      if (!usuario.emailVerificadoEn) await this.usuarioRepo.actualizarParcial(usuario.id, { emailVerificadoEn: ahora }, tx);
-      await this.usuarioRepo.invalidarTokens(usuario.id, "verificacion_email", ahora, tx);
-    });
-  }
-
-  // Siempre termina sin error, exista o no la cuenta: la respuesta no puede
-  // revelar qué emails están registrados. Tampoco puede revelarlo el tiempo: tras
-  // buscar la cuenta (una consulta, igual para ambos casos) se responde, y todo lo
-  // demás (límites, alta del token, correo) corre en segundo plano. Si la cuenta
-  // superó su límite de pedidos, tampoco se envía nada.
-  async solicitarRecuperacion(email: string, ahora: Date = new Date()): Promise<void> {
-    const usuario = await this.usuarioRepo.findByEmail(email);
-    if (!usuario) return;
-    // Invitación todavía sin aceptar: en vez de un enlace de recuperación se manda una invitación nueva.
-    if (usuario.estado === "pendiente") {
-      void this.invitaciones.reenviarPorOlvido(usuario.id, ahora).catch((error) =>
-        console.error(`[correo] no se pudo preparar la invitación de ${usuario.email}:`, error),
-      );
-      return;
-    }
-    if (usuario.estado !== "activo") return;
-
-    void this.enviarEnlaceDeRecuperacion(usuario, ahora).catch((error) =>
-      console.error(`[correo] no se pudo preparar la recuperación de ${usuario.email}:`, error),
-    );
-  }
-
-  private async enviarEnlaceDeRecuperacion(usuario: Usuario, ahora: Date): Promise<void> {
-    // Las comprobaciones y el alta del enlace van juntas bajo un bloqueo de la cuenta: si no,
-    // varios pedidos simultáneos leerían "ningún enlace reciente" a la vez y pasarían todos.
-    const token = await this.unitOfWork.runInTransaction(async (tx) => {
-      await this.usuarioRepo.bloquearCuenta(usuario.id, tx);
-      const recientes = await this.usuarioRepo.findTokensDesde(usuario.id, "recuperacion", new Date(ahora.getTime() - UNA_HORA_MS), tx);
-      if (recientes.length >= MAX_ENLACES_POR_HORA) return null;
-      if (recientes.some((t) => ahora.getTime() - t.creadoEn.getTime() < ESPERA_ENTRE_ENLACES_MS)) return null;
-
-      await this.usuarioRepo.invalidarTokens(usuario.id, "recuperacion", ahora, tx);
-      const enlace = nuevoEnlace(usuario.id, "recuperacion", ahora);
-      await this.usuarioRepo.crearToken(enlace.registro, tx);
-      return enlace.token;
-    });
-    if (!token) return;
-
-    const enlace = `${config.APP_URL}/restablecer-contrasena?token=${token}`;
-    await this.mailer.enviar(correoRecuperacion(usuario.nombre, usuario.email, enlace)).catch((error) =>
-      console.error(`[correo] no se pudo enviar la recuperación a ${usuario.email}:`, error),
-    );
-  }
-
-  // Cambia la contraseña, marca el enlace como usado, invalida los demás y corta
-  // todas las sesiones de la cuenta.
-  async restablecerContrasena(token: string, password: string, ahora: Date = new Date()): Promise<void> {
-    const passwordHash = await bcrypt.hash(password, RONDAS_BCRYPT);
-    await this.unitOfWork.runInTransaction(async (tx) => {
-      const registro = await this.usuarioRepo.findTokenPorHash(hashDeToken(token), tx);
-      // Solo enlaces de recuperación: uno de invitación o de verificación no sirve acá.
-      if (!registro || registro.tipo !== "recuperacion" || !enlaceVigente(registro, ahora)) {
-        throw new ValidationError(ENLACE_INVALIDO);
-      }
-      await this.usuarioRepo.bloquearCuenta(registro.usuarioId, tx);
-      // Marcado atómico: si dos pedidos usan el mismo enlace a la vez, solo uno gana.
-      if (!(await this.usuarioRepo.marcarTokenUsado(registro.id, ahora, tx))) {
-        throw new ValidationError(ENLACE_INVALIDO);
-      }
-      const usuario = await this.usuarioRepo.findById(registro.usuarioId, tx);
-      if (!usuario || usuario.estado !== "activo") throw new ValidationError(ENLACE_INVALIDO);
-
-      // El enlace llegó a su correo: si el email no estaba verificado, ahora lo está.
-      await this.usuarioRepo.actualizarParcial(usuario.id, { passwordHash, ...(usuario.emailVerificadoEn ? {} : { emailVerificadoEn: ahora }) }, tx);
-      await this.sesionRepo.cerrarTodas(usuario.id, ahora, undefined, tx);
-      await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "contrasena-cambiada" }, tx);
-      await this.usuarioRepo.invalidarTokens(usuario.id, "recuperacion", ahora, tx);
-    });
+    return { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol };
   }
 }

@@ -1,10 +1,5 @@
 import type { Rol } from "@/features/auth/types";
 
-export interface CambiarContrasenaInput {
-  passwordActual: string;
-  passwordNueva: string;
-}
-
 export interface SesionActiva {
   id: string;
   dispositivo: string;
@@ -21,5 +16,4 @@ export interface DatosPropios {
   nombre: string;
   email: string;
   rol: Rol;
-  emailVerificado: boolean;
 }

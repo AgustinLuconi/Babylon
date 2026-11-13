@@ -1,4 +1,3 @@
-import type { EstadoInvitacion } from "@/features/usuarios/types";
 import type { ResponsableElegido, VinculoPadre } from "@/features/padres/types";
 
 export type EstadoAlumno = "activo" | "inactivo" | "egresado";
@@ -58,8 +57,6 @@ export interface NuevoAlumnoInput {
   email?: string;
   observacionesMedicas?: string;
 }
-
-export type AlumnoInscripto = Alumno & { invitacion: EstadoInvitacion | null };
 
 // Ausente no se toca; null borra (solo lo que se puede completar después).
 export interface ActualizarAlumnoInput {

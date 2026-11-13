@@ -1,28 +1,24 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcrypt";
 import { soloPresentes } from "../../core/cambios";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
-import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
-import type { UsuarioRepository } from "../usuarios/usuario.repository";
-import type { Usuario } from "../usuarios/usuario.entity";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
+import type { ProfesorRepository } from "../profesores/profesor.repository";
+import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { PadreRepository } from "./padre.repository";
 import type { Padre } from "./padre.entity";
 import type { ActualizarPadreInput, CrearPadreInput, CrearPadreSinCuentaInput, DatosDeFichaInput } from "./padre.schema";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 
-export type PadreCreado = Padre & { invitacion: EstadoInvitacion | null };
-
 export class PadreService {
   constructor(
     private readonly padreRepo: PadreRepository,
     private readonly usuarioRepo: UsuarioRepository,
+    private readonly profesorRepo: ProfesorRepository,
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly invitaciones: InvitacionService,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
@@ -38,39 +34,13 @@ export class PadreService {
     return padre;
   }
 
-  // Crea la ficha de un responsable dentro de una transacción en curso (la usan el alta de un padre y la inscripción de un
-  // alumno, que crea al responsable y al alumno juntos). Con email crea la cuenta: con contraseña, activa; sin ella,
-  // pendiente (la invitación se manda con `enviarInvitacion` DESPUÉS de confirmar la transacción). Sin email, no hay cuenta.
-  async crearFichaEnTransaccion(datos: DatosDeFichaInput, tx: unknown): Promise<{ padre: Padre; cuenta: CuentaPreparada | null }> {
-    if (datos.email && (await this.usuarioRepo.findByEmail(datos.email, tx))) {
-      throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
-    }
+  // Crea la ficha de un responsable dentro de una transacción en curso (la usan el alta de un padre, la inscripción de un
+  // alumno —que crea al responsable y al alumno juntos— y la creación de una cuenta con ficha nueva). Solo la ficha: la cuenta
+  // de acceso la crea el administrador después (ver `UsuarioService.crearCuenta`); el email es un dato de contacto.
+  async crearFichaEnTransaccion(datos: DatosDeFichaInput, tx: unknown): Promise<{ padre: Padre }> {
     if (datos.dni && (await this.padreRepo.findByDni(datos.dni, tx))) {
       throw new ConflictError(`Ya existe un responsable con el DNI ${datos.dni}`);
     }
-
-    const ahora = new Date();
-    const nombreCuenta = `${datos.nombre} ${datos.apellido}`;
-    let usuarioId: string | undefined;
-    let cuenta: CuentaPreparada | null = null;
-    if (datos.email && datos.password) {
-      const usuario: Usuario = {
-        id: randomUUID(),
-        nombre: nombreCuenta,
-        email: datos.email,
-        passwordHash: await bcrypt.hash(datos.password, 10),
-        roles: ["padre"],
-        estado: "activo",
-        fechaCreacion: ahora,
-        emailVerificadoEn: null,
-      };
-      await this.usuarioRepo.create(usuario, tx);
-      usuarioId = usuario.id;
-    } else if (datos.email) {
-      cuenta = await this.invitaciones.prepararCuentaPendiente({ nombre: nombreCuenta, email: datos.email, roles: ["padre"] }, ahora, tx);
-      usuarioId = cuenta.usuario.id;
-    }
-
     const padre = await this.padreRepo.create(
       {
         id: randomUUID(),
@@ -80,26 +50,15 @@ export class PadreService {
         telefono: datos.telefono,
         email: datos.email,
         direccion: datos.direccion,
-        usuarioId,
       },
       tx,
     );
-    // Con contraseña la cuenta nace activa: ya le corresponden avisos (con invitación, cuando la active).
-    if (usuarioId && !cuenta) await this.anuncios.publicar("cuenta.cambio", { usuarioId }, tx);
     await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "alta", ids: { padreIds: [padre.id] } }, tx);
-    if (usuarioId) await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuarioId] } }, tx);
-    return { padre, cuenta };
+    return { padre };
   }
 
-  // Manda la invitación de una cuenta pendiente (ya confirmada la transacción). Sin cuenta pendiente no hay invitación.
-  async enviarInvitacion(cuenta: CuentaPreparada | null): Promise<EstadoInvitacion | null> {
-    if (!cuenta) return null;
-    return (await this.invitaciones.enviarInvitacion(cuenta)) ? "enviada" : "no-enviada";
-  }
-
-  async crearPadre(datos: CrearPadreInput): Promise<PadreCreado> {
-    const { padre, cuenta } = await this.unitOfWork.runInTransaction((tx) => this.crearFichaEnTransaccion(datos, tx));
-    return { ...padre, invitacion: await this.enviarInvitacion(cuenta) };
+  async crearPadre(datos: CrearPadreInput): Promise<Padre> {
+    return this.unitOfWork.runInTransaction(async (tx) => (await this.crearFichaEnTransaccion(datos, tx)).padre);
   }
 
   // Sin `UnitOfWork`: a diferencia de `crearPadre`, acá no hay un segundo
@@ -125,12 +84,20 @@ export class PadreService {
 
   async actualizarPadre(id: string, datos: ActualizarPadreInput): Promise<Padre> {
     return this.unitOfWork.runInTransaction(async (tx) => {
+      // Orden de los bloqueos, siempre el mismo (así dos pedidos simultáneos no se traban entre sí): primero la cuenta (si la
+      // ficha tiene una: editar la cuenta toma ese mismo bloqueo antes de escribir la ficha), después el alumno y por último la
+      // ficha.
+      const previo = await this.padreRepo.findById(id, tx);
+      if (previo?.usuarioId) await this.usuarioRepo.bloquearCuenta(previo.usuarioId, tx);
       // Si es el responsable "propio" de un alumno (una persona = un nombre), nombre, apellido y DNI se cambian en las dos
-      // fichas a la vez. Bloqueos siempre en el mismo orden: primero el alumno, después la ficha.
+      // fichas a la vez.
       const sincroniza = datos.nombre !== undefined || datos.apellido !== undefined || datos.dni !== undefined;
       const propio = sincroniza ? (await this.alumnoRepo.findByPadreId(id, tx)).find((a) => a.vinculoResponsable === "propio") : undefined;
       if (propio) await this.alumnoRepo.bloquear(propio.id, tx);
       await this.padreRepo.bloquear(id, tx);
+      if (previo && (await this.padreRepo.findById(id, tx))?.usuarioId !== previo.usuarioId) {
+        throw new ConflictError("El responsable cambió mientras se guardaba: volvé a intentarlo");
+      }
       // Con los bloqueos tomados se comprueba que el alumno "propio" siga siendo el mismo: si otro cambio lo movió mientras
       // tanto, no se escribe sobre un alumno que ya no corresponde.
       if (sincroniza) {
@@ -155,19 +122,30 @@ export class PadreService {
         throw new ValidationError("Este responsable ya tiene una cuenta de acceso: no se puede borrar su email");
       }
 
-      // Con una invitación todavía sin aceptar, corregir el email de la ficha corrige el de la cuenta y anula la invitación
-      // que se mandó a la dirección anterior (queda "vencida" hasta reenviarla a la nueva). Una cuenta ya activa conserva su
-      // email de acceso: cambiarlo es otra operación (fuera de alcance).
-      if (typeof datos.email === "string" && datos.email !== actual.email && actual.usuarioId) {
-        const usuarioId = actual.usuarioId;
-        await this.usuarioRepo.bloquearCuenta(usuarioId, tx);
-        const usuario = await this.usuarioRepo.findById(usuarioId, tx);
-        if (usuario?.estado === "pendiente") {
-          const otra = await this.usuarioRepo.findByEmail(datos.email, tx);
-          if (otra && otra.id !== usuario.id) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
-          await this.usuarioRepo.actualizarParcial(usuario.id, { email: datos.email }, tx);
-          await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", new Date(), tx);
+      // El email y el nombre de la ficha son los de su cuenta: si cambian, cambian también en la cuenta (409 si el email lo usa
+      // otra, sin cambiar ninguno), y el email también en la otra ficha de la cuenta si la hay (profesor).
+      const emailCambia = typeof datos.email === "string" && datos.email !== actual.email;
+      const nombreCambia = (datos.nombre !== undefined && datos.nombre !== actual.nombre) || (datos.apellido !== undefined && datos.apellido !== actual.apellido);
+      if (actual.usuarioId && (emailCambia || nombreCambia)) {
+        if (emailCambia) {
+          await this.usuarioRepo.bloquearCuenta(`email:${datos.email}`, tx);
+          const otra = await this.usuarioRepo.findByEmail(datos.email as string, tx);
+          if (otra && otra.id !== actual.usuarioId) throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
+          const comoProfesor = await this.profesorRepo.findByUsuarioId(actual.usuarioId, tx);
+          if (comoProfesor) {
+            await this.profesorRepo.actualizarParcial(comoProfesor.id, { email: datos.email as string }, tx);
+            await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "edicion", ids: { profesorIds: [comoProfesor.id] } }, tx);
+          }
         }
+        await this.usuarioRepo.actualizarParcial(
+          actual.usuarioId,
+          {
+            ...(emailCambia ? { email: datos.email as string } : {}),
+            ...(nombreCambia ? { nombre: `${datos.nombre ?? actual.nombre} ${datos.apellido ?? actual.apellido}`.trim() } : {}),
+          },
+          tx,
+        );
+        await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "edicion", ids: { usuarioIds: [actual.usuarioId] } }, tx);
       }
 
       // Solo las columnas que vinieron en el pedido: ausente no se toca, null borra.

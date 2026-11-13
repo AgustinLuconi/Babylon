@@ -87,7 +87,7 @@ const si = (b: boolean) => (b ? "sí" : "no");
   await esperar(500);
   const enTresDias = new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10);
   await pedir("POST", "/api/calificaciones/evaluaciones", profeToken, {
-    cursoId: m.cursoId, nombre: "Unit Vivo", tipo: "examen", fecha: enTresDias, periodo: "noviembre", escala: "numerica",
+    cursoId: m.cursoId, nombre: "Unit Vivo", tipo: "examen", fecha: enTresDias, periodo: "noviembre",
   });
   await esperar(500);
   ok("4: le llega como admin", si(multiAdmin.texto().includes("event: notificaciones")), "sí");
@@ -137,10 +137,10 @@ const si = (b: boolean) => (b ? "sí" : "no");
   const cp1 = abrir(p1);
   const cp2 = abrir(p2);
   await esperar(500);
-  await pedir("POST", "/api/auth/cambiar-contrasena", p1, { passwordActual: CLAVE, passwordNueva: "otraClave2026" });
+  await pedir("PATCH", `/api/auth/usuarios/${m.profe}`, await login("admin"), { password: "otraClave2026" });
   await esperar(500);
   ok("7: cambiar la contraseña", motivo(cp2), '{"motivo":"contrasena-cambiada"}');
-  ok("7: la sesión que la cambió sigue abierta", si(cp1.cerrada()), "no");
+  ok("7: el administrador cierra todas las sesiones de esa cuenta", motivo(cp1), '{"motivo":"contrasena-cambiada"}');
   const ajeno = abrir(await login("ajeno"));
   await esperar(500);
   await pedir("PATCH", `/api/auth/usuarios/${m.ajeno}/estado`, await login("admin"), { estado: "inactivo" });

@@ -56,7 +56,7 @@ const aviso = (usuarioId: string, rol: string, clave: string) => prisma.notifica
   ok("el padre lee: se resuelve", (await aviso(m.padre, "padre", clave))?.resueltaEn !== null ? "sí" : "no", "sí");
 
   // Un padre sin cuenta activa no recibe avisos; al activarla, aparece lo que ya le escribieron
-  await prisma.usuario.update({ where: { id: m.ajeno }, data: { estado: "pendiente" } });
+  await prisma.usuario.update({ where: { id: m.ajeno }, data: { estado: "inactivo" } });
   const delAjeno = await chats.iniciarConversacion(m.padreAjenoId);
   await chats.enviarMensaje(delAjeno.id, "Le escribimos por la cuota", m.admin, "secretario");
   ok("sin cuenta activa: sin aviso", (await aviso(m.ajeno, "padre", `mensajes:${delAjeno.id}`)) ? "sí" : "no", "no");

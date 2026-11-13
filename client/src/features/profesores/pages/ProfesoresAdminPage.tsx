@@ -8,9 +8,7 @@ import { resolverSoloModificados } from "@/core/formularios/resolverSoloModifica
 import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
 import { cambiosParaEnviar, hayCambios } from "@/core/lib/diferencias";
 import { erroresDeCampo } from "@/core/lib/erroresDeCampo";
-import { celularSchema, dniSchema, emailSchema, opcional, passwordNueva, textoRequerido } from "@/core/lib/validacion";
-import { mensajeDeAlta } from "@/features/usuarios/alta";
-import { ModoDeAcceso, type ModoAcceso } from "@/features/usuarios/components/ModoDeAcceso";
+import { celularSchema, dniSchema, emailSchema, opcional, textoRequerido } from "@/core/lib/validacion";
 import { Pencil, Search, ToggleLeft, ToggleRight, UserPlus } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
@@ -36,7 +34,6 @@ const profesorSchema = z.object({
   dni: dniSchema,
   telefono: opcional(celularSchema),
   email: emailSchema,
-  password: z.string().optional(),
 });
 type ProfesorFormInput = z.input<typeof profesorSchema>;
 type ProfesorForm = z.output<typeof profesorSchema>;
@@ -83,7 +80,6 @@ export default function ProfesoresAdminPage() {
   const [modal, setModal] = useState<ModalEstado>(null);
   const [estadoForm, setEstadoForm] = useState<EstadoProfesor>("activo");
   const [toast, setToast] = useState("");
-  const [modoAcceso, setModoAcceso] = useState<ModoAcceso>("invitacion");
 
   useEffect(() => {
     if (!toast) return;
@@ -173,10 +169,9 @@ export default function ProfesoresAdminPage() {
   });
 
   const abrirNuevo = () => {
-    reset({ nombre: "", apellido: "", dni: "", telefono: "", email: "", password: "" });
+    reset({ nombre: "", apellido: "", dni: "", telefono: "", email: "" });
     crearProfesor.reset();
     setSinCambios(false);
-    setModoAcceso("invitacion");
     setModal({ mode: "new" });
   };
 
@@ -187,7 +182,6 @@ export default function ProfesoresAdminPage() {
       dni: profesor.dni ?? "",
       telefono: profesor.telefono ?? "",
       email: profesor.email ?? "",
-      password: "",
     });
     actualizarProfesor.reset();
     setSinCambios(false);
@@ -216,17 +210,8 @@ export default function ProfesoresAdminPage() {
         await actualizarProfesor.mutateAsync({ id: modal.profesor.id, datos: cambios as ActualizarProfesorInput });
         setToast("Cambios guardados correctamente");
       } else {
-        let password: string | undefined;
-        if (modoAcceso === "contrasena") {
-          const resultadoPassword = passwordNueva.safeParse(datos.password ?? "");
-          if (!resultadoPassword.success) {
-            setError("password", { message: resultadoPassword.error.issues[0].message });
-            return;
-          }
-          password = resultadoPassword.data;
-        }
-        const creado = await crearProfesor.mutateAsync({ ...datos, password });
-        setToast(mensajeDeAlta(datos.email, creado.invitacion));
+        await crearProfesor.mutateAsync(datos);
+        setToast("Profesor creado. Para que pueda entrar, creale la cuenta desde Usuarios → Sin cuenta.");
       }
       setModal(null);
     } catch (error) {
@@ -433,22 +418,10 @@ export default function ProfesoresAdminPage() {
                 {errors.telefono && <p className="text-sm text-destructive">{errors.telefono.message}</p>}
               </div>
               <div className="col-span-2 space-y-1.5">
-                <label className="label">Email (login del sistema)</label>
+                <label className="label">Email</label>
                 <Input type="email" {...register("email")} className={`font-mono ${alDia.resaltados.has("email") ? "cambio-resaltado" : ""}`} />
                 {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
-              {modal.mode === "new" && (
-                <div className="col-span-2">
-                  <ModoDeAcceso valor={modoAcceso} onCambiar={setModoAcceso} />
-                </div>
-              )}
-              {modal.mode === "new" && modoAcceso === "contrasena" && (
-                <div className="col-span-2 space-y-1.5">
-                  <label className="label">Contraseña de acceso</label>
-                  <Input type="password" {...register("password")} />
-                  {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-                </div>
-              )}
             </div>
 
             {modal.mode === "edit" && (

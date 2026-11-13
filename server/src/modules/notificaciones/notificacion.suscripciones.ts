@@ -22,7 +22,10 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
   tablero.alPublicarse("asistencia.registrada", sincronizar(["asistencia_pendiente"]));
   tablero.alPublicarse("cursos.cambiaron", sincronizar(["asistencia_pendiente", "evaluacion_proxima", "notas_sin_publicar", "cierre_sin_publicar"]));
   tablero.alPublicarse("ciclo.activado", sincronizar(TIPOS_ESTADO));
-  tablero.alPublicarse("cuenta.cambio", sincronizar(TIPOS_ESTADO));
+  tablero.alPublicarse("cuenta.cambio", async ({ usuarioId, rolesQuitados }, tx) => {
+    if (rolesQuitados && rolesQuitados.length > 0) await avisos.borrarDeRoles(usuarioId, rolesQuitados, tx);
+    await avisos.sincronizar(TIPOS_ESTADO, tx);
+  });
   tablero.alPublicarse("evaluacion.creada", sincronizar(["evaluacion_proxima"]));
   tablero.alPublicarse("evaluacion.publicada", async ({ evaluacionId }, tx) => {
     await avisos.sincronizar(["notas_sin_publicar"], tx);

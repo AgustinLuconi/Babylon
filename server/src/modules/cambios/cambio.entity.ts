@@ -36,7 +36,6 @@ export type AccionCambio =
   | "revocacion"
   | "manual"
   | "estado"
-  | "invitacion"
   | "activacion"
   | "inicio"
   | "cierre";

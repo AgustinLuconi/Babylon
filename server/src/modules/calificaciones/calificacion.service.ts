@@ -80,7 +80,6 @@ export class CalificacionService {
       tipo: datos.tipo,
       fecha: datos.fecha,
       periodo: datos.periodo,
-      escala: datos.escala,
       estado: "borrador",
     };
     return this.unitOfWork.runInTransaction(async (tx) => {

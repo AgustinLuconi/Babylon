@@ -15,9 +15,9 @@ const CLAVES: Record<Exclude<TipoDato, "ciclos">, QueryKey[]> = {
   observaciones: [["observaciones"]],
   categorias: [["categoriasPersonalizadas"]],
   documentos: [["documentos"], ["autorizacionImagen"], ["reportes"]],
-  padres: [["padres"], ["pendientes"], ["alumnos"]],
-  profesores: [["profesores"], ["pendientes"], ["cursos"]],
-  usuarios: [["usuarios"], ["pendientes"]],
+  padres: [["padres"], ["sin-cuenta"], ["alumnos"]],
+  profesores: [["profesores"], ["sin-cuenta"], ["cursos"]],
+  usuarios: [["usuarios"], ["sin-cuenta"]],
   configuracion: [["configuracion"]],
   sesiones: [["sesiones"]],
 };

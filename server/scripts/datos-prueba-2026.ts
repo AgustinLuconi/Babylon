@@ -217,7 +217,6 @@ async function crear() {
   let evN = 0, calN = 0, ncN = 0;
   for (const c of CURSOS) {
     const alumnos = ALUMNOS.map((a, i) => ({ a, i })).filter(({ a }) => a[2] === c.n && !NUEVOS.has(ALUMNOS.indexOf(a)));
-    const conceptual = c.n === 1;
     const evals = [
       { nombre: "Reading Comprehension", tipo: "examen" as const, fecha: utc(2026, 6, 16), periodo: "julio" as const, estado: "publicada" as const },
       { nombre: "Oral Presentation", tipo: "oral" as const, fecha: utc(2026, 7, 2), periodo: "julio" as const, estado: "publicada" as const },
@@ -226,17 +225,17 @@ async function crear() {
     for (const e of evals) {
       evN++;
       const eid = `${P}eval-${evN}`;
-      await prisma.evaluacion.create({ data: { id: eid, cursoId: `${P}curso-${c.n}`, nombre: e.nombre, tipo: e.tipo, fecha: e.fecha, periodo: e.periodo, escala: conceptual ? "conceptual" : "numerica", estado: e.estado } });
+      await prisma.evaluacion.create({ data: { id: eid, cursoId: `${P}curso-${c.n}`, nombre: e.nombre, tipo: e.tipo, fecha: e.fecha, periodo: e.periodo, estado: e.estado } });
       if (e.estado === "borrador" && e.nombre === "Grammar Midterm" && c.n % 2 === 0) continue; // sin notas todavía
       for (const { i } of alumnos) {
         calN++;
-        const nota = conceptual ? elegir(["MB", "B", "B", "R"]) : String(elegir([5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]));
+        const nota = String(elegir([5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]));
         await prisma.calificacion.create({ data: { id: `${P}cal-${calN}`, evaluacionId: eid, alumnoId: `${P}alumno-${i + 1}`, nota, observacion: azar() < 0.3 ? elegir(["¡Excelente trabajo!", "Debe repasar vocabulario.", "Muy participativo/a."]) : undefined } });
       }
     }
     for (const { i } of alumnos) {
       ncN++;
-      await prisma.notaCierre.create({ data: { id: `${P}nc-${ncN}`, alumnoId: `${P}alumno-${i + 1}`, cursoId: `${P}curso-${c.n}`, periodo: "julio", nota: conceptual ? elegir(["MB", "B"]) : String(elegir([6, 7, 8, 9])), estado: c.n <= 3 ? "publicada" : "borrador", observacion: azar() < 0.3 ? "Buen desempeño en el período." : undefined } });
+      await prisma.notaCierre.create({ data: { id: `${P}nc-${ncN}`, alumnoId: `${P}alumno-${i + 1}`, cursoId: `${P}curso-${c.n}`, periodo: "julio", nota: String(elegir([6, 7, 8, 9])), estado: c.n <= 3 ? "publicada" : "borrador", observacion: azar() < 0.3 ? "Buen desempeño en el período." : undefined } });
     }
   }
 

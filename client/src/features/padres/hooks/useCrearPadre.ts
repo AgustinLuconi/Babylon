@@ -9,7 +9,7 @@ export function useCrearPadre() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["padres"] });
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      queryClient.invalidateQueries({ queryKey: ["pendientes"] });
+      queryClient.invalidateQueries({ queryKey: ["sin-cuenta"] });
     },
   });
 }

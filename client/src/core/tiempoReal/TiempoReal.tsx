@@ -7,7 +7,7 @@ import { avisarCierreLocal, iniciarTiempoReal } from "./coordinador";
 import type { SenalEnVivo } from "./lectorSse";
 import { emitirSenal } from "./senales";
 
-const MOTIVOS_CON_MENSAJE = ["cerrada-por-el-usuario", "cerrada-desde-otro-dispositivo", "contrasena-cambiada", "cuenta-desactivada"];
+const MOTIVOS_CON_MENSAJE = ["cerrada-por-el-usuario", "cerrada-desde-otro-dispositivo", "contrasena-cambiada", "roles-cambiados", "cuenta-desactivada"];
 
 // "vencida" (o un motivo desconocido) se muestra como la sesión vencida de siempre.
 function motivoParaElLogin(datos: unknown): string {

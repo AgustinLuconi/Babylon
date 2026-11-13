@@ -1,11 +1,7 @@
 import "dotenv/config";
 import { z } from "zod";
 
-// Variables vacías en el .env (SMTP_HOST="") cuentan como no configuradas.
-const opcional = z.string().optional().transform((v) => v || undefined);
-
-const envSchema = z
-  .object({
+const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL es requerida"),
@@ -23,25 +19,7 @@ const envSchema = z
     // esquivaría los límites por IP mandando un encabezado cualquiera. Hay que indicar cuántos
     // proxies hay delante (número de saltos), o "false".
     .refine((v) => v !== "true", 'TRUST_PROXY="true" no es seguro: indicá la cantidad de proxies delante (ej. "1") o "false"'),
-  // Envío de correos (recuperación de contraseña). Sin SMTP_HOST, los correos se
-  // escriben en la consola del server; en producción es obligatorio.
-  SMTP_HOST: opcional,
-  SMTP_PORT: z.coerce.number().int().positive().default(587),
-  SMTP_SECURE: z.enum(["true", "false"]).default("false").transform((v) => v === "true"),
-  SMTP_USER: opcional,
-  SMTP_PASS: opcional,
-  MAIL_FROM: z.string().default("Babylon English Institute <no-reply@babylon.local>"),
-  // Base de los enlaces que van en los correos (la URL del client).
-  APP_URL: opcional.pipe(z.url("APP_URL debe ser una URL completa (ej. https://babylon.ejemplo.com)").optional()),
-  })
-  .superRefine((env, ctx) => {
-    if (env.NODE_ENV === "production") {
-      for (const clave of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "APP_URL"] as const) {
-        if (!env[clave]) ctx.addIssue({ code: "custom", path: [clave], message: `${clave} es requerida en producción` });
-      }
-    }
-  })
-  .transform((env) => ({ ...env, APP_URL: env.APP_URL ?? env.CORS_ORIGIN }));
+});
 
 const parsedEnv = envSchema.safeParse(process.env);
 

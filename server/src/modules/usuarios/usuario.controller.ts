@@ -1,14 +1,11 @@
 import type { Request, Response } from "express";
 import { describirDispositivo } from "../../core/dispositivo";
 import {
-  cambiarContrasenaSchema,
   cambiarEstadoUsuarioSchema,
-  crearAdministradorSchema,
-  crearSecretarioSchema,
+  actualizarCuentaSchema,
   credencialesSchema,
-  olvideContrasenaSchema,
-  restablecerContrasenaSchema,
-  verificarEmailSchema,
+  crearCuentaSchema,
+  porEmailSchema,
 } from "./usuario.schema";
 import type { UsuarioService } from "./usuario.service";
 
@@ -24,25 +21,8 @@ export class UsuarioController {
     res.status(200).json(sesion);
   };
 
-  cambiarContrasena = async (req: Request, res: Response) => {
-    const datos = cambiarContrasenaSchema.parse(req.body);
-    await this.usuarioService.cambiarContrasena(req.auth!.sub, req.auth!.sesionId, datos);
-    res.status(204).end();
-  };
-
   yo = async (req: Request, res: Response) => {
     res.status(200).json(await this.usuarioService.yo(req.auth!.sub, req.auth!.rol));
-  };
-
-  enviarVerificacion = async (req: Request, res: Response) => {
-    await this.usuarioService.enviarVerificacion(req.auth!.sub);
-    res.status(204).end();
-  };
-
-  verificarEmail = async (req: Request, res: Response) => {
-    const { token } = verificarEmailSchema.parse(req.body);
-    await this.usuarioService.verificarEmail(token);
-    res.status(204).end();
   };
 
   logout = async (req: Request, res: Response) => {
@@ -64,21 +44,29 @@ export class UsuarioController {
     res.status(200).json({ cerradas });
   };
 
-  crearSecretario = async (req: Request, res: Response) => {
-    const datos = crearSecretarioSchema.parse(req.body);
-    const secretario = await this.usuarioService.crearSecretario(datos);
-    res.status(201).json(secretario);
+  listarSinCuenta = async (_req: Request, res: Response) => {
+    res.status(200).json(await this.usuarioService.listarSinCuenta());
   };
 
-  crearAdministrador = async (req: Request, res: Response) => {
-    const datos = crearAdministradorSchema.parse(req.body);
-    const administrador = await this.usuarioService.crearAdministrador(datos);
-    res.status(201).json(administrador);
+  buscarPorEmail = async (req: Request, res: Response) => {
+    const { email } = porEmailSchema.parse(req.query);
+    res.status(200).json(await this.usuarioService.buscarPorEmail(email));
+  };
+
+  crearCuenta = async (req: Request, res: Response) => {
+    const datos = crearCuentaSchema.parse(req.body);
+    res.status(201).json(await this.usuarioService.crearCuenta(datos, { usuarioId: req.auth!.sub, sesionId: req.auth!.sesionId }));
   };
 
   listarUsuarios = async (_req: Request, res: Response) => {
     const usuarios = await this.usuarioService.listarUsuarios();
     res.status(200).json(usuarios);
+  };
+
+  actualizarCuenta = async (req: Request, res: Response) => {
+    const datos = actualizarCuentaSchema.parse(req.body);
+    const usuario = await this.usuarioService.actualizarCuenta(String(req.params.id), datos, { usuarioId: req.auth!.sub, sesionId: req.auth!.sesionId });
+    res.status(200).json(usuario);
   };
 
   cambiarEstado = async (req: Request, res: Response) => {
@@ -87,17 +75,4 @@ export class UsuarioController {
     res.status(200).json(usuario);
   };
 
-  olvideContrasena = async (req: Request, res: Response) => {
-    const { email } = olvideContrasenaSchema.parse(req.body);
-    await this.usuarioService.solicitarRecuperacion(email);
-    res.status(200).json({
-      mensaje: "Si el email está registrado, te enviamos un enlace para restablecer la contraseña. Revisá también la carpeta de spam.",
-    });
-  };
-
-  restablecerContrasena = async (req: Request, res: Response) => {
-    const { token, password } = restablecerContrasenaSchema.parse(req.body);
-    await this.usuarioService.restablecerContrasena(token, password);
-    res.status(204).end();
-  };
 }

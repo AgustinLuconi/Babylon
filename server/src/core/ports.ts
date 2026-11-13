@@ -27,19 +27,6 @@ export interface UnitOfWork<TContext = unknown> {
 // inyecta la implementación con configurarValidadorDeSesion().
 export type ValidadorDeSesion = (sesionId: string, usuarioId: string) => Promise<boolean>;
 
-export interface MensajeCorreo {
-  para: string;
-  asunto: string;
-  texto: string;
-  html: string;
-}
-
-// Envío de correos. container.ts elige el adaptador: SMTP real si está
-// configurado, consola en desarrollo.
-export interface Mailer {
-  enviar(mensaje: MensajeCorreo): Promise<void>;
-}
-
 // Anuncios entre módulos (ver core/eventos.ts). `M` es el mapa nombre → datos de los anuncios que publica un módulo.
 // `tx` es la transacción en curso: lo que se suscribe "dentro" corre en ella; sin `tx`, todo corre en el momento.
 export interface Publicador<M> {
@@ -51,6 +38,7 @@ export type MotivoCierre =
   | "cerrada-por-el-usuario"
   | "cerrada-desde-otro-dispositivo"
   | "contrasena-cambiada"
+  | "roles-cambiados"
   | "cuenta-desactivada"
   | "vencida";
 

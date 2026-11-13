@@ -28,26 +28,6 @@ export const limiteLoginPorCuenta = rateLimit({
 // Techo general contra quien prueba muchas cuentas desde una IP.
 export const limiteLoginPorIp = rateLimit({ ...base, limit: 20, skipSuccessfulRequests: true });
 
-export const limiteOlvideContrasena = rateLimit({ ...base, limit: 5 });
-export const limiteRestablecerContrasena = rateLimit({ ...base, limit: 5 });
-
-// Cambiar la contraseña desde "Mi cuenta": quien tenga una sesión robada no puede adivinar la contraseña actual.
-// La clave es la cuenta (va después de authMiddleware). Solo cuentan los intentos con la contraseña actual equivocada
-// (PasswordActualIncorrectaError, de usuarios/): ni los cambios exitosos ni los errores de validación de la nueva.
-export const limiteCambioContrasena = rateLimit({
-  ...base,
-  limit: 5,
-  skipSuccessfulRequests: true,
-  requestWasSuccessful: (_req, res) => res.locals.errorDeDominio !== "PasswordActualIncorrectaError",
-  keyGenerator: (req) => req.auth?.sub ?? ipKeyGenerator(req.ip ?? ""),
-});
-
-// Enlaces públicos de invitación: quien prueba enlaces al azar choca con el límite.
-export const limiteConsultarInvitacion = rateLimit({ ...base, limit: 5 });
-export const limiteActivarCuenta = rateLimit({ ...base, limit: 5 });
-
-export const limiteVerificarEmail = rateLimit({ ...base, limit: 5 });
-
 // Aperturas de la conexión en vivo: 10 por minuto por sesión (va después de authMiddleware). Una pestaña que se
 // reconecta sin parar no puede saturar al servidor.
 export const limiteTiempoReal = rateLimit({

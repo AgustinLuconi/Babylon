@@ -9,7 +9,6 @@ import { config } from "./core/config";
 import { errorHandler } from "./core/middlewares/errorHandler";
 import { tiempoRealRoutes } from "./core/tiempoReal";
 import { container } from "./container";
-import { invitacionRoutes } from "./modules/usuarios/invitacion.routes";
 import { usuarioRoutes } from "./modules/usuarios/usuario.routes";
 import { cicloRoutes } from "./modules/ciclos/ciclo.routes";
 import { padreRoutes } from "./modules/padres/padre.routes";
@@ -42,7 +41,6 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", usuarioRoutes(container.usuarioController));
-app.use("/api/auth", invitacionRoutes(container.invitacionController));
 app.use("/api/ciclos", cicloRoutes(container.cicloController));
 app.use("/api/padres", padreRoutes(container.padreController));
 app.use("/api/profesores", profesorRoutes(container.profesorController));

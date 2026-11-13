@@ -84,7 +84,7 @@ const diasAdelante = (n: number) => new Date(Date.now() + n * 86_400_000).toISOS
   ok("chat: mensaje de 2001 caracteres", rechazo(await pedir("POST", `/api/chats/${chatId}/mensajes`, padre, { texto: largo(2001) }), "texto"), "400:texto");
   ok("chat: mensaje de puros espacios", rechazo(await pedir("POST", `/api/chats/${chatId}/mensajes`, padre, { texto: "   " }), "texto"), "400:texto");
 
-  const evaluacion = { cursoId: m.cursoId, nombre: "Unit", tipo: "examen", fecha: diasAdelante(5), periodo: "noviembre", escala: "numerica" };
+  const evaluacion = { cursoId: m.cursoId, nombre: "Unit", tipo: "examen", fecha: diasAdelante(5), periodo: "noviembre" };
   const crearEvaluacion = (cambios: object) => pedir("POST", "/api/calificaciones/evaluaciones", profe, { ...evaluacion, ...cambios });
   ok("evaluación: fecha a dos años", rechazo(await crearEvaluacion({ fecha: diasAdelante(730) }), "fecha"), "400:fecha");
   ok("evaluación: nombre de 81 caracteres", rechazo(await crearEvaluacion({ nombre: largo(81) }), "nombre"), "400:nombre");
@@ -102,8 +102,7 @@ const diasAdelante = (n: number) => new Date(Date.now() + n * 86_400_000).toISOS
     ["PATCH", `/api/profesores/${m.profesorId}`, admin],
     ["POST", "/api/cursos", admin],
     ["PATCH", `/api/cursos/${m.cursoId}`, admin],
-    ["POST", "/api/auth/secretarios", admin],
-    ["POST", "/api/auth/administradores", admin],
+    ["POST", "/api/auth/cuentas", admin],
     ["POST", "/api/ciclos", admin],
     ["PATCH", "/api/configuracion", admin],
     ["POST", "/api/cuotas/pagos", secre],

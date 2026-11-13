@@ -1,8 +1,6 @@
 import { Panel } from "@/core/components/ui/panel";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ROL_LABELS } from "@/features/auth/types";
-import { CambiarContrasena } from "../components/CambiarContrasena";
-import { EmailSinVerificar } from "../components/EmailSinVerificar";
 import { PreferenciasNotificaciones } from "../components/PreferenciasNotificaciones";
 import { SesionesActivas } from "../components/SesionesActivas";
 
@@ -18,7 +16,6 @@ export default function MiCuentaPage() {
 
   return (
     <div className="space-y-4">
-      <EmailSinVerificar />
       <Panel title="Datos">
         <dl className="grid gap-4 p-5 sm:grid-cols-3">
           {datos.map(([etiqueta, valor]) => (
@@ -28,8 +25,10 @@ export default function MiCuentaPage() {
             </div>
           ))}
         </dl>
+        <p className="border-t px-5 py-3 text-[12px] text-muted-foreground" style={{ borderColor: "var(--border-hex)" }}>
+          Para cambiar tu contraseña o tu email, pedíselo a la administración del instituto.
+        </p>
       </Panel>
-      <CambiarContrasena />
       <PreferenciasNotificaciones />
       <SesionesActivas />
     </div>

@@ -1,28 +1,24 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcrypt";
-import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
+import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
-import type { CuentaPreparada, EstadoInvitacion, InvitacionService } from "../usuarios/invitacion.service";
+import type { PadreRepository } from "../padres/padre.repository";
 import type { SesionRepository } from "../usuarios/sesion.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
-import type { Usuario } from "../usuarios/usuario.entity";
 import type { ProfesorRepository } from "./profesor.repository";
 import type { Profesor } from "./profesor.entity";
 import type { ActualizarProfesorInput, CrearProfesorInput, CrearProfesorSinCuentaInput } from "./profesor.schema";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosUsuarios } from "../usuarios/usuario.eventos";
 
-export type ProfesorCreado = Profesor & { invitacion: EstadoInvitacion | null };
-
 export class ProfesorService {
   constructor(
     private readonly profesorRepo: ProfesorRepository,
     private readonly usuarioRepo: UsuarioRepository,
     private readonly sesionRepo: SesionRepository,
+    private readonly padreRepo: PadreRepository,
     private readonly unitOfWork: UnitOfWork,
-    private readonly invitaciones: InvitacionService,
     private readonly anuncios: Publicador<EventosUsuarios & EventosCambios> = sinAnuncios(),
   ) {}
 
@@ -38,59 +34,30 @@ export class ProfesorService {
     return profesor;
   }
 
-  async crearProfesor(datos: CrearProfesorInput): Promise<ProfesorCreado> {
-    const emailExistente = await this.usuarioRepo.findByEmail(datos.email);
-    if (emailExistente) {
-      throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
-    }
-    const dniExistente = await this.profesorRepo.findByDni(datos.dni);
-    if (dniExistente) {
+  // Crea solo la ficha: la cuenta de acceso la crea el administrador después (ver `UsuarioService.crearCuenta`).
+  async crearProfesor(datos: CrearProfesorInput): Promise<Profesor> {
+    return this.unitOfWork.runInTransaction(async (tx) => (await this.crearFichaEnTransaccion(datos, tx)).profesor);
+  }
+
+  // La ficha de un profesor dentro de una transacción en curso (la usan el alta y la creación de una cuenta con ficha nueva).
+  async crearFichaEnTransaccion(datos: CrearProfesorInput, tx: unknown): Promise<{ profesor: Profesor }> {
+    if (await this.profesorRepo.findByDni(datos.dni, tx)) {
       throw new ConflictError(`Ya existe un profesor con el DNI ${datos.dni}`);
     }
-
-    const ahora = new Date();
-    const nombreCuenta = `${datos.nombre} ${datos.apellido}`;
-    const { profesor, cuenta } = await this.unitOfWork.runInTransaction(async (tx) => {
-      let usuarioId: string;
-      let cuenta: CuentaPreparada | null = null;
-      if (datos.password) {
-        const usuario: Usuario = {
-          id: randomUUID(),
-          nombre: nombreCuenta,
-          email: datos.email,
-          passwordHash: await bcrypt.hash(datos.password, 10),
-          roles: ["profesor"],
-          estado: "activo",
-          fechaCreacion: ahora,
-          emailVerificadoEn: null,
-        };
-        await this.usuarioRepo.create(usuario, tx);
-        usuarioId = usuario.id;
-      } else {
-        // Sin contraseña: la cuenta queda pendiente y la invitación se manda después de confirmar la transacción.
-        cuenta = await this.invitaciones.prepararCuentaPendiente({ nombre: nombreCuenta, email: datos.email, roles: ["profesor"] }, ahora, tx);
-        usuarioId = cuenta.usuario.id;
-      }
-
-      const profesor: Profesor = {
+    const profesor = await this.profesorRepo.create(
+      {
         id: randomUUID(),
         nombre: datos.nombre,
         apellido: datos.apellido,
         dni: datos.dni,
         telefono: datos.telefono,
         email: datos.email,
-        usuarioId,
         estado: "activo",
-      };
-      const creado = await this.profesorRepo.create(profesor, tx);
-      if (!cuenta) await this.anuncios.publicar("cuenta.cambio", { usuarioId }, tx);
-      await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "alta", ids: { profesorIds: [creado.id] } }, tx);
-      await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "alta", ids: { usuarioIds: [usuarioId] } }, tx);
-      return { profesor: creado, cuenta };
-    });
-
-    if (!cuenta) return { ...profesor, invitacion: null };
-    return { ...profesor, invitacion: (await this.invitaciones.enviarInvitacion(cuenta)) ? "enviada" : "no-enviada" };
+      },
+      tx,
+    );
+    await this.anuncios.publicar("datos.cambiaron", { dato: "profesores", accion: "alta", ids: { profesorIds: [profesor.id] } }, tx);
+    return { profesor };
   }
 
   // Sin `UnitOfWork`: un único insert, no hay Usuario que crear en la misma
@@ -157,42 +124,38 @@ export class ProfesorService {
               throw new ConflictError(`Ya existe un usuario con el email ${datos.email}`);
             }
           }
-          if (usuario.estado === "pendiente") {
-            // Invitación sin aceptar: el estado de la cuenta no se toca desde la ficha (pasa a activa solo cuando la
-            // persona la activa) y el estado del profesor tampoco puede cambiar hasta entonces.
-            if (actualizado.estado !== profesor.estado) throw new ValidationError("La cuenta todavía no fue activada");
-            const ahora = new Date();
-            await this.usuarioRepo.actualizarParcial(
-              usuario.id,
-              {
-                nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
-                ...(datos.email ? { email: datos.email } : {}),
-              },
-              tx,
-            );
-            // Si cambia el email, la invitación que se mandó al anterior ya no puede activar la cuenta: quedará
-            // "vencida" hasta que el admin la reenvíe al email nuevo.
-            if (datos.email && datos.email !== usuario.email) await this.usuarioRepo.invalidarTokens(usuario.id, "invitacion", ahora, tx);
-          } else {
-            // Solo los campos que cambian (no se reescribe la fila).
-            await this.usuarioRepo.actualizarParcial(
-              usuario.id,
-              {
-                nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
-                ...(datos.email ? { email: datos.email } : {}),
-                estado: actualizado.estado,
-              },
-              tx,
-            );
+          // El estado de la ficha solo pasa a la cuenta si el pedido lo cambia Y la cuenta es solo de profesor: una cuenta con
+          // más roles (por ejemplo, administración) no se desactiva —ni se deja afuera a su dueño— por desactivar la ficha; eso
+          // se hace a propósito desde Usuarios. Editar otros datos nunca toca el estado de la cuenta.
+          const cambiaElEstado = datos.estado !== undefined && datos.estado !== profesor.estado;
+          const cuentaSoloProfesor = usuario.roles.length === 1 && usuario.roles[0] === "profesor";
+          const sincronizaEstado = cambiaElEstado && cuentaSoloProfesor;
+          // Solo los campos que cambian (no se reescribe la fila).
+          await this.usuarioRepo.actualizarParcial(
+            usuario.id,
+            {
+              nombre: `${actualizado.nombre} ${actualizado.apellido ?? ""}`.trim(),
+              ...(datos.email ? { email: datos.email } : {}),
+              ...(sincronizaEstado ? { estado: actualizado.estado } : {}),
+            },
+            tx,
+          );
+          // El email es el mismo en todas las fichas de la cuenta: si hay también una de responsable, la acompaña.
+          if (datos.email) {
+            const comoPadre = await this.padreRepo.findByUsuarioId(usuario.id, tx);
+            if (comoPadre && comoPadre.email !== datos.email) {
+              await this.padreRepo.actualizarParcial(comoPadre.id, { email: datos.email }, tx);
+              await this.anuncios.publicar("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: [comoPadre.id] } }, tx);
+            }
+          }
+          if (sincronizaEstado) {
             // Desactivar al profesor cierra todas sus sesiones: reactivarlo más tarde no las revive.
             if (actualizado.estado === "inactivo") {
               await this.sesionRepo.cerrarTodas(usuario.id, new Date(), undefined, tx);
               await this.anuncios.publicar("sesiones.cerradas", { usuarioId: usuario.id, motivo: "cuenta-desactivada" }, tx);
             }
-            if (actualizado.estado !== profesor.estado) {
-              await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
-              await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "estado", ids: { usuarioIds: [usuario.id] } }, tx);
-            }
+            await this.anuncios.publicar("cuenta.cambio", { usuarioId: usuario.id }, tx);
+            await this.anuncios.publicar("datos.cambiaron", { dato: "usuarios", accion: "estado", ids: { usuarioIds: [usuario.id] } }, tx);
           }
         }
       }

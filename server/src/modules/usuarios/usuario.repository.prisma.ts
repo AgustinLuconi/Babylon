@@ -2,7 +2,6 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { ConflictError, EntityNotFoundError } from "../../core/errors";
 import type { Rol } from "../../core/ports";
 import type { CambiosUsuario, UsuarioRepository } from "./usuario.repository";
-import type { TipoTokenCuenta, TokenCuenta } from "./tokenCuenta.entity";
 import type { Usuario } from "./usuario.entity";
 
 type FilaUsuario = Awaited<ReturnType<PrismaClient["usuario"]["findUniqueOrThrow"]>>;
@@ -15,6 +14,10 @@ const normalizarEmail = (email: string) => email.trim().toLowerCase();
 function esEmailRepetido(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
+
+// Prisma avisa con P2025 que la fila no existe. Cualquier otro error (una caída de la base, un bloqueo abortado) no es "no existe":
+// se deja pasar tal cual para que se vea como lo que es.
+const noExiste = (error: unknown) => error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
 
 function aEntidad(fila: FilaUsuario): Usuario {
   return { ...fila, roles: fila.roles as Rol[] };
@@ -61,7 +64,8 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
       return aEntidad(fila);
     } catch (error) {
       if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${entidad.email}`);
-      throw new EntityNotFoundError("Usuario", id);
+      if (noExiste(error)) throw new EntityNotFoundError("Usuario", id);
+      throw error;
     }
   }
 
@@ -82,41 +86,12 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
       return aEntidad(fila);
     } catch (error) {
       if (esEmailRepetido(error)) throw new ConflictError(`Ya existe un usuario con el email ${cambios.email}`);
-      throw new EntityNotFoundError("Usuario", id);
+      if (noExiste(error)) throw new EntityNotFoundError("Usuario", id);
+      throw error;
     }
   }
 
   async bloquearCuenta(clave: string, tx: unknown): Promise<void> {
     await this.client(tx).$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clave}, 0))`;
-  }
-
-  async crearToken(token: TokenCuenta, tx?: unknown): Promise<TokenCuenta> {
-    return this.client(tx).tokenCuenta.create({ data: token });
-  }
-
-  async eliminarToken(id: string, tx?: unknown): Promise<void> {
-    await this.client(tx).tokenCuenta.deleteMany({ where: { id } });
-  }
-
-  async findTokenPorHash(hash: string, tx?: unknown): Promise<TokenCuenta | null> {
-    return this.client(tx).tokenCuenta.findUnique({ where: { hash } });
-  }
-
-  async findTokensDesde(usuarioId: string, tipo: TipoTokenCuenta, desde: Date, tx?: unknown): Promise<TokenCuenta[]> {
-    return this.client(tx).tokenCuenta.findMany({ where: { usuarioId, tipo, creadoEn: { gte: desde } } });
-  }
-
-  async findTokensDeUsuarios(usuarioIds: string[], tipo: TipoTokenCuenta, tx?: unknown): Promise<TokenCuenta[]> {
-    if (usuarioIds.length === 0) return [];
-    return this.client(tx).tokenCuenta.findMany({ where: { usuarioId: { in: usuarioIds }, tipo } });
-  }
-
-  async invalidarTokens(usuarioId: string, tipo: TipoTokenCuenta, ahora: Date, tx?: unknown): Promise<void> {
-    await this.client(tx).tokenCuenta.updateMany({ where: { usuarioId, tipo, usadoEn: null }, data: { usadoEn: ahora } });
-  }
-
-  async marcarTokenUsado(id: string, ahora: Date, tx?: unknown): Promise<boolean> {
-    const { count } = await this.client(tx).tokenCuenta.updateMany({ where: { id, usadoEn: null }, data: { usadoEn: ahora } });
-    return count === 1;
   }
 }
