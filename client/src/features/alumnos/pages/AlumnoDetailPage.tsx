@@ -3,6 +3,7 @@ import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { AlertCircle, ChevronLeft, ChevronRight, Download, FileSignature, FileText, PenLine, Pencil, Plus, RefreshCw, Send, Upload, UserCheck, UserX } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
+import { elegir, useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
@@ -89,7 +90,10 @@ export default function AlumnoDetailPage() {
   const { id: alumnoId } = useParams<{ id: string }>();
   const { usuario } = useAuth();
   const puedeGestionar = usuario?.rol === "admin";
-  const [tab, setTab] = useState<TabId>("info");
+  // Pestaña, período y filtro de observaciones en la dirección: un enlace abre el legajo en esa pestaña y recargar la conserva.
+  const { leer, escribir } = useFiltrosDeUrl();
+  const tab = elegir<TabId>(leer("pestana"), TABS.map((t) => t.id), "info");
+  const setTab = (id: TabId) => escribir({ pestana: id === "info" ? null : id });
   const [toast, setToast] = useState("");
 
   const mostrarToast = (mensaje: string) => {
@@ -114,7 +118,8 @@ export default function AlumnoDetailPage() {
   // Académico
   const { data: calificaciones, isLoading: cargandoNotas } = useCalificacionesDeAlumno(alumnoId);
   const { data: notasCierre, isLoading: cargandoNotasCierre } = useNotasCierreDeAlumno(alumnoId);
-  const [periodo, setPeriodo] = useState<PeriodoAcademico>("julio");
+  const periodo = elegir<PeriodoAcademico>(leer("periodo"), Object.keys(PERIODO_LABELS) as PeriodoAcademico[], "julio");
+  const setPeriodo = (id: PeriodoAcademico) => escribir({ periodo: id === "julio" ? null : id });
   const evalsDelPeriodo = useMemo(
     () => (calificaciones ?? []).filter((c) => c.evaluacionPeriodo === periodo),
     [calificaciones, periodo],
@@ -199,7 +204,10 @@ export default function AlumnoDetailPage() {
     for (const categoria of categoriasPersonalizadas ?? []) mapa.set(categoria.id, categoria.nombre);
     return mapa;
   }, [categoriasPersonalizadas]);
-  const [obsFiltro, setObsFiltro] = useState("all");
+  const obsPedido = leer("categoria") ?? "all";
+  // Mientras las categorías propias del curso cargan se respeta lo pedido; después, una que no existe vuelve a "Todas".
+  const obsFiltro = obsPedido === "all" || !categoriasPersonalizadas || nombresPorCategoria.has(obsPedido) ? obsPedido : "all";
+  const setObsFiltro = (id: string) => escribir({ categoria: id === "all" ? null : id });
   const observacionesVisibles = useMemo(
     () => (obsFiltro === "all" ? observaciones : observaciones?.filter((o) => o.categoria === obsFiltro)),
     [observaciones, obsFiltro],
