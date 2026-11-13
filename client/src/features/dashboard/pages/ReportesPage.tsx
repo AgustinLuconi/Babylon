@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Download, Printer } from "lucide-react";
 import { Avatar } from "@/core/components/ui/avatar";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
 import { KpiCard } from "@/core/components/ui/kpi-card";
 import { Select } from "@/core/components/ui/select";
+import { elegir, useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { formatMonto } from "@/core/lib/utils";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useReporteAlumnos } from "@/features/reportes/hooks/useReporteAlumnos";
@@ -63,12 +63,18 @@ export default function ReportesPage() {
   const cicloActivo = ciclos?.find((c) => c.activo);
   // "activo" es un centinela (no un id real): sigue al ciclo marcado como
   // activo en cada momento, mismo patrón que ya usa CursosAdminPage/Alumnos.
-  const [filtroCiclo, setFiltroCiclo] = useState<string>("activo");
+  // Ciclo, pestaña y período en la dirección; un valor que no existe vuelve al de por defecto.
+  const { leer, escribir } = useFiltrosDeUrl();
+  const cicloPedido = leer("ciclo") ?? "activo";
+  const filtroCiclo = cicloPedido === "activo" || cicloPedido === "todos" || !ciclos || ciclos.some((c) => c.id === cicloPedido) ? cicloPedido : "activo";
+  const setFiltroCiclo = (valor: string) => escribir({ ciclo: valor === "activo" ? null : valor });
   const cicloIdEfectivo = filtroCiclo === "todos" ? undefined : filtroCiclo === "activo" ? cicloActivo?.id : filtroCiclo;
 
   const { data: filas, isLoading } = useReporteAlumnos(cicloIdEfectivo);
-  const [tab, setTab] = useState<Tab>("cierre");
-  const [periodo, setPeriodo] = useState<Periodo>("julio");
+  const tab = elegir<Tab>(leer("pestana"), ["cierre", "anual", "financiero"], "cierre");
+  const setTab = (t: Tab) => escribir({ pestana: t === "cierre" ? null : t });
+  const periodo = elegir<Periodo>(leer("periodo"), ["julio", "noviembre"], "julio");
+  const setPeriodo = (p: Periodo) => escribir({ periodo: p === "julio" ? null : p });
 
   const rows = filas ?? [];
 

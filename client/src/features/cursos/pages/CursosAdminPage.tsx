@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -114,12 +115,20 @@ export default function CursosAdminPage() {
   const actualizarCurso = useActualizarCurso();
 
   const [busqueda, setBusqueda] = useState("");
-  const [filtroNivel, setFiltroNivel] = useState("todos");
-  const [filtroProfesor, setFiltroProfesor] = useState("todos");
+  // Nivel, profesor y ciclo en la dirección (la búsqueda por texto no). Un id que no existe vuelve a "todos".
+  const { leer, escribir } = useFiltrosDeUrl();
+  const nivelPedido = leer("nivel") ?? "todos";
+  const filtroNivel = nivelPedido === "todos" || NIVEL_LABELS[nivelPedido as NivelCurso] ? nivelPedido : "todos";
+  const setFiltroNivel = (valor: string) => escribir({ nivel: valor === "todos" ? null : valor });
+  const profesorPedido = leer("profesor") ?? "todos";
+  const filtroProfesor = profesorPedido === "todos" || !profesores || profesores.some((p) => p.id === profesorPedido) ? profesorPedido : "todos";
+  const setFiltroProfesor = (valor: string) => escribir({ profesor: valor === "todos" ? null : valor });
   // "activo" es un centinela (no un id real): sigue al ciclo que esté
   // marcado como activo en cada momento, en vez de quedar clavado al id del
   // ciclo que estaba activo cuando se abrió la pantalla.
-  const [filtroCiclo, setFiltroCiclo] = useState<string>("activo");
+  const cicloPedido = leer("ciclo") ?? "activo";
+  const filtroCiclo = cicloPedido === "activo" || cicloPedido === "todos" || !ciclos || ciclos.some((c) => c.id === cicloPedido) ? cicloPedido : "activo";
+  const setFiltroCiclo = (valor: string) => escribir({ ciclo: valor === "activo" ? null : valor });
   const cicloActivo = ciclos?.find((c) => c.activo);
   const [modal, setModal] = useState<{ mode: "new" } | { mode: "edit"; curso: Curso } | null>(null);
   const [estadoForm, setEstadoForm] = useState<EstadoCurso>("activo");

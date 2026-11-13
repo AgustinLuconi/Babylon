@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { etiquetaDeAutor } from "@/features/observaciones/autor";
 import { claseDeFila, useListaConSalidas } from "@/core/hooks/useListaConSalidas";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
@@ -28,21 +29,18 @@ const CATEGORIA_COLOR: Record<string, string> = {
 
 export default function ObservacionesProfesorPage() {
   const { data: cursos } = useCursosDelCicloActivo();
-  const [cursoId, setCursoId] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (!cursoId && cursos && cursos.length > 0) setCursoId(cursos[0].id);
-  }, [cursos, cursoId]);
+  // Curso, alumno y categoría en la dirección: un enlace los trae puestos y recargar los conserva. Un curso que no es del
+  // profesor, un alumno que no es de ese curso o una categoría que no existe caen en el de por defecto (la dirección no da
+  // permisos). El texto de la observación nunca va acá.
+  const { leer, escribir } = useFiltrosDeUrl();
+  const cursoPedido = leer("curso");
+  const cursoId = cursos?.some((c) => c.id === cursoPedido) ? (cursoPedido as string) : cursos?.[0]?.id;
+  const setCursoId = (id: string) => escribir({ curso: id, alumno: null, categoria: null });
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
-  const [alumnoId, setAlumnoId] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (alumnos && alumnos.length > 0 && !alumnos.find((a) => a.id === alumnoId)) {
-      setAlumnoId(alumnos[0].id);
-    }
-    if (alumnos && alumnos.length === 0) setAlumnoId(undefined);
-  }, [alumnos, alumnoId]);
+  const alumnoPedido = leer("alumno");
+  const alumnoId = alumnos?.some((a) => a.id === alumnoPedido) ? (alumnoPedido as string) : alumnos?.[0]?.id;
+  const setAlumnoId = (id: string) => escribir({ alumno: id });
 
   const { data: categoriasPersonalizadas } = useCategoriasPersonalizadas(cursoId);
   const { data: observaciones, isLoading, isError } = useObservacionesPorAlumno(alumnoId);
@@ -63,7 +61,12 @@ export default function ObservacionesProfesorPage() {
   const [texto, setTexto] = useState("");
   useSinGuardar(texto.trim() !== "");
   const [categoria, setCategoria] = useState<string>("academico");
-  const [catFilter, setCatFilter] = useState("all");
+  const categoriaPedida = leer("categoria") ?? "all";
+  // Mientras las categorías propias del curso cargan se respeta lo pedido; después, una que no existe vuelve a "Todas".
+  const catFilter = categoriaPedida === "all" || !categoriasPersonalizadas || nombresPorCategoria.has(categoriaPedida) ? categoriaPedida : "all";
+  const setCatFilter = (id: string) => escribir({ categoria: id === "all" ? null : id });
+  // Lo escrito es de la observación de ese alumno: al cambiar de alumno no se lleva a otro.
+  useEffect(() => setTexto(""), [alumnoId]);
   const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState("");
 
   const onCrearCategoria = () => {
