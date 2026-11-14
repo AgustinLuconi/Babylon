@@ -62,6 +62,8 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         return this.mensajesDelInstituto(tx);
       case "datos_incompletos":
         return this.datosIncompletos(tx);
+      case "ciclo_por_cerrar":
+        return this.cicloPorCerrar(ahora, tx);
     }
   }
 
@@ -121,6 +123,20 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     return (await this.staff(tx)).map((d) =>
       aviso({ ...d, tipo: "datos_incompletos", clave: "datos-incompletos", tono: "warning", texto, recurso: { tipo: "datos-incompletos" }, nivel: n }),
     );
+  }
+
+  // El año lectivo (marzo a noviembre) terminó y el ciclo activo sigue sin cerrarse: lo ve solo el administrador.
+  private async cicloPorCerrar(ahora: Date, tx?: unknown): Promise<AvisoEsperado[]> {
+    const ciclo = await this.db(tx).ciclo.findFirst({ where: { activo: true, bloqueado: false } });
+    if (!ciclo) return [];
+    const hoy = fechaHoraEnArgentina(ahora);
+    if (hoy.anio < ciclo.anio || (hoy.anio === ciclo.anio && hoy.mes < 12)) return [];
+    const texto = `El ciclo ${ciclo.anio} terminó. Falta pasar de año: pasá a los alumnos y activá el ciclo nuevo.`;
+    return (await this.staff(tx))
+      .filter((d) => d.rol === "admin")
+      .map((d) =>
+        aviso({ ...d, tipo: "ciclo_por_cerrar", clave: `ciclo-por-cerrar:${ciclo.id}`, tono: "warning", texto, recurso: { tipo: "pase-de-anio" }, nivel: 0 }),
+      );
   }
 
   private async evaluacionesProximas(ahora: Date, tx?: unknown): Promise<AvisoEsperado[]> {

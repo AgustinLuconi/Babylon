@@ -451,6 +451,7 @@ enum TipoNotificacion {
   datos_incompletos
   descuento_hermanos_instituto
   descuento_hermanos
+  ciclo_por_cerrar
 }
 
 enum ClaseNotificacion {

@@ -11,7 +11,8 @@ export type TipoEstado =
   | "documentacion_hijo"
   | "mensajes_familia"
   | "mensajes_instituto"
-  | "datos_incompletos";
+  | "datos_incompletos"
+  | "ciclo_por_cerrar";
 export type TipoEvento =
   | "nota_publicada"
   | "cierre_publicado"
@@ -27,6 +28,7 @@ export type RecursoAviso =
   | { tipo: "cuotas-vencidas" }
   | { tipo: "documentacion-pendiente" }
   | { tipo: "datos-incompletos" }
+  | { tipo: "pase-de-anio" }
   | { tipo: "evaluacion"; cursoId: string; evaluacionId: string }
   | { tipo: "asistencia"; cursoId: string; fecha: string }
   | { tipo: "cierre"; cursoId: string; periodo: string }
