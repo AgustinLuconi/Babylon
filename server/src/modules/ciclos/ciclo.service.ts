@@ -44,6 +44,7 @@ export class CicloService {
   // activar este es atómico para no dejar 0 o 2+ ciclos activos si algo falla.
   async marcarActivo(id: string): Promise<Ciclo> {
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.cicloRepo.bloquear(id, tx);
       const ciclo = await this.cicloRepo.findById(id, tx);
       if (!ciclo) {
         throw new EntityNotFoundError("Ciclo", id);
@@ -64,6 +65,7 @@ export class CicloService {
   // quedaría sin poder inscribir): para cerrar un año se activa primero el siguiente. Repetir la acción no hace nada.
   async bloquearCiclo(id: string): Promise<Ciclo> {
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.cicloRepo.bloquear(id, tx);
       const ciclo = await this.cicloRepo.findById(id, tx);
       if (!ciclo) throw new EntityNotFoundError("Ciclo", id);
       if (ciclo.activo) throw new ConflictError(`El ciclo ${ciclo.anio} está activo: activá otro ciclo antes de bloquearlo`);
@@ -76,6 +78,7 @@ export class CicloService {
 
   async desbloquearCiclo(id: string): Promise<Ciclo> {
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.cicloRepo.bloquear(id, tx);
       const ciclo = await this.cicloRepo.findById(id, tx);
       if (!ciclo) throw new EntityNotFoundError("Ciclo", id);
       if (!ciclo.bloqueado) return ciclo;

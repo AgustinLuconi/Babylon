@@ -14,6 +14,7 @@ import { UsuarioController } from "./modules/usuarios/usuario.controller";
 import { PrismaCicloRepository } from "./modules/ciclos/ciclo.repository.prisma";
 import { CicloService } from "./modules/ciclos/ciclo.service";
 import { CicloController } from "./modules/ciclos/ciclo.controller";
+import { crearVerificadorDeCiclo } from "./modules/ciclos/ciclo.guarda";
 
 import { PrismaPadreRepository } from "./modules/padres/padre.repository.prisma";
 import { PadreService } from "./modules/padres/padre.service";
@@ -94,6 +95,8 @@ const unitOfWork = new PrismaUnitOfWork(prisma);
 const tablero = new TableroDeAnuncios<EventosDelSistema>();
 
 // --- Servicios ---
+// Guarda del bloqueo de ciclos: la reciben los services que escriben algo que pertenece a un ciclo.
+const verificadorDeCiclo = crearVerificadorDeCiclo(cicloRepository, cursoRepository);
 const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
 const padreService = new PadreService(padreRepository, usuarioRepository, profesorRepository, alumnoRepository, unitOfWork, tablero);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, padreRepository, unitOfWork, tablero);
@@ -146,6 +149,8 @@ export const container = {
   // Expuestos para la ruta en vivo (ver server.ts).
   canalEnVivo,
   validadorDeSesion,
+  // Expuesta para verificar los flujos (la barrida de la batería usa la misma guarda que los services).
+  verificadorDeCiclo,
   // Expuesto para la depuración diaria de sesiones y para verificar los flujos.
   usuarioService,
   configuracionController: new ConfiguracionController(configuracionService),

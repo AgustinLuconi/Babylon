@@ -27,6 +27,15 @@ export class PrismaCicloRepository implements CicloRepository {
     await this.client(tx).ciclo.updateMany({ where: { activo: true }, data: { activo: false } });
   }
 
+  async bloquear(id: string, tx?: unknown): Promise<void> {
+    await this.client(tx).$queryRaw`SELECT id FROM "Ciclo" WHERE id = ${id} FOR UPDATE`;
+  }
+
+  async bloquearParaLectura(id: string, tx?: unknown): Promise<Ciclo | null> {
+    const filas = await this.client(tx).$queryRaw<Ciclo[]>`SELECT id, anio, activo, bloqueado FROM "Ciclo" WHERE id = ${id} FOR SHARE`;
+    return filas[0] ?? null;
+  }
+
   async findAll(tx?: unknown): Promise<Ciclo[]> {
     return this.client(tx).ciclo.findMany({ orderBy: { anio: "desc" } });
   }
