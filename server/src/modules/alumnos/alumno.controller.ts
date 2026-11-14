@@ -41,6 +41,10 @@ export class AlumnoController {
     res.status(200).json(alumno);
   };
 
+  historialDeCursos = async (req: Request, res: Response) => {
+    res.status(200).json(await this.alumnoService.listarHistorialDeCursos(String(req.params.id)));
+  };
+
   actualizar = async (req: Request, res: Response) => {
     const datos = actualizarAlumnoSchema.parse(req.body);
     const alumno = await this.alumnoService.actualizarAlumno(String(req.params.id), datos);

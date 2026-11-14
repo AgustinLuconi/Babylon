@@ -2,6 +2,17 @@ import type { ResponsableElegido, VinculoPadre } from "@/features/padres/types";
 
 export type EstadoAlumno = "activo" | "inactivo" | "egresado";
 
+// Una fila del historial de cursos de un alumno (una por ciclo, la más nueva primero).
+export interface HistorialDeCurso {
+  cicloId: string;
+  anio: number;
+  cursoId: string;
+  cursoNombre: string;
+  fecha: string;
+  aplicaDescuentoHermanos: boolean;
+  actual: boolean;
+}
+
 export const ESTADO_ALUMNO_LABELS: Record<EstadoAlumno, string> = {
   activo: "Activo",
   inactivo: "Inactivo",

@@ -40,6 +40,7 @@ import { usePadres } from "@/features/padres/hooks/usePadres";
 import { VINCULO_LABELS } from "@/features/padres/types";
 import { CambiarResponsableModal } from "../components/CambiarResponsableModal";
 import { EditarDatosModal } from "../components/EditarDatosModal";
+import { HistorialDeCursos } from "../components/HistorialDeCursos";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { useAlumnosIncompletos } from "../hooks/useAlumnosIncompletos";
@@ -510,6 +511,8 @@ export default function AlumnoDetailPage() {
               </p>
             </details>
           </Panel>
+
+          <HistorialDeCursos alumnoId={alumno.id} />
         </div>
       )}
 

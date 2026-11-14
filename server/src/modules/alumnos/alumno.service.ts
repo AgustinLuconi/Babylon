@@ -27,6 +27,18 @@ export interface MovimientoDePase {
   destino: { tipo: "pasa"; cursoId: string; cicloId: string } | { tipo: "egresa" } | { tipo: "no-continua" };
 }
 
+// Una fila del historial de cursos de un alumno: lo que dice su inscripción de cada ciclo.
+export interface HistorialDeCurso {
+  cicloId: string;
+  anio: number;
+  cursoId: string;
+  cursoNombre: string;
+  fecha: Date;
+  aplicaDescuentoHermanos: boolean;
+  // Es el curso que figura hoy como su curso actual.
+  actual: boolean;
+}
+
 export interface HijoConCurso extends Alumno {
   cursoNombre: string | null;
   cursoNivel: string | null;
@@ -118,6 +130,27 @@ export class AlumnoService {
     const inscripciones = await this.cicloRepo.findInscripcionesByCicloId(cicloId);
     const alumnos = await Promise.all(inscripciones.map((i) => this.alumnoRepo.findById(i.alumnoId)));
     return alumnos.filter((a): a is Alumno => a !== null);
+  }
+
+  // El historial de cursos del alumno, un renglón por ciclo y el más nuevo primero (sale de las inscripciones).
+  async listarHistorialDeCursos(alumnoId: string): Promise<HistorialDeCurso[]> {
+    const alumno = await this.alumnoRepo.findById(alumnoId);
+    if (!alumno) throw new EntityNotFoundError("Alumno", alumnoId);
+    const filas: HistorialDeCurso[] = [];
+    for (const inscripcion of await this.cicloRepo.findInscripcionesByAlumnoId(alumnoId)) {
+      const [curso, ciclo] = await Promise.all([this.cursoRepo.findById(inscripcion.cursoId), this.cicloRepo.findById(inscripcion.cicloId)]);
+      if (!curso || !ciclo) continue;
+      filas.push({
+        cicloId: ciclo.id,
+        anio: ciclo.anio,
+        cursoId: curso.id,
+        cursoNombre: curso.nombre,
+        fecha: inscripcion.fecha,
+        aplicaDescuentoHermanos: inscripcion.aplicaDescuentoHermanos,
+        actual: curso.id === alumno.cursoId,
+      });
+    }
+    return filas.sort((a, b) => b.anio - a.anio);
   }
 
   async contarInscriptosPorCurso(): Promise<Record<string, number>> {

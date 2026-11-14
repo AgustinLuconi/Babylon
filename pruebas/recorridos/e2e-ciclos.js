@@ -92,6 +92,14 @@ const api = async (metodo, ruta, tk, cuerpo) => {
     const lista = await api("GET", `/api/cursos/${P}-c1/alumnos`, admin);
     ok("el curso viejo sigue mostrando a su alumno", lista.d.map((a) => a.id).join(","), `${P}-e1`);
     ok("el ciclo activo real no cambió", q(`select id from "Ciclo" where activo = true`), activoAntes);
+
+    // El legajo muestra el historial de cursos: el año nuevo (actual) y el anterior
+    await p.goto(`${BASE}/alumnos/${P}-e1`);
+    const historial = p.locator(".card-hl", { has: p.getByRole("heading", { name: "Historial de cursos" }) });
+    await historial.getByText("2099").waitFor({ timeout: 8000 });
+    const texto = await historial.textContent();
+    ok("el legajo muestra el historial: 2099 (actual) y 2098", `${texto.includes("2099")} ${texto.includes("2098")} ${texto.includes("Actual")}`, "true true true");
+    ok("el historial muestra el nombre del curso de 2098", texto.includes("Pruebaav Uno"), true);
   } finally {
     await b.close();
   }
