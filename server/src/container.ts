@@ -113,8 +113,9 @@ const alumnoService = new AlumnoService(
   cuotaService,
   unitOfWork,
   tablero,
+  verificadorDeCiclo,
 );
-const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork, tablero);
+const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork, tablero, verificadorDeCiclo);
 const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork, tablero);
 const documentoService = new DocumentoService(documentoRepository, alumnoRepository, unitOfWork, tablero);
 const calificacionService = new CalificacionService(
@@ -151,6 +152,13 @@ export const container = {
   validadorDeSesion,
   // Expuesta para verificar los flujos (la barrida de la batería usa la misma guarda que los services).
   verificadorDeCiclo,
+  // Expuestos para verificar las reglas de ciclo directamente sobre los services reales (scripts de la batería).
+  cicloService,
+  cursoService,
+  alumnoService,
+  asistenciaService,
+  calificacionService,
+  observacionService,
   // Expuesto para la depuración diaria de sesiones y para verificar los flujos.
   usuarioService,
   configuracionController: new ConfiguracionController(configuracionService),

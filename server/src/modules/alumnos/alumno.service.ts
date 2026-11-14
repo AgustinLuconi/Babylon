@@ -4,8 +4,10 @@ import type { Publicador, UnitOfWork } from "../../core/ports";
 import { soloPresentes } from "../../core/cambios";
 import { hoyISOEnArgentina } from "../../core/fechas";
 import { sinAnuncios } from "../../core/eventos";
+import { cicloSiempreAbierto, type VerificadorDeCiclo } from "../ciclos/ciclo.guarda";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { CuotaService } from "../cuotas/cuota.service";
+import type { Curso } from "../cursos/curso.entity";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { PadreRepository } from "../padres/padre.repository";
 import type { PadreService } from "../padres/padre.service";
@@ -56,7 +58,18 @@ export class AlumnoService {
     private readonly cuotaService: CuotaService,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosAlumnos & EventosCambios> = sinAnuncios(),
+    private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
+
+  // Inscribir o cambiar de curso solo admite cursos del ciclo activo (y, por coherencia, de un ciclo no bloqueado).
+  private async exigirCursoDelCicloActivo(curso: Curso, tx: unknown): Promise<void> {
+    const activo = await this.cicloRepo.findActivo(tx);
+    if (!activo) throw new ValidationError("No hay un ciclo activo: activá un ciclo antes de inscribir o cambiar de curso");
+    if (curso.cicloId !== activo.id) {
+      throw new ValidationError(`El curso "${curso.nombre}" no es del ciclo activo (${activo.anio}): solo se puede elegir un curso del ciclo activo`);
+    }
+    await this.verificador.verificarCicloAbierto(curso.cicloId, tx);
+  }
 
   async listarAlumnos(): Promise<Alumno[]> {
     return this.alumnoRepo.findAll();
@@ -229,6 +242,7 @@ export class AlumnoService {
     return this.unitOfWork.runInTransaction(async (tx) => {
       const curso = await this.cursoRepo.findById(datos.cursoId, tx);
       if (!curso) throw new EntityNotFoundError("Curso", datos.cursoId);
+      await this.exigirCursoDelCicloActivo(curso, tx);
 
       const responsable = await this.resolverResponsable(datos.responsable, datos, null, curso.nivel, tx);
       // Con la ficha bloqueada, dos inscripciones simultáneas del mismo responsable se hacen de a una: la segunda ve a la
@@ -366,8 +380,10 @@ export class AlumnoService {
         (datos.nombre !== undefined || datos.apellido !== undefined || datos.dni !== undefined);
       if (sincroniza) await this.padreRepo.bloquear(actual.padreId as string, tx);
 
-      if (datos.cursoId && datos.cursoId !== actual.cursoId && !(await this.cursoRepo.findById(datos.cursoId, tx))) {
-        throw new EntityNotFoundError("Curso", datos.cursoId);
+      if (datos.cursoId && datos.cursoId !== actual.cursoId) {
+        const cursoNuevo = await this.cursoRepo.findById(datos.cursoId, tx);
+        if (!cursoNuevo) throw new EntityNotFoundError("Curso", datos.cursoId);
+        await this.exigirCursoDelCicloActivo(cursoNuevo, tx);
       }
       if (datos.dni && datos.dni !== actual.dni) {
         const otro = await this.alumnoRepo.findByDni(datos.dni, tx);

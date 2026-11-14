@@ -3,6 +3,7 @@ import { EntityNotFoundError } from "../../core/errors";
 import type { Publicador, UnitOfWork } from "../../core/ports";
 import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
+import { cicloSiempreAbierto, type VerificadorDeCiclo } from "../ciclos/ciclo.guarda";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { ProfesorRepository } from "../profesores/profesor.repository";
 import type { CursoRepository } from "./curso.repository";
@@ -19,6 +20,7 @@ export class CursoService {
     private readonly cicloRepo: CicloRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosCursos & EventosCambios> = sinAnuncios(),
+    private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
 
   async listarCursos(): Promise<Curso[]> {
@@ -63,6 +65,7 @@ export class CursoService {
     };
     // Atómico: el curso con sus horarios (antes podía quedar un curso sin horarios si fallaba a mitad de camino).
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.verificador.verificarCicloAbierto(cicloId, tx);
       await this.cursoRepo.create(curso, tx);
       for (const horario of datos.horarios) {
         await this.cursoRepo.agregarHorario({ id: randomUUID(), cursoId: curso.id, ...horario }, tx);
@@ -83,6 +86,7 @@ export class CursoService {
       if (!actual) {
         throw new EntityNotFoundError("Curso", id);
       }
+      await this.verificador.verificarCicloAbierto(actual.cicloId, tx);
       if (datos.profesorId) {
         const profesor = await this.profesorRepo.findById(datos.profesorId, tx);
         if (!profesor) {
