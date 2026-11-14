@@ -15,6 +15,7 @@ import { useCalificacionesDeAlumno } from "@/features/calificaciones/hooks/useCa
 import { useNotasCierreDeAlumno } from "@/features/calificaciones/hooks/useNotasCierreDeAlumno";
 import { TIPO_EVALUACION_LABELS } from "@/features/calificaciones/types";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
+import { HistorialDeCursos } from "../components/HistorialDeCursos";
 import { SelectorDeAnio } from "../components/SelectorDeAnio";
 import { useVistaDeCurso } from "../hooks/useVistaDeCurso";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
@@ -93,7 +94,8 @@ export default function ParentDashboardPage() {
   const asistencia = useMemo(() => vista.filtrar(asistenciaTodas), [vista, asistenciaTodas]);
   const { data: cuotas } = useCuotasPorAlumno(kid?.id ?? null);
   const { data: documentos } = useDocumentosPorAlumno(kid?.id);
-  const { data: observaciones } = useObservacionesPorAlumno(kid?.id);
+  const { data: observacionesTodas } = useObservacionesPorAlumno(kid?.id);
+  const observaciones = useMemo(() => vista.filtrarPorFecha(observacionesTodas), [vista, observacionesTodas]);
   const marcarCargado = useMarcarCargado();
   const autorizarImagen = useAutorizarImagen();
 
@@ -406,6 +408,8 @@ export default function ParentDashboardPage() {
               })}
             </Panel>
           </div>
+
+          {kid && <HistorialDeCursos alumnoId={kid.id} conDescuento={false} />}
         </div>
       )}
 
@@ -471,6 +475,7 @@ export default function ParentDashboardPage() {
               </div>
             </div>
           )}
+
         </div>
       )}
 

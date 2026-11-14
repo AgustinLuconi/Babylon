@@ -124,6 +124,28 @@ const api = async (metodo, ruta, tk, cuerpo) => {
     await f.getByLabel("Año").selectOption(`${P}-c1`);
     await f.getByText("Pruebaav examen viejo").waitFor({ timeout: 8000 });
     ok("familia: al elegir 2098 ve su nota", await f.getByText("Pruebaav examen viejo").count(), 1);
+
+    // El panel de la familia también muestra el historial de cursos (sin la columna de descuento) y separa las observaciones por año
+    q(`insert into "Observacion" (id, "alumnoId", "emisorId", "emisorRol", fecha, texto, categoria) values ('${P}-obs-vieja', '${P}-e1', '${P}-admin', 'admin', '2098-06-01T12:00:00Z', 'Pruebaav obs vieja', 'academico'), ('${P}-obs-nueva', '${P}-e1', '${P}-admin', 'admin', '2099-06-01T12:00:00Z', 'Pruebaav obs nueva', 'academico')`);
+    await f.goto(`${BASE}/mis-hijos?hijo=${P}-e1`);
+    const histFamilia = f.locator(".card-hl", { has: f.getByRole("heading", { name: "Historial de cursos" }) });
+    await histFamilia.getByText("2098").waitFor({ timeout: 8000 });
+    const tf = await histFamilia.textContent();
+    ok("familia: el historial muestra 2099 (actual) y 2098, sin descuento", `${tf.includes("2099")} ${tf.includes("2098")} ${tf.includes("Actual")} ${tf.includes("Descuento")}`, "true true true false");
+    await f.getByText("Pruebaav obs nueva").waitFor({ timeout: 8000 });
+    ok("familia: por defecto ve la observación del curso actual y no la vieja", `${await f.getByText("Pruebaav obs nueva").count()} ${await f.getByText("Pruebaav obs vieja").count()}`, "1 0");
+    await f.getByLabel("Año").selectOption(`${P}-c1`);
+    await f.getByText("Pruebaav obs vieja").waitFor({ timeout: 8000 });
+    ok("familia: al elegir 2098 ve la observación de ese año", `${await f.getByText("Pruebaav obs vieja").count()} ${await f.getByText("Pruebaav obs nueva").count()}`, "1 0");
+
+    // Y el legajo separa las observaciones por año
+    await p.goto(`${BASE}/alumnos/${P}-e1?pestana=observaciones`);
+    await p.getByLabel("Año").waitFor({ timeout: 8000 });
+    await p.getByText("Pruebaav obs nueva").waitFor({ timeout: 8000 });
+    ok("legajo: por defecto ve la observación del curso actual y no la vieja", `${await p.getByText("Pruebaav obs nueva").count()} ${await p.getByText("Pruebaav obs vieja").count()}`, "1 0");
+    await p.getByLabel("Año").selectOption(`${P}-c1`);
+    await p.getByText("Pruebaav obs vieja").waitFor({ timeout: 8000 });
+    ok("legajo: al elegir 2098 ve la observación de ese año", `${await p.getByText("Pruebaav obs vieja").count()} ${await p.getByText("Pruebaav obs nueva").count()}`, "1 0");
   } finally {
     await b.close();
   }

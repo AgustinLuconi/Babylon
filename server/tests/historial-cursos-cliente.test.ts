@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { cursoDeLaVista, filtrarPorCurso } from "../../client/src/features/alumnos/historialDeCursos";
+import { cursoDeLaVista, filtrarObservaciones, filtrarPorCurso } from "../../client/src/features/alumnos/historialDeCursos";
 
 const fila = (cursoId: string, anio: number, actual = false) => ({ cursoId, anio, actual });
 const filas = [fila("c3", 2026, true), fila("c2", 2025)];
@@ -21,4 +21,32 @@ describe("historial de cursos (pantalla): filtrar notas, cierres y asistencia po
   test("deja solo los del curso", () => assert.deepEqual(filtrarPorCurso(items, "c3")?.map((i) => i.id), [1, 3]));
   test("sin curso elegido devuelve todo", () => assert.deepEqual(filtrarPorCurso(items, null)?.map((i) => i.id), [1, 2, 3]));
   test("sin datos todavía devuelve undefined", () => assert.equal(filtrarPorCurso(undefined, "c3"), undefined));
+});
+
+describe("historial de cursos (pantalla): las observaciones no guardan curso, se reparten por el año en que se escribieron", () => {
+  const obs = (id: number, fecha: string) => ({ id, fecha });
+  const ids = (r: { id: number }[] | undefined) => r?.map((o) => o.id);
+  const historial = [fila("c3", 2027, true), fila("c2", 2025)];
+
+  test("cada año se queda con las de ese año", () => {
+    const items = [obs(1, "2027-06-10T15:00:00Z"), obs(2, "2025-09-02T15:00:00Z")];
+    assert.deepEqual(ids(filtrarObservaciones(items, historial, "c3")), [1]);
+    assert.deepEqual(ids(filtrarObservaciones(items, historial, "c2")), [2]);
+  });
+  test("una escrita en un año sin curso en el historial se muestra en el curso actual", () => {
+    const items = [obs(1, "2026-06-10T15:00:00Z"), obs(2, "2025-09-02T15:00:00Z")];
+    assert.deepEqual(ids(filtrarObservaciones(items, historial, "c3")), [1]);
+    assert.deepEqual(ids(filtrarObservaciones(items, historial, "c2")), [2]);
+  });
+  test("sin curso actual marcado, el más nuevo hace de actual", () => {
+    const sinActual = [fila("c3", 2027), fila("c2", 2025)];
+    assert.deepEqual(ids(filtrarObservaciones([obs(1, "2026-06-10T15:00:00Z")], sinActual, "c3")), [1]);
+  });
+  test("sin historial, sin curso elegido o sin datos todavía no se filtra", () => {
+    const items = [obs(1, "2026-06-10T15:00:00Z")];
+    assert.deepEqual(ids(filtrarObservaciones(items, undefined, "c3")), [1]);
+    assert.deepEqual(ids(filtrarObservaciones(items, [], "c3")), [1]);
+    assert.deepEqual(ids(filtrarObservaciones(items, historial, null)), [1]);
+    assert.equal(filtrarObservaciones(undefined, historial, "c3"), undefined);
+  });
 });

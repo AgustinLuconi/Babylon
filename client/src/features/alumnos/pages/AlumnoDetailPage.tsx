@@ -218,7 +218,8 @@ export default function AlumnoDetailPage() {
   };
 
   // Observaciones
-  const { data: observaciones, isLoading: cargandoObservaciones } = useObservacionesPorAlumno(alumnoId);
+  const { data: observacionesTodas, isLoading: cargandoObservaciones } = useObservacionesPorAlumno(alumnoId);
+  const observaciones = useMemo(() => vista.filtrarPorFecha(observacionesTodas), [vista, observacionesTodas]);
   const { data: categoriasPersonalizadas } = useCategoriasPersonalizadas(alumno?.cursoId);
   const nombresPorCategoria = useMemo(() => {
     const mapa = new Map<string, string>(Object.entries(CATEGORIA_LABELS));
@@ -527,7 +528,7 @@ export default function AlumnoDetailPage() {
         </div>
       )}
 
-      {(tab === "academico" || tab === "asistencia") && <SelectorDeAnio filas={vista.filas} cursoId={vista.cursoId} onElegir={vista.elegir} />}
+      {(tab === "academico" || tab === "asistencia" || tab === "observaciones") && <SelectorDeAnio filas={vista.filas} cursoId={vista.cursoId} onElegir={vista.elegir} />}
 
       {tab === "academico" && (
         <div className="space-y-4">

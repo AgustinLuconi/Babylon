@@ -4,7 +4,8 @@ import { formatFecha } from "@/core/lib/utils";
 import { useHistorialDeCursos } from "../hooks/useHistorialDeCursos";
 
 // Legajo: en qué curso estuvo el alumno cada año (sale de sus inscripciones; los años anteriores no cambian).
-export function HistorialDeCursos({ alumnoId }: { alumnoId: string }) {
+// `conDescuento`: la familia no ve esa columna (se entera del descuento por el aviso y por el monto de la cuota).
+export function HistorialDeCursos({ alumnoId, conDescuento = true }: { alumnoId: string; conDescuento?: boolean }) {
   const { data: filas, isLoading, isError } = useHistorialDeCursos(alumnoId);
   return (
     <Panel title="Historial de cursos">
@@ -19,7 +20,7 @@ export function HistorialDeCursos({ alumnoId }: { alumnoId: string }) {
                 <th>Año</th>
                 <th>Curso</th>
                 <th>Inscripto</th>
-                <th>Descuento</th>
+                {conDescuento && <th>Descuento</th>}
               </tr>
             </thead>
             <tbody>
@@ -30,7 +31,7 @@ export function HistorialDeCursos({ alumnoId }: { alumnoId: string }) {
                     {f.cursoNombre} {f.actual && <Badge variant="success">Actual</Badge>}
                   </td>
                   <td className="tnum">{formatFecha(f.fecha)}</td>
-                  <td>{f.aplicaDescuentoHermanos ? "10%" : "—"}</td>
+                  {conDescuento && <td>{f.aplicaDescuentoHermanos ? "10%" : "—"}</td>}
                 </tr>
               ))}
             </tbody>
