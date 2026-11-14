@@ -40,7 +40,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 
 ---
 
-### Tarea 1: Estado "bloqueado" del ciclo y sus dos acciones
+### Task 1: Estado "bloqueado" del ciclo y sus dos acciones
 
 **Archivos:** modificar `server/prisma/schema.prisma`, `ciclo.entity.ts`, `ciclo.repository.ts`, `ciclo.repository.prisma.ts`, `ciclo.service.ts`, `ciclo.controller.ts`, `ciclo.routes.ts`, `cambio.entity.ts` (acciones `"bloqueo"` y `"desbloqueo"`), `client/src/features/cambios/{types,mensajes}.ts`; crear migración `…_ciclo_bloqueado`; crear `server/scripts/_ciclo-bloqueo.ts`; modificar `_mundo-avisos.ts` (`limpiarMundo` borra al final los ciclos con id que empiece con `P`).
 
@@ -57,7 +57,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 - [ ] **Paso 5: correr** `_ciclo-bloqueo.ts` (esperado `N bien, 0 mal`) y `pnpm typecheck`.
 - [ ] **Paso 6: commit** `Ciclos: estado bloqueado con sus dos acciones` (incluir `git add -f server/scripts/_ciclo-bloqueo.ts`).
 
-### Tarea 2: La guarda `verificarCicloAbierto`
+### Task 2: La guarda `verificarCicloAbierto`
 
 **Archivos:** crear `ciclo.guarda.ts`; modificar `ciclo.repository.ts`/`.prisma.ts`, `container.ts`; crear `server/scripts/_ciclo-guarda.ts`.
 
@@ -79,7 +79,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 - [ ] **Paso 3: implementar** la guarda y `bloquearParaLectura`; `bloquearCiclo`/`desbloquearCiclo` leen con `SELECT … FOR UPDATE` (nuevo `bloquear(id, tx)` en el repositorio, mismo patrón que `AlumnoRepository.bloquear`). En `container.ts` crear `const verificadorDeCiclo = crearVerificadorDeCiclo(cicloRepository, cursoRepository)` (todavía sin pasarlo a nadie).
 - [ ] **Paso 4: correr** el script (`N bien, 0 mal`), `pnpm typecheck`; **commit** `Ciclos: guarda verificarCicloAbierto con bloqueo compartido`.
 
-### Tarea 3: Guardas en Cursos y Alumnos, e inscribir solo en el ciclo activo
+### Task 3: Guardas en Cursos y Alumnos, e inscribir solo en el ciclo activo
 
 **Archivos:** modificar `curso.service.ts`, `alumno.service.ts`, `container.ts`; crear `server/scripts/_ciclo-inscribir.ts`.
 
@@ -97,7 +97,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 - [ ] **Paso 3: implementar.** `CursoService`: `crearCurso` llama `verificarCicloAbierto(cicloId)` antes de crear (dentro de la transacción); `actualizarCurso` llama `verificarCicloAbierto(actual.cicloId)` tras leer el curso. `AlumnoService`: `inscribirAlumno` y `actualizarAlumno` (solo cuando cambia `cursoId`) validan que `curso.cicloId` sea el del ciclo activo (`ValidationError`) y luego `verificarCicloAbierto(curso.cicloId, tx)`; la inscripción del ciclo activo que se crea o cambia pasa por la misma validación (ya implícita: el ciclo activo nunca está bloqueado).
 - [ ] **Paso 4: correr** el script, `pnpm typecheck`, `pnpm test`; **commit** `Ciclos: bloqueo en cursos y alumnos; inscribir solo en el ciclo activo`.
 
-### Tarea 4: Guardas en asistencia, calificaciones, observaciones y cuotas
+### Task 4: Guardas en asistencia, calificaciones, observaciones y cuotas
 
 **Archivos:** modificar `asistencia.service.ts`, `calificacion.service.ts`, `observacion.service.ts`, `cuota.service.ts`, `container.ts`; crear `server/scripts/_ciclo-guardas-servicios.ts`.
 
@@ -110,7 +110,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 - [ ] **Paso 3: implementar** la llamada a `verificarCicloDelCurso(cursoId, tx)` al principio de la transacción de cada operación listada (en `publicarEvaluacion` con `evaluacion.cursoId`; en `publicarNotasCierre` con el curso de cada nota; en `cargarNotasCierre` con cada `cursoId` distinto). En `cuota.service.ts`, `contextoDeGeneracion` devuelve `null` si `ciclo.bloqueado` (la generación automática no debe lanzar). `registrarPago` no cambia.
 - [ ] **Paso 4: correr** el script, `pnpm typecheck`, `pnpm test`; **commit** `Ciclos: bloqueo en asistencia, calificaciones, observaciones y cuotas`.
 
-### Tarea 5: Barrido de la batería sobre todas las rutas de escritura
+### Task 5: Barrido de la batería sobre todas las rutas de escritura
 
 **Archivos:** crear `server/scripts/_ciclo-bloqueado.ts`; modificar `pruebas/bin/bateria.sh` (agregar `_ciclo-bloqueo _ciclo-guarda _ciclo-inscribir _ciclo-guardas-servicios` a la lista de scripts sin HTTP y `_ciclo-bloqueado` a la de HTTP).
 
@@ -124,7 +124,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 - [ ] **Paso 3: arreglar** lo que el barrido encuentre (rutas sin guarda), correr (`N bien, 0 mal`), `bash pruebas/bin/api.sh stop`.
 - [ ] **Paso 4: commit** `Ciclos: barrido de la batería sobre las rutas de escritura`.
 
-### Tarea 6: La lista de alumnos de un curso sale de las inscripciones
+### Task 6: La lista de alumnos de un curso sale de las inscripciones
 
 **Archivos:** modificar `alumno.repository.prisma.ts` (`findByCursoId`), `alumno.service.ts` si hace falta; crear `server/scripts/revisar-nomina-inscripciones.ts` (solo lectura) y `server/scripts/_nomina-inscripciones.ts`; ajustar `_nomina-activos.ts` si su mundo no tiene inscripciones.
 
@@ -136,7 +136,7 @@ Client (`client/src/features/ciclos/`): `types.ts`, `cicloService.ts`, hooks (`u
 - [ ] **Paso 4: `revisar-nomina-inscripciones.ts`** (solo lee, nunca escribe): imprime los alumnos con `cursoId` sin inscripción en ese curso (caso conocido: Valentino Rodríguez) y cursos con alumnos que dejarían de aparecer. **Correrlo contra la base real y mostrar la lista al usuario; no corregir nada sin su autorización.**
 - [ ] **Paso 5: correr** los scripts de nómina y `pnpm test`; **commit** `Ciclos: la lista de alumnos de un curso sale de las inscripciones`.
 
-### Tarea 7: Planificación del pase de año (función pura)
+### Task 7: Planificación del pase de año (función pura)
 
 **Archivos:** crear `paseDeAnio.plan.ts`, `server/tests/pase-de-anio.test.ts`.
 
@@ -170,7 +170,7 @@ export function planificarPaseDeAnio(datos: DatosDelPlan): Plan;
 - [ ] **Paso 3: implementar** `planificarPaseDeAnio` (sin Prisma ni Express, sin importar nada externo).
 - [ ] **Paso 4: `pnpm test`** (todo en verde); **commit** `Ciclos: planificación pura del pase de año`.
 
-### Tarea 8: Vista previa y confirmación del pase de año
+### Task 8: Vista previa y confirmación del pase de año
 
 **Archivos:** crear `paseDeAnio.schema.ts`, `paseDeAnio.service.ts`, `paseDeAnio.controller.ts`; modificar `ciclo.service.ts` (extraer `activarEnTransaccion`), `alumno.service.ts` (`registrarPaseDeAnio`), `ciclo.routes.ts`, `container.ts`, `server.ts` si monta rutas aparte, `ciclo.eventos.ts`; crear `server/scripts/_pase-de-anio.ts`.
 
@@ -196,7 +196,7 @@ export function planificarPaseDeAnio(datos: DatosDelPlan): Plan;
 - [ ] **Paso 3: implementar.** Orden dentro de **una** transacción en `confirmar`: validar ciclos → crear el ciclo destino si viene `anio` → crear/reutilizar cursos con horarios → si `cierre.activarDestino`, `activarEnTransaccion(destino)` → releer datos con `tx` y volver a planificar (`cursosSinDecision` o `invalidos` no vacío → `ValidationError`) → `registrarPaseDeAnio` → si `cierre.bloquearOrigen`, `bloquearEnTransaccion(origen)` → publicar `datos.cambiaron` de `cursos` y `ciclos`. Cada curso nuevo y cada alumno pasan por la guarda. Si ~150 alumnos rozan los 20 s de `PrismaUnitOfWork`, medir con la base de prueba y, solo si hace falta, subir el tiempo de forma acotada para esta operación.
 - [ ] **Paso 4: correr** el script (`N bien, 0 mal`), `pnpm typecheck`, `pnpm test`, y agregar `_pase-de-anio` a `bateria.sh` (lista HTTP si usa la API; si no, la otra); **commit** `Ciclos: asistente Pasar de año (vista previa y confirmación)`.
 
-### Tarea 9: Aviso `ciclo_por_cerrar`
+### Task 9: Aviso `ciclo_por_cerrar`
 
 **Archivos:** modificar `schema.prisma` (valor en `enum TipoNotificacion`) + migración `…_aviso_ciclo_por_cerrar` (respaldo antes), `notificacion.entity.ts` (`TipoEstado` y `RecursoAviso { tipo: "pase-de-anio" }`), `notificacion.tipos.ts`, `notificacion.criterios.prisma.ts`, `notificacion.suscripciones.ts`; client `features/notificaciones/{types,rutas}.ts`; crear `server/scripts/_aviso-ciclo-por-cerrar.ts`.
 
@@ -207,7 +207,7 @@ export function planificarPaseDeAnio(datos: DatosDelPlan): Plan;
 - [ ] **Paso 3: implementar** el criterio (`ciclo.activo = true`, `bloqueado = false`, `fechaHoraEnArgentina(ahora)` ≥ 1 de diciembre de `ciclo.anio`), el valor del enum, el catálogo (con `_avisos-servicio` ajustado si cuenta tipos por rol) y la suscripción: `ciclo.activado` ya sincroniza todos los tipos; bloquear no puede cambiar el aviso (el activo no se bloquea), así que no hace falta otro anuncio. La revisión de las 03:00 ya lo cubre. En el client, el tipo y `rutaDeAviso("pase-de-anio")` → `/ciclos/pasar-de-anio`.
 - [ ] **Paso 4: correr** el script, `_avisos-servicio`, `_criterios`, `pnpm typecheck`; **commit** `Ciclos: aviso de fin de año para el administrador`.
 
-### Tarea 10: Client — bloquear y desbloquear, y selectores solo del ciclo activo
+### Task 10: Client — bloquear y desbloquear, y selectores solo del ciclo activo
 
 **Archivos:** modificar `client/src/features/ciclos/{types,cicloService}.ts`, crear `hooks/useBloquearCiclo.ts` y `hooks/useDesbloquearCiclo.ts` (mismo patrón que `useMarcarCicloActivo`), `ConfiguracionPage.tsx`, `InscribirAlumnoPage.tsx`, `AlumnoDetailPage.tsx`.
 
@@ -216,7 +216,7 @@ export function planificarPaseDeAnio(datos: DatosDelPlan): Plan;
 - [ ] **Paso 1: implementar.** En Configuración → Ciclos lectivos: etiqueta `Bloqueado` (`Badge variant="warning"`) junto a Histórico/Activo; botones "Bloquear" (solo si no es el activo) y "Desbloquear" con confirmación (`Modal`/`ConfirmDialog` existente); "Marcar como activo" deshabilitado en un ciclo bloqueado con el motivo. Los mensajes del servidor se muestran como los demás (`ApiError.message`). En Inscribir alumno y en la edición del curso del legajo, los selectores usan `useCursosDelCicloActivo()` (hoy usan `useCursos()`); un curso actual de un ciclo viejo se muestra como texto, no como opción.
 - [ ] **Paso 2: verificar** `cd client && pnpm typecheck && pnpm lint && pnpm build`; **commit** `Ciclos: bloquear y desbloquear desde Configuración; selectores del ciclo activo`.
 
-### Tarea 11: Client — pantalla "Pasar de año"
+### Task 11: Client — pantalla "Pasar de año"
 
 **Archivos:** crear `client/src/features/ciclos/pages/PasarDeAnioPage.tsx` y un componente por paso en `features/ciclos/components/` (`PasoCiclos`, `PasoCursos`, `PasoAlumnos`, `PasoRevision`, `PasoCierre`), `hooks/usePaseDeAnio.ts` (vista previa y confirmación), tipos en `types.ts`; modificar `AppRoutes.tsx` (`/ciclos/pasar-de-anio`, `rolesPermitidos={["admin"]}`), `pageTitles.ts`, `ConfiguracionPage.tsx` (botón "Pasar de año").
 
@@ -225,7 +225,7 @@ export function planificarPaseDeAnio(datos: DatosDelPlan): Plan;
 - [ ] **Paso 1: implementar** los cinco pasos del spec (Ciclos → Cursos → Alumnos → Revisión → Cierre): casilla "copiar" marcada por defecto para los cursos con alumnos activos; por curso de origen un selector con los cursos del destino, las copias, "Egresan" y "No continúan", y la lista de alumnos desplegable para excepciones; el botón de confirmar deshabilitado mientras `cursosSinDecision` no esté vacío; la revisión muestra los totales, los "ya inscripto en {curso}" y los avisos de curso actual distinto, y la advertencia si `advertenciaAnioEnCurso`; la vista previa se pide con cada cambio de decisión. Usar `useSinGuardar` con las decisiones sin confirmar. Tras confirmar, invalidar `["ciclos"]`, `["cursos"]`, `["alumnos"]`.
 - [ ] **Paso 2: verificar** `pnpm typecheck && pnpm lint && pnpm build`; **commit** `Ciclos: pantalla del asistente Pasar de año`.
 
-### Tarea 12: Recorrido de navegador, documentación y batería completa
+### Task 12: Recorrido de navegador, documentación y batería completa
 
 **Archivos:** crear `pruebas/recorridos/e2e-ciclos.js`; modificar `pruebas/bin/navegador.sh` y `bateria.sh` (registrarlo), `CLAUDE.md` (nueva sección "Ciclos: bloqueo, pase de año y avisos"; actualizar la tabla de API con las rutas nuevas y la nota "Pendiente aparte: cómo funciona la inscripción al ciclo lectivo" de la regla de descuento), `pruebas/README.md`.
 
