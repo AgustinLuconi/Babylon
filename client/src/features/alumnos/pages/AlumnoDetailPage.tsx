@@ -44,6 +44,7 @@ import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { useAlumnosIncompletos } from "../hooks/useAlumnosIncompletos";
 import { textoIncompleto } from "../datosFaltantes";
+import { quienPagaCompleto } from "../descuentoHermanos";
 import { ESTADO_ALUMNO_LABELS, ESTADO_ALUMNO_VARIANT } from "../types";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 
@@ -111,6 +112,14 @@ export default function AlumnoDetailPage() {
   );
   const { data: cursos } = useCursos();
   const curso = useMemo(() => cursos?.find((c) => c.id === alumno?.cursoId), [cursos, alumno]);
+
+  // Descuento por hermanos: la marca guardada manda para el sí/no; la regla solo sirve para decir quién paga completo.
+  const descuentoPorHermanos = useMemo(() => {
+    if (!alumno || alumno.estado !== "activo") return null;
+    if (!alumno.aplicaDescuentoHermanos) return "No";
+    const paga = hermanos.find((h) => h.id === quienPagaCompleto([alumno, ...hermanos.filter((h2) => h2.estado === "activo")]));
+    return paga ? `Sí · ${paga.nombre} ${paga.apellido} paga la cuota completa` : "Sí";
+  }, [alumno, hermanos]);
 
   const edad = alumno ? calcularEdad(alumno.fechaNacimiento) : null;
   const antiguedad = alumno ? calcularEdad(alumno.fechaInscripcion) : null;
@@ -405,6 +414,7 @@ export default function AlumnoDetailPage() {
                 <Campo label="Dirección" value={padre?.direccion} />
                 <Campo label="Celular" value={padre?.telefono && formatCelular(padre.telefono)} />
                 <Campo label="Email" value={padre?.email} />
+                {descuentoPorHermanos && <Campo label="Descuento por hermanos" value={descuentoPorHermanos} />}
                 {hermanos.length > 0 && (
                   <div className="mt-3 flex items-center gap-2 rounded-md border p-2.5" style={{ background: "var(--brand-soft)", borderColor: "var(--brand-border)" }}>
                     <span className="text-xs" style={{ color: "var(--brand)" }}>

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import * as cliente from "../../client/src/features/alumnos/descuentoHermanos";
 import * as servidor from "../src/modules/alumnos/alumno.hermanos";
 
 type Estado = "activo" | "inactivo" | "egresado";
@@ -11,8 +12,11 @@ const alumno = (id: string, dia: number, estado: Estado = "activo", marca = fals
 });
 const ids = (s: Set<string>) => [...s].sort();
 
-// La misma tabla corre contra la copia del server y (Task 5) la del client: son dos escrituras de la misma regla.
-const implementaciones = [{ nombre: "server", ...servidor }];
+// La misma tabla corre contra la copia del server y la del client: son dos escrituras de la misma regla.
+const implementaciones = [
+  { nombre: "server", ...servidor },
+  { nombre: "client", ...cliente },
+];
 
 for (const impl of implementaciones) {
   describe(`descuento por hermanos (${impl.nombre})`, () => {
