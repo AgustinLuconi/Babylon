@@ -103,7 +103,8 @@ const cuenta = async () => ({
     ok("a4 egresa: egresado y conserva su curso", `${a4.estado}/${a4.cursoId}`, `egresado/${P}-c2`);
     ok("a6, ya inscripto, no se toca", (await prisma.alumno.findUniqueOrThrow({ where: { id: `${P}-a6` } })).cursoId, `${P}-c1`);
     ok("a5, inactivo, no se toca", (await prisma.alumno.findUniqueOrThrow({ where: { id: `${P}-a5` } })).estado, "inactivo");
-    ok("no se generaron avisos de descuento", await prisma.notificacion.count({ where: { tipo: { in: ["descuento_hermanos", "descuento_hermanos_instituto"] }, creadaEn: { gte: new Date(Date.now() - 60_000) } } }), 0);
+    // Solo los avisos sobre los alumnos de esta prueba (los de otros scripts no cuentan).
+    ok("no se generaron avisos de descuento", await prisma.notificacion.count({ where: { tipo: { in: ["descuento_hermanos", "descuento_hermanos_instituto"] }, clave: { startsWith: `descuento:${P}-` } } }), 0);
 
     // Repetir no duplica nada
     const despues = await cuenta();
