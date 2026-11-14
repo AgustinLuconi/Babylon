@@ -38,6 +38,11 @@ const nominaPor = async (t: string, cursoId: string) =>
     ok("el curso actual muestra a sus alumnos inscriptos (una sola vez cada uno)", await ids(m.cursoId), "hijo1,hijo2,x");
     ok("sin inscripción no aparece aunque su curso actual sea ese", (await ids(viejo)).includes("y"), false);
 
+    // El contador de cada curso (cupo) sale de las mismas inscripciones
+    const conteo = await container.alumnoService.contarInscriptosPorCurso();
+    ok("conteo: el curso viejo cuenta a quien cursó en él", conteo[viejo], 1);
+    ok("conteo: el curso actual cuenta a sus inscriptos", conteo[m.cursoId], 3);
+
     // La validación de nómina al cargar notas usa la misma lista
     const evaluacion = await container.calificacionService.crearEvaluacion(
       crearEvaluacionSchema.parse({ cursoId: viejo, nombre: "Pruebaav eval", tipo: "examen", fecha: new Date().toISOString().slice(0, 10), periodo: "julio" }),

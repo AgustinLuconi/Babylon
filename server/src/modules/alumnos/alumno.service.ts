@@ -120,6 +120,10 @@ export class AlumnoService {
     return alumnos.filter((a): a is Alumno => a !== null);
   }
 
+  async contarInscriptosPorCurso(): Promise<Record<string, number>> {
+    return this.alumnoRepo.contarInscriptosPorCurso();
+  }
+
   async listarPorCurso(cursoId: string, profesorId?: string): Promise<Alumno[]> {
     if (profesorId) {
       const curso = await this.cursoRepo.findById(cursoId);

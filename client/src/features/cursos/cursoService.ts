@@ -6,6 +6,7 @@ export const cursoService = {
   listar: () => apiClient.get<Curso[]>("/api/cursos"),
   listarAlumnos: (cursoId: string) => apiClient.get<Alumno[]>(`/api/cursos/${cursoId}/alumnos`),
   listarHorarios: () => apiClient.get<Horario[]>("/api/cursos/horarios"),
+  contarInscriptos: () => apiClient.get<Record<string, number>>("/api/cursos/inscriptos"),
   crear: (datos: CrearCursoInput) => apiClient.post<Curso>("/api/cursos", datos),
   actualizar: (id: string, datos: ActualizarCursoInput) => apiClient.patch<Curso>(`/api/cursos/${id}`, datos),
 };

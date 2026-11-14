@@ -53,6 +53,11 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
     return filas.map(aEntidad);
   }
 
+  async contarInscriptosPorCurso(tx?: unknown): Promise<Record<string, number>> {
+    const grupos = await this.client(tx).inscripcion.groupBy({ by: ["cursoId"], _count: { _all: true } });
+    return Object.fromEntries(grupos.map((g) => [g.cursoId, g._count._all]));
+  }
+
   async findAll(tx?: unknown): Promise<Alumno[]> {
     const filas = await this.client(tx).alumno.findMany();
     return filas.map(aEntidad);

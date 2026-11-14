@@ -13,6 +13,7 @@ export function cursoRoutes(controller: CursoController): Router {
     requireRole("admin", "secretario", "profesor"),
     controller.listarHorarios,
   );
+  router.get("/inscriptos", authMiddleware, requireRole("admin", "secretario"), controller.contarInscriptos);
   router.patch("/:id", authMiddleware, requireRole("admin"), controller.actualizar);
   router.get(
     "/:id/alumnos",
