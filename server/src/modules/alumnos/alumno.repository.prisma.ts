@@ -46,8 +46,10 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
     return filas.map(aEntidad);
   }
 
+  // La lista de alumnos de un curso sale de las inscripciones (no de `Alumno.cursoId`, que es solo el curso actual):
+  // un curso de un ciclo viejo sigue mostrando para siempre a quienes cursaron en él.
   async findByCursoId(cursoId: string, tx?: unknown): Promise<Alumno[]> {
-    const filas = await this.client(tx).alumno.findMany({ where: { cursoId } });
+    const filas = await this.client(tx).alumno.findMany({ where: { inscripciones: { some: { cursoId } } } });
     return filas.map(aEntidad);
   }
 
