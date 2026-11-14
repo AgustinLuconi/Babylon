@@ -16,7 +16,8 @@ import type { Alumno, VinculoResponsable } from "./alumno.entity";
 import type { DatoFaltante } from "./alumno.incompleto";
 import type { ActualizarAlumnoInput, NuevoAlumnoInput, ResponsableInput } from "./alumno.schema";
 import type { EventosCambios } from "../cambios/cambio.eventos";
-import type { EventosAlumnos } from "./alumno.eventos";
+import type { CambioDeDescuento, EventosAlumnos } from "./alumno.eventos";
+import { alumnosConDescuento, correccionesDeDescuento, type CausaDescuento } from "./alumno.hermanos";
 
 export interface HijoConCurso extends Alumno {
   cursoNombre: string | null;
@@ -174,6 +175,48 @@ export class AlumnoService {
     return { padre, vinculo: "propio", nombre: alumno.nombre, apellido: alumno.apellido };
   }
 
+  // Descuento por hermanos: vuelve a calcular la marca de los alumnos activos de esas familias (regla única en
+  // `alumno.hermanos`) y la guarda en el alumno y en su inscripción del ciclo activo (si no tiene, se omite). Las cuotas ya
+  // generadas no se tocan: la generación de las próximas lee esta marca. Las fichas se bloquean en orden de id y, para que
+  // dos cambios simultáneos en una misma familia no se traben, quien llama las bloquea ANTES de tocar ningún alumno.
+  // Devuelve los ids de los alumnos cuya marca cambió.
+  private async recalcularDescuentos(
+    padreIds: (string | undefined)[],
+    causa: CausaDescuento,
+    alumnoDeLaCausaId: string,
+    tx: unknown,
+  ): Promise<string[]> {
+    const familias = await this.bloquearFamilias(padreIds, tx);
+    const cicloActivo = await this.cicloRepo.findActivo(tx);
+    const cambios: CambioDeDescuento[] = [];
+    for (const padreId of familias) {
+      const hermanos = await this.alumnoRepo.findByPadreId(padreId, tx);
+      for (const { alumnoId, aplica } of correccionesDeDescuento(hermanos)) {
+        await this.alumnoRepo.actualizarParcial(alumnoId, { aplicaDescuentoHermanos: aplica }, tx);
+        if (cicloActivo && (await this.cicloRepo.findInscripcionByAlumnoYCiclo(alumnoId, cicloActivo.id, tx))) {
+          await this.cicloRepo.actualizarInscripcion(alumnoId, cicloActivo.id, { aplicaDescuentoHermanos: aplica }, tx);
+        }
+        cambios.push({ alumnoId, aplica, causa, alumnoDeLaCausaId });
+      }
+    }
+    if (cambios.length > 0) await this.anuncios.publicar("alumnos.descuentoCambio", { cambios }, tx);
+    return cambios.map((c) => c.alumnoId);
+  }
+
+  // Señal en vivo de los hermanos cuya marca cambió (aparte de la del cambio que la provocó: así cada pantalla dice qué
+  // pasó de verdad, "cambió el descuento por hermanos de X", y no "actualizó los datos de X").
+  private async anunciarDescuento(alumnoIds: string[], tx: unknown): Promise<void> {
+    if (alumnoIds.length === 0) return;
+    await this.anuncios.publicar("datos.cambiaron", { dato: "alumnos", accion: "descuento", ids: { alumnoIds } }, tx);
+  }
+
+  // Bloquea las fichas (únicas, ordenadas por id) y las devuelve en ese orden.
+  private async bloquearFamilias(padreIds: (string | undefined)[], tx: unknown): Promise<string[]> {
+    const familias = [...new Set(padreIds.filter((p): p is string => !!p))].sort();
+    for (const padreId of familias) await this.padreRepo.bloquear(padreId, tx);
+    return familias;
+  }
+
   // La inscripción es una sola operación: el responsable (si es nuevo) y el alumno se crean juntos o no se crea nada.
   async inscribirAlumno(datos: NuevoAlumnoInput): Promise<Alumno> {
     if (datos.dni && (await this.alumnoRepo.findByDni(datos.dni))) {
@@ -196,12 +239,17 @@ export class AlumnoService {
       const clave = normalizarNombre(responsable.nombre, responsable.apellido);
       const repetido = hermanosActivos.find((h) => normalizarNombre(h.nombre, h.apellido) === clave);
       if (repetido) throw new ConflictError(`Ese responsable ya tiene un alumno activo llamado ${repetido.nombre} ${repetido.apellido}`);
-      // Descuento del 10% a partir del segundo hijo: si el responsable ya tiene al menos un alumno activo inscripto,
-      // este nuevo alumno también lo aplica.
-      const aplicaDescuentoHermanos = hermanosActivos.length >= 1;
+      // Descuento del 10% a partir del segundo hijo (regla única, `alumno.hermanos`): como la fecha de inscripción del
+      // nuevo es la más reciente, nunca cambia la marca de sus hermanos.
+      const id = randomUUID();
+      const fechaInscripcion = new Date();
+      const aplicaDescuentoHermanos = alumnosConDescuento([
+        ...hermanosActivos,
+        { id, estado: "activo", fechaInscripcion, aplicaDescuentoHermanos: false },
+      ]).has(id);
 
       const nuevo: Alumno = {
-        id: randomUUID(),
+        id,
         nombre: responsable.nombre,
         apellido: responsable.apellido,
         dni: datos.dni,
@@ -214,7 +262,7 @@ export class AlumnoService {
         padreId: responsable.padre.id,
         vinculoResponsable: responsable.vinculo,
         cursoId: datos.cursoId,
-        fechaInscripcion: new Date(),
+        fechaInscripcion,
         estado: "activo",
         aplicaDescuentoHermanos,
       };
@@ -247,13 +295,20 @@ export class AlumnoService {
   }
 
   // Asigna o cambia el responsable de un alumno ya inscripto (o su vínculo, o pasa a ser responsable de sí mismo).
-  // El descuento por hermanos se calcula al inscribir y no se recalcula acá. Al dejar de ser "propio", termina la
-  // sincronización de nombre, apellido y DNI y la ficha anterior queda como estaba.
+  // Si cambia de familia, el descuento por hermanos se recalcula en las dos (la que lo deja y la que lo recibe). Al dejar
+  // de ser "propio", termina la sincronización de nombre, apellido y DNI y la ficha anterior queda como estaba.
   async asignarResponsable(id: string, responsable: ResponsableInput): Promise<Alumno> {
     return this.unitOfWork.runInTransaction(async (tx) => {
+      // Las fichas primero y el alumno después (el recálculo del descuento toca a los hermanos de las dos familias).
+      const previo = await this.alumnoRepo.findById(id, tx);
+      if (!previo) throw new EntityNotFoundError("Alumno", id);
+      await this.bloquearFamilias([previo.padreId, responsable.tipo === "existente" ? responsable.padreId : undefined], tx);
       await this.alumnoRepo.bloquear(id, tx);
       const actual = await this.alumnoRepo.findById(id, tx);
       if (!actual) throw new EntityNotFoundError("Alumno", id);
+      // Con las fichas bloqueadas por lo que se leyó antes: si en el medio cambió de responsable, las fichas tomadas
+      // ya no son las suyas.
+      if (actual.padreId !== previo.padreId) throw new ConflictError("El responsable del alumno cambió mientras tanto: volvé a intentarlo");
 
       const curso = actual.cursoId ? await this.cursoRepo.findById(actual.cursoId, tx) : null;
       const resuelto = await this.resolverResponsable(responsable, actual, id, curso?.nivel ?? null, tx);
@@ -266,14 +321,21 @@ export class AlumnoService {
         },
         tx,
       );
+      const cambioDeFamilia = actual.padreId !== resuelto.padre.id;
+      const conMarcaNueva = cambioDeFamilia ? await this.recalcularDescuentos([actual.padreId, resuelto.padre.id], "cambio-responsable", id, tx) : [];
       await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: id }, tx);
       // La familia anterior también se entera: su hijo dejó de figurar con ella.
-      const familiaAnterior = actual.padreId && actual.padreId !== resuelto.padre.id ? [actual.padreId] : [];
+      const familiaAnterior = actual.padreId && cambioDeFamilia ? [actual.padreId] : [];
       await this.anuncios.publicar(
         "datos.cambiaron",
-        { dato: "alumnos", accion: "edicion", ids: { alumnoIds: [id], cursoIds: actual.cursoId ? [actual.cursoId] : [], padreIds: familiaAnterior } },
+        {
+          dato: "alumnos",
+          accion: "edicion",
+          ids: { alumnoIds: [id], cursoIds: actual.cursoId ? [actual.cursoId] : [], padreIds: familiaAnterior },
+        },
         tx,
       );
+      await this.anunciarDescuento(conMarcaNueva, tx);
       return guardado;
     });
   }
@@ -281,11 +343,21 @@ export class AlumnoService {
   async actualizarAlumno(id: string, datos: ActualizarAlumnoInput): Promise<Alumno> {
     return this.unitOfWork.runInTransaction(async (tx) => {
       // Bloqueos siempre en el mismo orden (primero el alumno, después su ficha de responsable): así dos cambios
-      // simultáneos que tocan las dos filas no se traban entre sí.
+      // simultáneos que tocan las dos filas no se traban entre sí. Un cambio de estado recalcula el descuento de los
+      // hermanos y por eso toma la ficha primero (ver `recalcularDescuentos`).
+      const previo = await this.alumnoRepo.findById(id, tx);
+      if (!previo) throw new EntityNotFoundError("Alumno", id);
+      if (datos.estado !== undefined && datos.estado !== previo.estado) await this.bloquearFamilias([previo.padreId], tx);
       await this.alumnoRepo.bloquear(id, tx);
       const actual = await this.alumnoRepo.findById(id, tx);
       if (!actual) {
         throw new EntityNotFoundError("Alumno", id);
+      }
+      const cambiaEstado = datos.estado !== undefined && datos.estado !== actual.estado;
+      // La ficha se tomó (o no) según lo leído antes del bloqueo: si en el medio cambió el estado o el responsable,
+      // el orden de bloqueos ya no es el correcto.
+      if (datos.estado !== undefined && (actual.estado !== previo.estado || (cambiaEstado && actual.padreId !== previo.padreId))) {
+        throw new ConflictError("El alumno cambió mientras tanto: volvé a intentarlo");
       }
       // Si es responsable de sí mismo, nombre, apellido y DNI son los mismos que los de su ficha.
       const sincroniza =
@@ -341,11 +413,15 @@ export class AlumnoService {
         }
       }
 
+      const conMarcaNueva = cambiaEstado
+        ? await this.recalcularDescuentos([resultado.padreId], resultado.estado === "activo" ? "reactivacion" : "baja", id, tx)
+        : [];
+
       await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: id }, tx);
       // Los dos cursos (el de antes y el de ahora): al profesor del curso anterior también le cambia la nómina.
       const cursoIds = [...new Set([actual.cursoId, resultado.cursoId].filter((c): c is string => !!c))];
       const accion =
-        datos.estado && datos.estado !== actual.estado
+        cambiaEstado
           ? datos.estado === "activo"
             ? "reactivacion"
             : "baja"
@@ -353,6 +429,7 @@ export class AlumnoService {
             ? "cambio-curso"
             : "edicion";
       await this.anuncios.publicar("datos.cambiaron", { dato: "alumnos", accion, ids: { alumnoIds: [id], cursoIds } }, tx);
+      await this.anunciarDescuento(conMarcaNueva, tx);
       return resultado;
     });
   }

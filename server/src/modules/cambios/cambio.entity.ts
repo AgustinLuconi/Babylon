@@ -28,6 +28,7 @@ export type AccionCambio =
   | "cambio-curso"
   | "baja"
   | "reactivacion"
+  | "descuento"
   | "alta"
   | "publicacion"
   | "carga"

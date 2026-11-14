@@ -1,9 +1,11 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
 import { esMesLectivo } from "../cuotas/cuota.calendario";
+import type { CambioDeDescuento } from "../alumnos/alumno.eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "../documentos/documento.repository";
 import type { CriteriosDeAvisos } from "./notificacion.criterios";
+import { textoDeAvisoDeDescuento } from "./notificacion.descuento";
 import type { AvisoEsperado, Destinatario, TipoEstado } from "./notificacion.entity";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -411,5 +413,46 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         nivel: 0,
       }),
     ];
+  }
+
+  // Un aviso por alumno cuyo descuento cambió: a administración y secretaría, y al responsable si tiene cuenta activa.
+  // Un alumno que ya no está activo no avisa. La clave lleva el momento: un cambio posterior vuelve a avisar.
+  async descuentoCambiado(cambios: CambioDeDescuento[], ahora: Date, tx?: unknown): Promise<AvisoEsperado[]> {
+    if (cambios.length === 0) return [];
+    const ids = [...new Set(cambios.flatMap((c) => [c.alumnoId, ...(c.alumnoDeLaCausaId ? [c.alumnoDeLaCausaId] : [])]))];
+    const alumnos = new Map(
+      (await this.db(tx).alumno.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, apellido: true, estado: true, padreId: true } })).map(
+        (a) => [a.id, a],
+      ),
+    );
+    const staff = await this.staff(tx);
+    const cuentas = await this.cuentasDePadres(tx);
+    const avisos: AvisoEsperado[] = [];
+    for (const c of cambios) {
+      const alumno = alumnos.get(c.alumnoId);
+      if (!alumno || alumno.estado !== "activo") continue;
+      const causa = c.alumnoDeLaCausaId ? alumnos.get(c.alumnoDeLaCausaId) : undefined;
+      const datos = {
+        alumno: `${alumno.nombre} ${alumno.apellido}`,
+        aplica: c.aplica,
+        causa: c.causa,
+        alumnoDeLaCausa: causa ? `${causa.nombre} ${causa.apellido}` : null,
+        esElQueSeMovio: c.alumnoId === c.alumnoDeLaCausaId,
+      };
+      const clave = `descuento:${c.alumnoId}:${ahora.toISOString()}`;
+      const comunes = { clave, tono: "info" as const, nivel: 0 };
+      for (const d of staff) {
+        avisos.push(
+          aviso({ ...d, ...comunes, tipo: "descuento_hermanos_instituto", texto: textoDeAvisoDeDescuento({ ...datos, destinatario: "instituto" }), recurso: { tipo: "alumno", alumnoId: c.alumnoId } }),
+        );
+      }
+      const usuarioId = alumno.padreId ? cuentas.get(alumno.padreId) : undefined;
+      if (usuarioId) {
+        avisos.push(
+          aviso({ usuarioId, rol: "padre", ...comunes, tipo: "descuento_hermanos", texto: textoDeAvisoDeDescuento({ ...datos, destinatario: "familia" }), recurso: { tipo: "hijo", alumnoId: c.alumnoId } }),
+        );
+      }
+    }
+    return avisos;
   }
 }

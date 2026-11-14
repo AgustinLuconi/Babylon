@@ -70,6 +70,11 @@ const ids = (r: { ids: Record<string, string[]> }[]) => {
   ok("curso reasignado: el profesor anterior solo su propio id", ids(profe), "cursoIds=curso profesorIds=profe");
   ok("curso reasignado: el nuevo recibe el curso", ids(multi), "cursoIds=curso profesorIds=multi");
 
+  await publicar({ dato: "alumnos", accion: "descuento", ids: { alumnoIds: [m.hijo2, m.alumnoAjeno] } });
+  ok("descuento: el instituto ve los dos", ids(admin), "alumnoIds=alumno-ajeno+hijo2");
+  ok("descuento: cada familia solo su hijo", ids(padre), "alumnoIds=hijo2");
+  ok("descuento: la otra familia solo el suyo", ids(ajeno), "alumnoIds=alumno-ajeno");
+
   const antes = padre.length;
   await publicar({ dato: "observaciones", accion: "alta", ids: { alumnoIds: [m.alumnoAjeno], observacionIds: [obs.id] } });
   ok("observación de otro alumno: la familia no recibe nada", padre.length, antes);

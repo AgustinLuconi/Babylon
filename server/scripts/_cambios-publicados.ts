@@ -93,7 +93,10 @@ async function limpiarCreados(): Promise<void> {
   ok("al padre le llega", insc.alPadre.some((c) => c.dato === "alumnos") ? "sí" : "no", "sí");
   ok("editar datos", resumen(del(await tras(() => pedir("PATCH", `/api/alumnos/${nuevo}`, secre, { telefono: "351 555-1234" })), "alumnos")), `alumnos/edicion alumnoIds=${nuevo} cursoIds=curso`);
   ok("cambiar de curso", resumen(del(await tras(() => pedir("PATCH", `/api/alumnos/${nuevo}`, secre, { cursoId: m.cursoMultiId })), "alumnos")), `alumnos/cambio-curso alumnoIds=${nuevo} cursoIds=curso+curso-multi`);
-  ok("dar de baja", resumen(del(await tras(() => pedir("PATCH", `/api/alumnos/${nuevo}`, secre, { estado: "inactivo" })), "alumnos")), `alumnos/baja alumnoIds=${nuevo} cursoIds=curso-multi`);
+  const bajaR = await tras(() => pedir("PATCH", `/api/alumnos/${nuevo}`, secre, { estado: "inactivo" }));
+  ok("dar de baja", resumen(bajaR.nuevos.find((c) => c.dato === "alumnos" && c.accion === "baja")), `alumnos/baja alumnoIds=${nuevo} cursoIds=curso-multi`);
+  // hijo2 tenía la marca de descuento desactualizada (mundo de prueba): la baja la corrige, y eso viaja en una señal aparte
+  ok("la baja corrige el descuento de un hermano: señal aparte", resumen(bajaR.nuevos.find((c) => c.dato === "alumnos" && c.accion === "descuento")), "alumnos/descuento alumnoIds=hijo2");
   ok("reactivar", resumen(del(await tras(() => pedir("PATCH", `/api/alumnos/${nuevo}`, secre, { estado: "activo" })), "alumnos")), `alumnos/reactivacion alumnoIds=${nuevo} cursoIds=curso-multi`);
 
   // Cursos

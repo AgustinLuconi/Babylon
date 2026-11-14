@@ -1,3 +1,4 @@
+import type { CambioDeDescuento } from "../alumnos/alumno.eventos";
 import type { AvisoEsperado, TipoEstado } from "./notificacion.entity";
 
 // De dónde sale cada aviso: qué avisos de estado tienen que estar abiertos ahora (en todo el instituto) y qué avisos
@@ -8,4 +9,5 @@ export interface CriteriosDeAvisos {
   notasPublicadas(evaluacionId: string, alumnoIds: string[] | null, tx?: unknown): Promise<AvisoEsperado[]>;
   cierrePublicado(notaCierreId: string, tx?: unknown): Promise<AvisoEsperado[]>;
   observacionNueva(observacionId: string, tx?: unknown): Promise<AvisoEsperado[]>;
+  descuentoCambiado(cambios: CambioDeDescuento[], ahora: Date, tx?: unknown): Promise<AvisoEsperado[]>;
 }

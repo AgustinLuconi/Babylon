@@ -447,6 +447,8 @@ enum TipoNotificacion {
   mensajes_familia
   mensajes_instituto
   datos_incompletos
+  descuento_hermanos_instituto
+  descuento_hermanos
 }
 
 enum ClaseNotificacion {

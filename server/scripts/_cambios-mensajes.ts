@@ -17,6 +17,9 @@ ok("vencimiento (el sistema)", t({ dato: "cuotas", accion: "vencimiento", ids: {
 ok("inscripción", t({ dato: "alumnos", accion: "inscripcion", ids: { alumnoIds: ["a1"] } }), "Lucía inscribió a Tomás Rodríguez");
 ok("cambio de curso", t({ dato: "alumnos", accion: "cambio-curso", ids: { alumnoIds: ["a1"] } }), "Lucía cambió de curso a Tomás Rodríguez");
 ok("baja", t({ dato: "alumnos", accion: "baja", ids: { alumnoIds: ["a2"] } }), "Lucía dio de baja a Ana Gómez");
+ok("descuento por hermanos de un alumno", t({ dato: "alumnos", accion: "descuento", ids: { alumnoIds: ["a2"] } }), "Lucía cambió el descuento por hermanos de Ana Gómez");
+ok("descuento por hermanos de varios", t({ dato: "alumnos", accion: "descuento", ids: { alumnoIds: ["a1", "a2"] } }), "Lucía cambió el descuento por hermanos de 2 alumnos");
+ok("descuento sin nombre en caché", t({ dato: "alumnos", accion: "descuento", ids: { alumnoIds: ["a1"] } }, sinNombres), "Lucía cambió el descuento por hermanos de un alumno");
 ok("publicación de evaluación", t({ dato: "evaluaciones", accion: "publicacion", ids: {}, por: { usuarioId: "u2", nombre: "Martín Sosa", rol: "profesor" } }), "Martín publicó una evaluación");
 ok("carga de notas", t({ dato: "calificaciones", accion: "carga", ids: {}, por: { usuarioId: "u2", nombre: "Martín Sosa", rol: "profesor" } }), "Martín cargó notas");
 ok("notas de cierre publicadas", t({ dato: "notas-cierre", accion: "publicacion", ids: { alumnoIds: Array.from({ length: 28 }, (_, i) => `x${i}`) }, por: { usuarioId: "u2", nombre: "Martín Sosa", rol: "profesor" } }), "Martín publicó las notas de cierre de 28 alumnos");
