@@ -18,20 +18,14 @@ export function filtrarPorCurso<T extends { cursoId: string }>(items: T[] | unde
   return items.filter((i) => i.cursoId === cursoId);
 }
 
-// Las observaciones no guardan de qué curso son: se reparten por el año en que se escribieron (hora local). Cada curso del
-// historial se queda con las de su año; las escritas en un año sin curso en el historial (por ejemplo, el año real antes de
-// que empiece el ciclo siguiente) se muestran en el curso actual.
+// Las observaciones no guardan de qué curso son: cada curso del historial muestra las escritas en su año (hora local), que es el
+// año de su ciclo. Una escrita en un año que no es el de ningún curso del historial no se muestra en ninguno.
 export function filtrarObservaciones<T extends { fecha: string }>(
   items: T[] | undefined,
   filas: FilaDelHistorial[] | undefined,
   cursoId: string | null,
 ): T[] | undefined {
   const elegida = filas?.find((f) => f.cursoId === cursoId);
-  if (!items || !filas || !elegida) return items;
-  const anios = new Set(filas.map((f) => f.anio));
-  const esElActual = elegida.cursoId === cursoDeLaVista(filas, null);
-  return items.filter((i) => {
-    const anio = new Date(i.fecha).getFullYear();
-    return anio === elegida.anio || (esElActual && !anios.has(anio));
-  });
+  if (!items || !elegida) return items;
+  return items.filter((i) => new Date(i.fecha).getFullYear() === elegida.anio);
 }

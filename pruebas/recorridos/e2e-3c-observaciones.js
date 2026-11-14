@@ -1,5 +1,6 @@
 // Las observaciones muestran quién las escribió y con qué rol, en las tres pantallas. Antes: _mundo-avisos.ts crear.
 const { chromium } = require("playwright");
+const { execSync } = require("child_process");
 const ok = (e, r, x) => console.log(`${e}: ${r} (esperado ${x})`);
 const BASE = "http://localhost:5173";
 const API = "http://localhost:4000";
@@ -19,6 +20,8 @@ const AUTOR = "Pruebaav secre · Secretaría";
 (async () => {
   const secre = await loginApi("secre");
   await fetch(`${API}/api/observaciones`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${secre}` }, body: JSON.stringify({ alumnoId: "prueba-tmp-av-hijo1", texto: "Trajo la autorización firmada", categoria: "administrativo" }) });
+  // Cada curso muestra las observaciones de su año: la de la prueba se fecha en el año del ciclo activo.
+  execSync(`docker exec babylon-postgres psql -U babylon -d babylon -tAc "update \\"Observacion\\" set fecha = make_date((select anio from \\"Ciclo\\" where activo), 6, 1) where \\"alumnoId\\" = 'prueba-tmp-av-hijo1'"`);
   const navegador = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
   const admin = await navegador.newPage({ viewport: { width: 1280, height: 900 } });
   await entrar(admin, "admin");

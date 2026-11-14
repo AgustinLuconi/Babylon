@@ -23,7 +23,7 @@ describe("historial de cursos (pantalla): filtrar notas, cierres y asistencia po
   test("sin datos todavía devuelve undefined", () => assert.equal(filtrarPorCurso(undefined, "c3"), undefined));
 });
 
-describe("historial de cursos (pantalla): las observaciones no guardan curso, se reparten por el año en que se escribieron", () => {
+describe("historial de cursos (pantalla): las observaciones no guardan curso, cada curso muestra las de su año", () => {
   const obs = (id: number, fecha: string) => ({ id, fecha });
   const ids = (r: { id: number }[] | undefined) => r?.map((o) => o.id);
   const historial = [fila("c3", 2027, true), fila("c2", 2025)];
@@ -33,14 +33,10 @@ describe("historial de cursos (pantalla): las observaciones no guardan curso, se
     assert.deepEqual(ids(filtrarObservaciones(items, historial, "c3")), [1]);
     assert.deepEqual(ids(filtrarObservaciones(items, historial, "c2")), [2]);
   });
-  test("una escrita en un año sin curso en el historial se muestra en el curso actual", () => {
+  test("una escrita en un año sin curso en el historial no se muestra en ningún curso", () => {
     const items = [obs(1, "2026-06-10T15:00:00Z"), obs(2, "2025-09-02T15:00:00Z")];
-    assert.deepEqual(ids(filtrarObservaciones(items, historial, "c3")), [1]);
+    assert.deepEqual(ids(filtrarObservaciones(items, historial, "c3")), []);
     assert.deepEqual(ids(filtrarObservaciones(items, historial, "c2")), [2]);
-  });
-  test("sin curso actual marcado, el más nuevo hace de actual", () => {
-    const sinActual = [fila("c3", 2027), fila("c2", 2025)];
-    assert.deepEqual(ids(filtrarObservaciones([obs(1, "2026-06-10T15:00:00Z")], sinActual, "c3")), [1]);
   });
   test("sin historial, sin curso elegido o sin datos todavía no se filtra", () => {
     const items = [obs(1, "2026-06-10T15:00:00Z")];
