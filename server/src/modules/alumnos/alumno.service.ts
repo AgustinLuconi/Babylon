@@ -133,9 +133,13 @@ export class AlumnoService {
   }
 
   // El historial de cursos del alumno, un renglón por ciclo y el más nuevo primero (sale de las inscripciones).
-  async listarHistorialDeCursos(alumnoId: string): Promise<HistorialDeCurso[]> {
+  // Con `padreId` (lo llama una familia) solo se devuelve el de su propio hijo.
+  async listarHistorialDeCursos(alumnoId: string, padreId?: string): Promise<HistorialDeCurso[]> {
     const alumno = await this.alumnoRepo.findById(alumnoId);
     if (!alumno) throw new EntityNotFoundError("Alumno", alumnoId);
+    if (padreId !== undefined && alumno.padreId !== padreId) {
+      throw new AuthorizationError("Un padre solo puede ver el historial de sus propios hijos");
+    }
     const filas: HistorialDeCurso[] = [];
     for (const inscripcion of await this.cicloRepo.findInscripcionesByAlumnoId(alumnoId)) {
       const [curso, ciclo] = await Promise.all([this.cursoRepo.findById(inscripcion.cursoId), this.cicloRepo.findById(inscripcion.cicloId)]);

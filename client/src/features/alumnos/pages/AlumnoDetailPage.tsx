@@ -41,6 +41,8 @@ import { VINCULO_LABELS } from "@/features/padres/types";
 import { CambiarResponsableModal } from "../components/CambiarResponsableModal";
 import { EditarDatosModal } from "../components/EditarDatosModal";
 import { HistorialDeCursos } from "../components/HistorialDeCursos";
+import { SelectorDeAnio } from "../components/SelectorDeAnio";
+import { useVistaDeCurso } from "../hooks/useVistaDeCurso";
 import { useActualizarAlumno } from "../hooks/useActualizarAlumno";
 import { useAlumnos } from "../hooks/useAlumnos";
 import { useAlumnosIncompletos } from "../hooks/useAlumnosIncompletos";
@@ -126,8 +128,12 @@ export default function AlumnoDetailPage() {
   const antiguedad = alumno ? calcularEdad(alumno.fechaInscripcion) : null;
 
   // Académico
-  const { data: calificaciones, isLoading: cargandoNotas } = useCalificacionesDeAlumno(alumnoId);
-  const { data: notasCierre, isLoading: cargandoNotasCierre } = useNotasCierreDeAlumno(alumnoId);
+  const { data: calificacionesTodas, isLoading: cargandoNotas } = useCalificacionesDeAlumno(alumnoId);
+  const { data: notasCierreTodas, isLoading: cargandoNotasCierre } = useNotasCierreDeAlumno(alumnoId);
+  // El servidor entrega lo de todos los años: se muestra el curso elegido (por defecto, el actual).
+  const vista = useVistaDeCurso(alumnoId);
+  const calificaciones = useMemo(() => vista.filtrar(calificacionesTodas), [vista, calificacionesTodas]);
+  const notasCierre = useMemo(() => vista.filtrar(notasCierreTodas), [vista, notasCierreTodas]);
   const periodo = elegir<PeriodoAcademico>(leer("periodo"), Object.keys(PERIODO_LABELS) as PeriodoAcademico[], "julio");
   const setPeriodo = (id: PeriodoAcademico) => escribir({ periodo: id === "julio" ? null : id });
   const evalsDelPeriodo = useMemo(
@@ -142,7 +148,8 @@ export default function AlumnoDetailPage() {
   const notaCierrePeriodo = useMemo(() => notasCierre?.find((n) => n.periodo === periodo), [notasCierre, periodo]);
 
   // Asistencia
-  const { data: asistencias, isLoading: cargandoAsistencia } = useAsistenciaDeAlumno(alumnoId);
+  const { data: asistenciasTodas, isLoading: cargandoAsistencia } = useAsistenciaDeAlumno(alumnoId);
+  const asistencias = useMemo(() => vista.filtrar(asistenciasTodas), [vista, asistenciasTodas]);
   const mesesConRegistros = useMemo(() => {
     const mapa = new Map<string, { anio: number; mes: number }>();
     for (const a of asistencias ?? []) {
@@ -152,6 +159,10 @@ export default function AlumnoDetailPage() {
     return Array.from(mapa.values()).sort((a, b) => b.anio - a.anio || b.mes - a.mes);
   }, [asistencias]);
   const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
+  // Al cambiar de curso se vuelve al mes más reciente de ese curso.
+  useEffect(() => {
+    setMesAsistencia(null);
+  }, [vista.cursoId]);
   useEffect(() => {
     if (mesAsistencia) return;
     if (mesesConRegistros.length > 0) {
@@ -515,6 +526,8 @@ export default function AlumnoDetailPage() {
           <HistorialDeCursos alumnoId={alumno.id} />
         </div>
       )}
+
+      {(tab === "academico" || tab === "asistencia") && <SelectorDeAnio filas={vista.filas} cursoId={vista.cursoId} onElegir={vista.elegir} />}
 
       {tab === "academico" && (
         <div className="space-y-4">

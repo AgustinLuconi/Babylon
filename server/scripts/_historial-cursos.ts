@@ -50,7 +50,14 @@ const pedir = async (ruta: string, tk: string) => {
     ok("admin: 200 con las dos filas", `${admin.status} ${admin.d?.length}`, "200 2");
     ok("secretaría: 200", (await pedir(ruta, await token("secre"))).status, 200);
     ok("profesor: 403", (await pedir(ruta, await token("profe"))).status, 403);
-    ok("familia: 403", (await pedir(ruta, await token("padre"))).status, 403);
+    ok("la familia del alumno: 200", (await pedir(ruta, await token("padre"))).status, 200);
+    ok("otra familia: 403", (await pedir(ruta, await token("ajeno"))).status, 403);
+
+    // Las notas llevan el curso de su evaluación (para separar por año en las pantallas)
+    await prisma.evaluacion.create({ data: { id: `${P}-ev1`, cursoId: `${P}-c1`, nombre: "Pruebaav eval", tipo: "examen", fecha: new Date("2098-05-05T00:00:00Z"), periodo: "julio", estado: "publicada" } });
+    await prisma.calificacion.create({ data: { id: `${P}-nota1`, evaluacionId: `${P}-ev1`, alumnoId: alumno, nota: "8" } });
+    const notas = await pedir(`/api/calificaciones/alumnos/${alumno}`, await token("padre"));
+    ok("la familia ve la nota con el curso de su evaluación", `${notas.status} ${notas.d?.[0]?.cursoId}`, `200 ${P}-c1`);
   } catch (e) {
     ok("sin excepciones", String(e), "ninguna");
   } finally {

@@ -19,6 +19,8 @@ export interface Solicitante {
 }
 
 export interface CalificacionConEvaluacion extends Calificacion {
+  // Curso de la evaluación (para separar las notas por año en las pantallas).
+  cursoId: string;
   evaluacionNombre: string;
   evaluacionTipo: string;
   evaluacionFecha: Date;
@@ -246,6 +248,7 @@ export class CalificacionService {
 
       enriquecidas.push({
         ...calificacion,
+        cursoId: evaluacion.cursoId,
         evaluacionNombre: evaluacion.nombre,
         evaluacionTipo: evaluacion.tipo,
         evaluacionFecha: evaluacion.fecha,

@@ -46,6 +46,7 @@ export interface Calificacion {
 }
 
 export interface CalificacionConEvaluacion extends Calificacion {
+  cursoId: string;
   evaluacionNombre: string;
   evaluacionTipo: TipoEvaluacion;
   evaluacionFecha: string;

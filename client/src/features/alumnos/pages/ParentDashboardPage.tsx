@@ -15,6 +15,8 @@ import { useCalificacionesDeAlumno } from "@/features/calificaciones/hooks/useCa
 import { useNotasCierreDeAlumno } from "@/features/calificaciones/hooks/useNotasCierreDeAlumno";
 import { TIPO_EVALUACION_LABELS } from "@/features/calificaciones/types";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
+import { SelectorDeAnio } from "../components/SelectorDeAnio";
+import { useVistaDeCurso } from "../hooks/useVistaDeCurso";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
 import { useCuotasPorAlumno } from "@/features/cuotas/hooks/useCuotasPorAlumno";
 import type { EstadoCuota } from "@/features/cuotas/types";
@@ -81,9 +83,14 @@ export default function ParentDashboardPage() {
   }, [kid]);
   const elegirHijo = (id: string) => escribir({ hijo: id });
 
-  const { data: calificaciones } = useCalificacionesDeAlumno(kid?.id);
-  const { data: notasCierre } = useNotasCierreDeAlumno(kid?.id);
-  const { data: asistencia } = useAsistenciaDeAlumno(kid?.id);
+  const { data: calificacionesTodas } = useCalificacionesDeAlumno(kid?.id);
+  const { data: notasCierreTodas } = useNotasCierreDeAlumno(kid?.id);
+  const { data: asistenciaTodas } = useAsistenciaDeAlumno(kid?.id);
+  // El servidor entrega lo de todos los años: se muestra el curso elegido (por defecto, el actual).
+  const vista = useVistaDeCurso(kid?.id);
+  const calificaciones = useMemo(() => vista.filtrar(calificacionesTodas), [vista, calificacionesTodas]);
+  const notasCierre = useMemo(() => vista.filtrar(notasCierreTodas), [vista, notasCierreTodas]);
+  const asistencia = useMemo(() => vista.filtrar(asistenciaTodas), [vista, asistenciaTodas]);
   const { data: cuotas } = useCuotasPorAlumno(kid?.id ?? null);
   const { data: documentos } = useDocumentosPorAlumno(kid?.id);
   const { data: observaciones } = useObservacionesPorAlumno(kid?.id);
@@ -127,7 +134,7 @@ export default function ParentDashboardPage() {
   const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
   useEffect(() => {
     setMesAsistencia(null);
-  }, [kid?.id]);
+  }, [kid?.id, vista.cursoId]);
   useEffect(() => {
     if (mesAsistencia) return;
     if (mesesConRegistros.length > 0) {
@@ -319,6 +326,10 @@ export default function ParentDashboardPage() {
           </button>
         ))}
       </div>
+
+      {(tab === "home" || tab === "grades" || tab === "attendance") && (
+        <SelectorDeAnio filas={vista.filas} cursoId={vista.cursoId} onElegir={vista.elegir} />
+      )}
 
       {tab === "home" && (
         <div className="space-y-4">

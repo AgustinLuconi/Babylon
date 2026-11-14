@@ -42,7 +42,9 @@ export class AlumnoController {
   };
 
   historialDeCursos = async (req: Request, res: Response) => {
-    res.status(200).json(await this.alumnoService.listarHistorialDeCursos(String(req.params.id)));
+    // Una familia ve solo el de su hijo; administración y secretaría, el de cualquier alumno.
+    const padreId = req.auth!.rol === "padre" ? (await this.padreService.buscarPorUsuarioId(req.auth!.sub)).id : undefined;
+    res.status(200).json(await this.alumnoService.listarHistorialDeCursos(String(req.params.id), padreId));
   };
 
   actualizar = async (req: Request, res: Response) => {

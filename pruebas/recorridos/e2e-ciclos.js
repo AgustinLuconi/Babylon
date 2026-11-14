@@ -100,6 +100,30 @@ const api = async (metodo, ruta, tk, cuerpo) => {
     const texto = await historial.textContent();
     ok("el legajo muestra el historial: 2099 (actual) y 2098", `${texto.includes("2099")} ${texto.includes("2098")} ${texto.includes("Actual")}`, "true true true");
     ok("el historial muestra el nombre del curso de 2098", texto.includes("Pruebaav Uno"), true);
+
+    // Lo que le fue en cada curso: una nota de 2098 no aparece en el curso actual y sí al elegir el año anterior
+    q(`insert into "Evaluacion" (id, "cursoId", nombre, tipo, fecha, periodo, estado) values ('${P}-ev-vieja', '${P}-c1', 'Pruebaav examen viejo', 'examen', '2098-05-05', 'julio', 'publicada')`);
+    q(`insert into "Calificacion" (id, "evaluacionId", "alumnoId", nota) values ('${P}-nota-vieja', '${P}-ev-vieja', '${P}-e1', '9')`);
+    await p.goto(`${BASE}/alumnos/${P}-e1?pestana=academico`);
+    await p.getByLabel("Año").waitFor({ timeout: 8000 });
+    ok("legajo: por defecto no se ve la nota del curso viejo", await p.getByText("Pruebaav examen viejo").count(), 0);
+    await p.getByLabel("Año").selectOption(`${P}-c1`);
+    await p.getByText("Pruebaav examen viejo").waitFor({ timeout: 8000 });
+    ok("legajo: al elegir 2098 se ve su nota", await p.getByText("Pruebaav examen viejo").count(), 1);
+
+    // Lo mismo desde el panel de la familia (cada familia solo ve a su hijo)
+    const f = await b.newPage({ viewport: { width: 1280, height: 1200 } });
+    await f.goto(`${BASE}/login`);
+    await f.fill('input[name="email"]', email("padre"));
+    await f.fill('input[name="password"]', "prueba1234");
+    await f.click('button[type="submit"]');
+    await f.waitForURL((u) => !u.pathname.startsWith("/login"));
+    await f.goto(`${BASE}/mis-hijos/calificaciones?hijo=${P}-e1`);
+    await f.getByLabel("Año").waitFor({ timeout: 8000 });
+    ok("familia: por defecto no ve la nota del curso viejo", await f.getByText("Pruebaav examen viejo").count(), 0);
+    await f.getByLabel("Año").selectOption(`${P}-c1`);
+    await f.getByText("Pruebaav examen viejo").waitFor({ timeout: 8000 });
+    ok("familia: al elegir 2098 ve su nota", await f.getByText("Pruebaav examen viejo").count(), 1);
   } finally {
     await b.close();
   }
