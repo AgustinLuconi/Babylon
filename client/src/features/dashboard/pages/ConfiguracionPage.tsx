@@ -6,6 +6,7 @@ import { Moon, Plus, Sun } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
+import { Modal } from "@/core/components/ui/modal";
 import { Panel } from "@/core/components/ui/panel";
 import { ApiError } from "@/core/lib/apiClient";
 import { useThemeStore } from "@/core/store/themeStore";
@@ -13,13 +14,19 @@ import { formatMonto } from "@/core/lib/utils";
 import { useActualizarConfiguracion } from "@/features/configuracion/hooks/useActualizarConfiguracion";
 import { useConfiguracion } from "@/features/configuracion/hooks/useConfiguracion";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
+import { useBloquearCiclo } from "@/features/ciclos/hooks/useBloquearCiclo";
 import { useCrearCiclo } from "@/features/ciclos/hooks/useCrearCiclo";
+import { useDesbloquearCiclo } from "@/features/ciclos/hooks/useDesbloquearCiclo";
+import type { Ciclo } from "@/features/ciclos/types";
 import { useMarcarCicloActivo } from "@/features/ciclos/hooks/useMarcarCicloActivo";
 
 export default function ConfiguracionPage() {
   const { data: ciclos, isLoading } = useCiclos();
   const crearCiclo = useCrearCiclo();
   const marcarActivo = useMarcarCicloActivo();
+  const bloquearCiclo = useBloquearCiclo();
+  const desbloquearCiclo = useDesbloquearCiclo();
+  const [confirmando, setConfirmando] = useState<{ accion: "bloquear" | "desbloquear"; ciclo: Ciclo } | null>(null);
   const [nuevoAnio, setNuevoAnio] = useState("");
   const { tema, alternarTema } = useThemeStore();
   const { data: configuracion } = useConfiguracion();
@@ -149,7 +156,8 @@ export default function ConfiguracionPage() {
         <div className="space-y-3 p-5">
           <p className="text-[12.5px] text-muted-foreground">
             El ciclo activo es el que se asigna por defecto a los cursos y alumnos que se dan de alta hoy. Los ciclos
-            anteriores quedan como historial, no se pueden reactivar cursos viejos, solo consultarlos.
+            anteriores quedan como historial. Un ciclo terminado se puede bloquear: queda tal como está y nadie puede cambiar
+            sus cursos, inscripciones, asistencia ni notas (se pueden seguir cobrando sus cuotas).
           </p>
 
           {isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
@@ -162,17 +170,31 @@ export default function ConfiguracionPage() {
                 ) : (
                   <Badge variant="neutral">Histórico</Badge>
                 )}
+                {ciclo.bloqueado && <Badge variant="warning">Bloqueado</Badge>}
               </div>
-              {!ciclo.activo && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={marcarActivo.isPending}
-                  onClick={() => marcarActivo.mutate(ciclo.id)}
-                >
-                  Marcar como activo
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {!ciclo.activo && !ciclo.bloqueado && (
+                  <Button variant="outline" size="sm" onClick={() => setConfirmando({ accion: "bloquear", ciclo })}>
+                    Bloquear
+                  </Button>
+                )}
+                {ciclo.bloqueado && (
+                  <Button variant="outline" size="sm" onClick={() => setConfirmando({ accion: "desbloquear", ciclo })}>
+                    Desbloquear
+                  </Button>
+                )}
+                {!ciclo.activo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={marcarActivo.isPending || ciclo.bloqueado}
+                    title={ciclo.bloqueado ? "Desbloqueá el ciclo para poder activarlo" : undefined}
+                    onClick={() => marcarActivo.mutate(ciclo.id)}
+                  >
+                    Marcar como activo
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
 
@@ -202,6 +224,40 @@ export default function ConfiguracionPage() {
           )}
         </div>
       </Panel>
+
+      {confirmando && (
+        <Modal
+          title={confirmando.accion === "bloquear" ? `Bloquear el ciclo ${confirmando.ciclo.anio}` : `Desbloquear el ciclo ${confirmando.ciclo.anio}`}
+          onClose={() => setConfirmando(null)}
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setConfirmando(null)}>
+                Cancelar
+              </Button>
+              <Button
+                disabled={bloquearCiclo.isPending || desbloquearCiclo.isPending}
+                onClick={() => {
+                  const mutacion = confirmando.accion === "bloquear" ? bloquearCiclo : desbloquearCiclo;
+                  mutacion.mutate(confirmando.ciclo.id, { onSuccess: () => setConfirmando(null) });
+                }}
+              >
+                {confirmando.accion === "bloquear" ? "Bloquear" : "Desbloquear"}
+              </Button>
+            </>
+          }
+        >
+          <p className="text-sm">
+            {confirmando.accion === "bloquear"
+              ? `Con el ciclo ${confirmando.ciclo.anio} bloqueado nadie puede cambiar sus cursos, inscripciones, asistencia ni notas, y los registros quedan tal como están. Se pueden seguir cobrando las cuotas pendientes o vencidas. Podés desbloquearlo cuando quieras.`
+              : `Con el ciclo ${confirmando.ciclo.anio} desbloqueado se vuelven a poder cambiar sus cursos, inscripciones, asistencia y notas.`}
+          </p>
+          {(bloquearCiclo.isError || desbloquearCiclo.isError) && (
+            <p className="text-sm text-destructive">
+              {[bloquearCiclo.error, desbloquearCiclo.error].find((e) => e instanceof ApiError)?.message ?? "No se pudo cambiar el estado del ciclo"}
+            </p>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

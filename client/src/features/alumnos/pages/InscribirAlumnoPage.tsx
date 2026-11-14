@@ -26,7 +26,7 @@ import { usePadres } from "@/features/padres/hooks/usePadres";
 import { useActualizarPadre } from "@/features/padres/hooks/useActualizarPadre";
 import { SelectorDeResponsable, type ResultadoDelSelector, type SelectorDeResponsableHandle } from "@/features/padres/components/SelectorDeResponsable";
 import { VINCULO_LABELS } from "@/features/padres/types";
-import { useCursos } from "@/features/cursos/hooks/useCursos";
+import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import { DIA_SEMANA_LABELS, NIVEL_GRUPO, NIVEL_LABELS } from "@/features/cursos/types";
 import { useAlumnos } from "../hooks/useAlumnos";
@@ -71,7 +71,8 @@ const texto = (valor: unknown) => (typeof valor === "string" ? valor : "");
 export default function InscribirAlumnoPage() {
   const navigate = useNavigate();
   const { data: padres } = usePadres();
-  const { data: cursos } = useCursos();
+  // Solo se puede inscribir en cursos del ciclo activo.
+  const { data: cursos } = useCursosDelCicloActivo();
   const { data: horarios } = useHorarios();
   const { data: alumnos } = useAlumnos();
   const actualizarPadre = useActualizarPadre();
