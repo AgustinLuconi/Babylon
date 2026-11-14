@@ -2,6 +2,9 @@
 // responsable, paga completo el que se inscribió primero y los demás tienen descuento. Un alumno inactivo o egresado
 // no cuenta ni lo recibe. Hay una copia con los mismos nombres en el client (no comparten código).
 
+// Por qué cambió el descuento de un alumno (la causa la define quien lo recalcula, el módulo de alumnos).
+export type CausaDescuento = "baja" | "reactivacion" | "cambio-responsable";
+
 export interface AlumnoParaDescuento {
   id: string;
   estado: "activo" | "inactivo" | "egresado";

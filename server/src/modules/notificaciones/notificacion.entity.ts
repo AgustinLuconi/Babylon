@@ -12,7 +12,12 @@ export type TipoEstado =
   | "mensajes_familia"
   | "mensajes_instituto"
   | "datos_incompletos";
-export type TipoEvento = "nota_publicada" | "cierre_publicado" | "observacion_nueva";
+export type TipoEvento =
+  | "nota_publicada"
+  | "cierre_publicado"
+  | "observacion_nueva"
+  | "descuento_hermanos_instituto"
+  | "descuento_hermanos";
 export type TipoNotificacion = TipoEstado | TipoEvento;
 export type ClaseNotificacion = "estado" | "evento";
 export type TonoNotificacion = "danger" | "warning" | "info";
@@ -28,6 +33,7 @@ export type RecursoAviso =
   | { tipo: "cuota"; alumnoId: string; cuotaId: string }
   | { tipo: "documentacion"; alumnoId: string }
   | { tipo: "calificaciones"; alumnoId: string }
+  | { tipo: "alumno"; alumnoId: string }
   | { tipo: "hijo"; alumnoId: string }
   | { tipo: "chat"; chatId: string };
 

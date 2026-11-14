@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { alConfirmar } from "../../core/alConfirmar";
 import { EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { CanalEnVivo, Rol, UnitOfWork } from "../../core/ports";
+import type { CambioDeDescuento } from "../alumnos/alumno.eventos";
 import type { CriteriosDeAvisos } from "./notificacion.criterios";
 import type {
   AvisoEsperado,
@@ -99,6 +100,10 @@ export class NotificacionService {
 
   async cierrePublicado(notaCierreId: string, tx: unknown): Promise<void> {
     await this.registrarEventos(await this.criterios.cierrePublicado(notaCierreId, tx), tx);
+  }
+
+  async descuentoCambiado(cambios: CambioDeDescuento[], tx: unknown, ahora: Date = new Date()): Promise<void> {
+    await this.registrarEventos(await this.criterios.descuentoCambiado(cambios, ahora, tx), tx, ahora);
   }
 
   async observacionNueva(observacionId: string, tx: unknown): Promise<void> {

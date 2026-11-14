@@ -1,4 +1,6 @@
-export type CausaDescuento = "baja" | "reactivacion" | "cambio-responsable";
+import type { CausaDescuento } from "../alumnos/alumno.hermanos";
+
+export type { CausaDescuento };
 
 const RIGE = " Rige desde la próxima cuota que se genere.";
 

@@ -26,6 +26,8 @@ export function rutaDeAviso(recurso: RecursoAviso, rol: Rol): string {
       return conFiltros("/mis-hijos/documentacion", { hijo: recurso.alumnoId });
     case "calificaciones":
       return conFiltros("/mis-hijos/calificaciones", { hijo: recurso.alumnoId });
+    case "alumno":
+      return `/alumnos/${recurso.alumnoId}`;
     case "hijo":
       return conFiltros("/mis-hijos", { hijo: recurso.alumnoId });
     case "chat":

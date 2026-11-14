@@ -105,7 +105,7 @@ const observacion = (alumnoId: string, autor: string) =>
 
   // 7) Preferencias
   const prefs = await servicio.preferencias(padre);
-  ok("7: el padre ve sus 6 tipos, encendidos", `${prefs.length} ${prefs.every((p) => p.activa)}`, "6 true");
+  ok("7: el padre ve sus 7 tipos, encendidos", `${prefs.length} ${prefs.every((p) => p.activa)}`, "7 true");
   // Vencida: su aviso existe tanto con la fecha fija de la prueba (sincronizar) como con la hora real (encender una
   // preferencia sincroniza con la hora real). Una "por vencer" solo coincide en las dos fechas por casualidad.
   await cuota("c3", m.hijo2, 10, "2026-10-10", "vencida");
