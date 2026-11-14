@@ -64,6 +64,8 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.padre.deleteMany({ where: { id: { in: padreIds } } });
   await prisma.profesor.deleteMany({ where: { id: { in: profesorIds } } });
   await prisma.usuario.deleteMany({ where: { OR: [{ id: { startsWith: P } }, { email: { startsWith: P } }] } });
+  // Ciclos de prueba (año 2098/2099): sus cursos e inscripciones ya se borraron arriba.
+  await prisma.ciclo.deleteMany({ where: { id: { startsWith: P } } });
 }
 
 export async function crearMundo(prisma: PrismaClient): Promise<Mundo> {

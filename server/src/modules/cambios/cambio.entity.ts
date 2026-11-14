@@ -38,6 +38,8 @@ export type AccionCambio =
   | "manual"
   | "estado"
   | "activacion"
+  | "bloqueo"
+  | "desbloqueo"
   | "inicio"
   | "cierre";
 

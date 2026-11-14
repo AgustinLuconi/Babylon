@@ -8,6 +8,8 @@ export function cicloRoutes(controller: CicloController): Router {
   router.get("/", authMiddleware, requireRole("admin", "secretario", "profesor"), controller.listar);
   router.post("/", authMiddleware, requireRole("admin"), controller.crear);
   router.patch("/:id/activar", authMiddleware, requireRole("admin"), controller.marcarActivo);
+  router.patch("/:id/bloquear", authMiddleware, requireRole("admin"), controller.bloquear);
+  router.patch("/:id/desbloquear", authMiddleware, requireRole("admin"), controller.desbloquear);
 
   return router;
 }
