@@ -116,7 +116,7 @@ const alumnoService = new AlumnoService(
   verificadorDeCiclo,
 );
 const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork, tablero, verificadorDeCiclo);
-const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork, tablero);
+const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork, tablero, verificadorDeCiclo);
 const documentoService = new DocumentoService(documentoRepository, alumnoRepository, unitOfWork, tablero);
 const calificacionService = new CalificacionService(
   calificacionRepository,
@@ -124,8 +124,9 @@ const calificacionService = new CalificacionService(
   alumnoRepository,
   unitOfWork,
   tablero,
+  verificadorDeCiclo,
 );
-const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository, unitOfWork, tablero);
+const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository, unitOfWork, tablero, verificadorDeCiclo);
 const chatService = new ChatService(chatRepository, usuarioRepository, padreRepository, unitOfWork, tablero);
 const reporteService = new ReporteService(prisma, documentoRepository);
 const notificacionService = new NotificacionService(

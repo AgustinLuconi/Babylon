@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AuthorizationError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
+import { cicloSiempreAbierto, type VerificadorDeCiclo } from "../ciclos/ciclo.guarda";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { CalificacionRepository } from "./calificacion.repository";
@@ -31,6 +32,7 @@ export class CalificacionService {
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosCalificaciones & EventosCambios> = sinAnuncios(),
+    private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -83,6 +85,7 @@ export class CalificacionService {
       estado: "borrador",
     };
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.verificador.verificarCicloDelCurso(datos.cursoId, tx);
       const creada = await this.calificacionRepo.crearEvaluacion(evaluacion, tx);
       await this.anuncios.publicar("evaluacion.creada", { evaluacionId: creada.id }, tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "evaluaciones", accion: "alta", ids: { cursoIds: [creada.cursoId], evaluacionIds: [creada.id] } }, tx);
@@ -98,6 +101,7 @@ export class CalificacionService {
     await this.verificarDuenoDelCurso(evaluacion.cursoId, profesorId);
 
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.verificador.verificarCicloDelCurso(evaluacion.cursoId, tx);
       const publicada = await this.calificacionRepo.actualizarEvaluacion(
         evaluacionId,
         { ...evaluacion, estado: "publicada", publicadaEn: evaluacion.publicadaEn ?? new Date() },
@@ -131,6 +135,7 @@ export class CalificacionService {
     const idsNomina = new Set(nomina.map((alumno) => alumno.id));
 
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.verificador.verificarCicloDelCurso(evaluacion.cursoId, tx);
       const calificaciones: Calificacion[] = [];
       for (const nota of datos.notas) {
         if (!idsNomina.has(nota.alumnoId)) {
@@ -168,6 +173,7 @@ export class CalificacionService {
     for (const cursoId of new Set(notas.map((n) => n.cursoId))) await this.verificarDuenoDelCurso(cursoId, profesorId);
 
     return this.unitOfWork.runInTransaction(async (tx) => {
+      for (const cursoId of new Set(notas.map((n) => n.cursoId))) await this.verificador.verificarCicloDelCurso(cursoId, tx);
       const guardadas: NotaCierre[] = [];
       for (const datos of notas) {
         const existente = await this.calificacionRepo.findNotaCierre(datos.alumnoId, datos.cursoId, datos.periodo, tx);
@@ -206,6 +212,7 @@ export class CalificacionService {
         }
         if (!cursosVerificados.has(notaCierre.cursoId)) {
           await this.verificarDuenoDelCurso(notaCierre.cursoId, profesorId);
+          await this.verificador.verificarCicloDelCurso(notaCierre.cursoId, tx);
           cursosVerificados.add(notaCierre.cursoId);
         }
         publicadas.push(

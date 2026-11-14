@@ -3,6 +3,7 @@ import { AuthorizationError, EntityNotFoundError, ValidationError } from "../../
 import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
+import { cicloSiempreAbierto, type VerificadorDeCiclo } from "../ciclos/ciclo.guarda";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { UsuarioRepository } from "../usuarios/usuario.repository";
 import type { ObservacionRepository } from "./observacion.repository";
@@ -28,6 +29,7 @@ export class ObservacionService {
     private readonly usuarioRepo: UsuarioRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosObservaciones & EventosCambios> = sinAnuncios(),
+    private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -110,6 +112,7 @@ export class ObservacionService {
       nombre: datos.nombre,
     };
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.verificador.verificarCicloDelCurso(datos.cursoId, tx);
       const creada = await this.observacionRepo.crearCategoriaPersonalizada(categoria, tx);
       await this.anuncios.publicar("datos.cambiaron", { dato: "categorias", accion: "alta", ids: { cursoIds: [creada.cursoId] } }, tx);
       return creada;
