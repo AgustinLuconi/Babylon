@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
 import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
 import { useSinGuardar } from "@/core/sinGuardar/sinGuardar";
+import { Link } from "react-router-dom";
 import { Moon, Plus, Sun } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
@@ -152,7 +153,16 @@ export default function ConfiguracionPage() {
         </div>
       </Panel>
 
-      <Panel title="Ciclos lectivos">
+      <Panel
+        title="Ciclos lectivos"
+        action={
+          <Link to="/ciclos/pasar-de-anio">
+            <Button variant="outline" size="sm">
+              Pasar de año
+            </Button>
+          </Link>
+        }
+      >
         <div className="space-y-3 p-5">
           <p className="text-[12.5px] text-muted-foreground">
             El ciclo activo es el que se asigna por defecto a los cursos y alumnos que se dan de alta hoy. Los ciclos

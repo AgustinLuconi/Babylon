@@ -14,6 +14,7 @@ const TITULOS: { prefijo: string; titulo: string; subtitulo: string }[] = [
   { prefijo: "/reportes", titulo: "Reportes", subtitulo: "Informes académicos y financieros" },
   { prefijo: "/usuarios", titulo: "Usuarios del sistema", subtitulo: "Acceso, roles y permisos" },
   { prefijo: "/configuracion", titulo: "Configuración", subtitulo: "Parámetros del sistema" },
+  { prefijo: "/ciclos/pasar-de-anio", titulo: "Pasar de año", subtitulo: "Copiar los cursos y pasar a los alumnos al ciclo siguiente" },
   { prefijo: "/chats", titulo: "Chats", subtitulo: "Consultas de las familias con administración" },
   { prefijo: "/asistencia", titulo: "Asistencia", subtitulo: "Registro de presentes, tardanzas y ausencias" },
   { prefijo: "/calificaciones", titulo: "Calificaciones", subtitulo: "Carga y publicación de evaluaciones" },
