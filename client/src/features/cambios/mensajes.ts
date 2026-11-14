@@ -35,6 +35,8 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
       return sobre("dio de baja a", "dio de baja a un alumno");
     case "alumnos/reactivacion":
       return sobre("reactivó a", "reactivó a un alumno");
+    case "alumnos/descuento":
+      return alumnos.length > 1 ? `${quien} cambió el descuento por hermanos de ${alumnos.length} alumnos` : sobre("cambió el descuento por hermanos de", "cambió el descuento por hermanos de un alumno");
     case "alumnos/edicion":
       return sobre("actualizó los datos de", "actualizó los datos de un alumno");
     case "cursos/alta":

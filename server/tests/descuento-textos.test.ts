@@ -43,4 +43,15 @@ describe("textoDeAvisoDeDescuento", () => {
     assert.equal(entra, `Carla Pérez pasó a tener 10% de descuento por hermanos porque se sumó un hermano a tu cargo.${S}`);
     assert.ok(!entra.includes("Zoe Ajena"));
   });
+  test("baja que corrige una marca vieja: el texto sigue el efecto real", () =>
+    assert.equal(
+      textoDeAvisoDeDescuento({ ...base, aplica: true, causa: "baja" }),
+      `Bruno Pérez pasó a tener 10% de descuento por hermanos porque Ana Pérez se dio de baja.${S}`,
+    ));
+  test("reactivación del propio alumno: no se nombra a sí mismo como causa", () => {
+    const con = textoDeAvisoDeDescuento({ ...base, aplica: true, causa: "reactivacion", alumnoDeLaCausa: "Bruno Pérez", esElQueSeMovio: true });
+    assert.equal(con, `Bruno Pérez pasó a tener 10% de descuento por hermanos porque volvió a estar activo.${S}`);
+    const sin = textoDeAvisoDeDescuento({ ...base, aplica: false, causa: "reactivacion", alumnoDeLaCausa: "Bruno Pérez", esElQueSeMovio: true });
+    assert.equal(sin, `Bruno Pérez pasó a pagar la cuota completa porque volvió a estar activo.${S}`);
+  });
 });

@@ -122,6 +122,22 @@ async function pedir<T = Record<string, unknown>>(metodo: string, ruta: string, 
   ok("administrador reactiva: 200", comoAdmin.status, 200);
   ok("Eva vuelve y es la primera; Gina pasa a tener descuento", await marcas(e.id, g.id), "false,true");
 
+  // ── Dos cambios de responsable a la vez sobre el mismo alumno: uno gana, el otro recibe 409 o se aplica después; nunca 500 ──
+  const h = await inscribir("Hugo", nuevoResp("Resp5"));
+  const r6 = await inscribir("Irma", nuevoResp("Resp6"));
+  const r7 = await inscribir("Juan", nuevoResp("Resp7"));
+  const [m1, m2] = await Promise.all([
+    pedir("PUT", `/api/alumnos/${h.id}/responsable`, secre, { tipo: "existente", padreId: r6.padreId, vinculo: "padre" }),
+    pedir("PUT", `/api/alumnos/${h.id}/responsable`, secre, { tipo: "existente", padreId: r7.padreId, vinculo: "padre" }),
+  ]);
+  ok("dos cambios de responsable simultáneos: ninguno da 500", [m1.status, m2.status].every((x) => x === 200 || x === 409), true);
+  ok("dos cambios de responsable simultáneos: al menos uno se aplicó", [m1.status, m2.status].includes(200), true);
+  const final = await prisma.alumno.findUniqueOrThrow({ where: { id: h.id } });
+  ok("el alumno quedó con uno de los dos responsables", [r6.padreId, r7.padreId].includes(final.padreId as string), true);
+  const enFamilia = (padreId: string) => prisma.alumno.findMany({ where: { padreId, estado: "activo" }, orderBy: { fechaInscripcion: "asc" } });
+  const destino = await enFamilia(final.padreId as string);
+  ok("la familia que lo recibió queda con exactamente uno que paga completo", destino.filter((a) => !a.aplicaDescuentoHermanos).length, 1);
+
   await limpiarMundo(prisma);
   ok("limpieza", await prisma.alumno.count({ where: { OR: [{ id: { startsWith: P } }, { apellido: "Pruebaav" }] } }), 0);
   await prisma.$disconnect();

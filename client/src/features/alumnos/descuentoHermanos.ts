@@ -1,6 +1,8 @@
 // Descuento por hermanos: la misma regla que el server (`server/src/modules/alumnos/alumno.hermanos.ts`), escrita dos
 // veces con los mismos nombres porque no comparten código. Entre los alumnos activos de un mismo responsable paga
 // completo el que se inscribió primero y los demás tienen el 10%. Sin alias `@/`: server/tests/ la prueba por ruta relativa.
+// Solo `quienPagaCompleto` se usa en pantalla; `alumnosConDescuento` y `correccionesDeDescuento` se mantienen con los mismos
+// nombres que el server para que la misma tabla de casos pruebe las dos copias.
 
 export interface AlumnoParaDescuento {
   id: string;

@@ -203,6 +203,13 @@ export class AlumnoService {
     return cambios.map((c) => c.alumnoId);
   }
 
+  // Señal en vivo de los hermanos cuya marca cambió (aparte de la del cambio que la provocó: así cada pantalla dice qué
+  // pasó de verdad, "cambió el descuento por hermanos de X", y no "actualizó los datos de X").
+  private async anunciarDescuento(alumnoIds: string[], tx: unknown): Promise<void> {
+    if (alumnoIds.length === 0) return;
+    await this.anuncios.publicar("datos.cambiaron", { dato: "alumnos", accion: "descuento", ids: { alumnoIds } }, tx);
+  }
+
   // Bloquea las fichas (únicas, ordenadas por id) y las devuelve en ese orden.
   private async bloquearFamilias(padreIds: (string | undefined)[], tx: unknown): Promise<string[]> {
     const familias = [...new Set(padreIds.filter((p): p is string => !!p))].sort();
@@ -299,6 +306,9 @@ export class AlumnoService {
       await this.alumnoRepo.bloquear(id, tx);
       const actual = await this.alumnoRepo.findById(id, tx);
       if (!actual) throw new EntityNotFoundError("Alumno", id);
+      // Con las fichas bloqueadas por lo que se leyó antes: si en el medio cambió de responsable, las fichas tomadas
+      // ya no son las suyas.
+      if (actual.padreId !== previo.padreId) throw new ConflictError("El responsable del alumno cambió mientras tanto: volvé a intentarlo");
 
       const curso = actual.cursoId ? await this.cursoRepo.findById(actual.cursoId, tx) : null;
       const resuelto = await this.resolverResponsable(responsable, actual, id, curso?.nivel ?? null, tx);
@@ -321,10 +331,11 @@ export class AlumnoService {
         {
           dato: "alumnos",
           accion: "edicion",
-          ids: { alumnoIds: [...new Set([id, ...conMarcaNueva])], cursoIds: actual.cursoId ? [actual.cursoId] : [], padreIds: familiaAnterior },
+          ids: { alumnoIds: [id], cursoIds: actual.cursoId ? [actual.cursoId] : [], padreIds: familiaAnterior },
         },
         tx,
       );
+      await this.anunciarDescuento(conMarcaNueva, tx);
       return guardado;
     });
   }
@@ -343,7 +354,11 @@ export class AlumnoService {
         throw new EntityNotFoundError("Alumno", id);
       }
       const cambiaEstado = datos.estado !== undefined && datos.estado !== actual.estado;
-      if (cambiaEstado && actual.padreId !== previo.padreId) throw new ConflictError("El responsable del alumno cambió mientras tanto: volvé a intentarlo");
+      // La ficha se tomó (o no) según lo leído antes del bloqueo: si en el medio cambió el estado o el responsable,
+      // el orden de bloqueos ya no es el correcto.
+      if (datos.estado !== undefined && (actual.estado !== previo.estado || (cambiaEstado && actual.padreId !== previo.padreId))) {
+        throw new ConflictError("El alumno cambió mientras tanto: volvé a intentarlo");
+      }
       // Si es responsable de sí mismo, nombre, apellido y DNI son los mismos que los de su ficha.
       const sincroniza =
         actual.vinculoResponsable === "propio" &&
@@ -413,7 +428,8 @@ export class AlumnoService {
           : datos.cursoId && datos.cursoId !== actual.cursoId
             ? "cambio-curso"
             : "edicion";
-      await this.anuncios.publicar("datos.cambiaron", { dato: "alumnos", accion, ids: { alumnoIds: [...new Set([id, ...conMarcaNueva])], cursoIds } }, tx);
+      await this.anuncios.publicar("datos.cambiaron", { dato: "alumnos", accion, ids: { alumnoIds: [id], cursoIds } }, tx);
+      await this.anunciarDescuento(conMarcaNueva, tx);
       return resultado;
     });
   }

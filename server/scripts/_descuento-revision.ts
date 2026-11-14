@@ -35,6 +35,16 @@ const prisma = new PrismaClient();
   ok("aplicar: los alumnos reales no cambian", JSON.stringify(await reales()) === marcasReales ? "iguales" : "cambiaron", "iguales");
   ok("una segunda revisión ya no encuentra nada", (await revisar(prisma, { aplicar: false, prefijoDeId: P })).length, 0);
 
+  // Aplicar sin prefijo y sin confirmar que es sobre toda la base se rechaza antes de tocar nada.
+  const sinPrefijo = await revisar(prisma, { aplicar: true }).then(() => "aplicó", (e: Error) => e.message);
+  ok("aplicar sin prefijo ni confirmación: se rechaza", sinPrefijo.startsWith("Aplicar sobre toda la base necesita"), true);
+  ok("y no cambió ningún alumno real", JSON.stringify(await reales()) === marcasReales ? "iguales" : "cambiaron", "iguales");
+
   await limpiarMundo(prisma);
   await prisma.$disconnect();
-})();
+})().catch(async (err) => {
+  ok("sin excepciones", String(err), "ninguna");
+  await limpiarMundo(prisma).catch(() => {});
+  await prisma.$disconnect();
+  process.exit(1);
+});

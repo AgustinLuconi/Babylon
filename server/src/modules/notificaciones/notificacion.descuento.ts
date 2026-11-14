@@ -11,7 +11,7 @@ interface DatosDelTexto {
   aplica: boolean;
   causa: CausaDescuento;
   alumnoDeLaCausa: string | null;
-  // En un cambio de responsable: este alumno es el que cambió de familia.
+  // Este alumno es el que provocó el cambio (cambió de familia o volvió a estar activo).
   esElQueSeMovio: boolean;
 }
 
@@ -22,9 +22,10 @@ export function textoDeAvisoDeDescuento(d: DatosDelTexto): string {
   const quien = d.alumnoDeLaCausa ?? "otro alumno";
   switch (d.causa) {
     case "baja":
-      return `${d.alumno} pasó a pagar la cuota completa porque ${quien} se dio de baja.${RIGE}`;
+      return `${d.alumno} ${efecto} porque ${quien} se dio de baja.${RIGE}`;
     case "reactivacion":
-      return `${d.alumno} ${efecto} porque ${quien} volvió a estar activo.${RIGE}`;
+      // Si el que volvió es el propio alumno (su marca se corrigió al reactivarlo), no se nombra a sí mismo.
+      return d.esElQueSeMovio ? `${d.alumno} ${efecto} porque volvió a estar activo.${RIGE}` : `${d.alumno} ${efecto} porque ${quien} volvió a estar activo.${RIGE}`;
     case "cambio-responsable":
       if (d.esElQueSeMovio) return `${d.alumno} ${efecto} por el cambio de responsable.${RIGE}`;
       if (d.destinatario === "instituto") return `${d.alumno} ${efecto} porque ${quien} cambió de responsable.${RIGE}`;

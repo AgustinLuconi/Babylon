@@ -437,7 +437,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         aplica: c.aplica,
         causa: c.causa,
         alumnoDeLaCausa: causa ? `${causa.nombre} ${causa.apellido}` : null,
-        esElQueSeMovio: c.causa === "cambio-responsable" && c.alumnoId === c.alumnoDeLaCausaId,
+        esElQueSeMovio: c.alumnoId === c.alumnoDeLaCausaId,
       };
       const clave = `descuento:${c.alumnoId}:${ahora.toISOString()}`;
       const comunes = { clave, tono: "info" as const, nivel: 0 };
