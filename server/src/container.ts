@@ -14,6 +14,8 @@ import { UsuarioController } from "./modules/usuarios/usuario.controller";
 import { PrismaCicloRepository } from "./modules/ciclos/ciclo.repository.prisma";
 import { CicloService } from "./modules/ciclos/ciclo.service";
 import { CicloController } from "./modules/ciclos/ciclo.controller";
+import { PaseDeAnioController } from "./modules/ciclos/paseDeAnio.controller";
+import { PaseDeAnioService } from "./modules/ciclos/paseDeAnio.service";
 import { crearVerificadorDeCiclo } from "./modules/ciclos/ciclo.guarda";
 
 import { PrismaPadreRepository } from "./modules/padres/padre.repository.prisma";
@@ -115,6 +117,7 @@ const alumnoService = new AlumnoService(
   tablero,
   verificadorDeCiclo,
 );
+const paseDeAnioService = new PaseDeAnioService(cicloService, cicloRepository, cursoRepository, alumnoRepository, alumnoService, unitOfWork, tablero, verificadorDeCiclo);
 const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork, tablero, verificadorDeCiclo);
 const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork, tablero, verificadorDeCiclo);
 const documentoService = new DocumentoService(documentoRepository, alumnoRepository, unitOfWork, tablero);
@@ -155,6 +158,7 @@ export const container = {
   verificadorDeCiclo,
   // Expuestos para verificar las reglas de ciclo directamente sobre los services reales (scripts de la batería).
   cicloService,
+  paseDeAnioService,
   cursoService,
   alumnoService,
   asistenciaService,
@@ -165,6 +169,7 @@ export const container = {
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
   cicloController: new CicloController(cicloService),
+  paseDeAnioController: new PaseDeAnioController(paseDeAnioService),
   padreController: new PadreController(padreService),
   profesorController: new ProfesorController(profesorService),
   alumnoController: new AlumnoController(alumnoService, padreService),

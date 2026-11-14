@@ -21,6 +21,12 @@ import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { CambioDeDescuento, EventosAlumnos } from "./alumno.eventos";
 import { alumnosConDescuento, correccionesDeDescuento, type CausaDescuento } from "./alumno.hermanos";
 
+// Qué le pasa a cada alumno en el asistente "Pasar de año" (`registrarPaseDeAnio`).
+export interface MovimientoDePase {
+  alumnoId: string;
+  destino: { tipo: "pasa"; cursoId: string; cicloId: string } | { tipo: "egresa" } | { tipo: "no-continua" };
+}
+
 export interface HijoConCurso extends Alumno {
   cursoNombre: string | null;
   cursoNivel: string | null;
@@ -198,6 +204,7 @@ export class AlumnoService {
     causa: CausaDescuento,
     alumnoDeLaCausaId: string,
     tx: unknown,
+    avisar = true,
   ): Promise<string[]> {
     const familias = await this.bloquearFamilias(padreIds, tx);
     const cicloActivo = await this.cicloRepo.findActivo(tx);
@@ -212,7 +219,8 @@ export class AlumnoService {
         cambios.push({ alumnoId, aplica, causa, alumnoDeLaCausaId });
       }
     }
-    if (cambios.length > 0) await this.anuncios.publicar("alumnos.descuentoCambio", { cambios }, tx);
+    // El pase de año recalcula sin avisar: es una operación masiva, no algo que le pase a una familia.
+    if (avisar && cambios.length > 0) await this.anuncios.publicar("alumnos.descuentoCambio", { cambios }, tx);
     return cambios.map((c) => c.alumnoId);
   }
 
@@ -448,5 +456,47 @@ export class AlumnoService {
       await this.anunciarDescuento(conMarcaNueva, tx);
       return resultado;
     });
+  }
+
+  // Aplica el pase de año de varios alumnos dentro de la transacción del asistente. Bloqueos en el orden de siempre (las
+  // fichas de los responsables antes que los alumnos, cada grupo en orden de id). Quien pasa recibe su inscripción del
+  // ciclo de destino (con su marca de descuento actual) y su curso actual nuevo; quien egresa o no continúa cambia de
+  // estado y conserva su último curso. Después se recalcula el descuento por hermanos de las familias, sin avisos.
+  async registrarPaseDeAnio(movimientos: MovimientoDePase[], tx: unknown): Promise<void> {
+    if (movimientos.length === 0) return;
+    const previos = new Map<string, Alumno>();
+    for (const { alumnoId } of movimientos) {
+      const alumno = await this.alumnoRepo.findById(alumnoId, tx);
+      if (!alumno) throw new EntityNotFoundError("Alumno", alumnoId);
+      previos.set(alumnoId, alumno);
+    }
+    const familias = await this.bloquearFamilias([...previos.values()].map((a) => a.padreId), tx);
+    for (const alumnoId of [...previos.keys()].sort()) await this.alumnoRepo.bloquear(alumnoId, tx);
+
+    const cursoIds = new Set<string>();
+    for (const { alumnoId, destino } of movimientos) {
+      const alumno = (await this.alumnoRepo.findById(alumnoId, tx)) as Alumno;
+      if (alumno.cursoId) cursoIds.add(alumno.cursoId);
+      if (destino.tipo === "pasa") {
+        await this.verificador.verificarCicloAbierto(destino.cicloId, tx);
+        if (!(await this.cicloRepo.findInscripcionByAlumnoYCiclo(alumnoId, destino.cicloId, tx))) {
+          await this.cicloRepo.crearInscripcion(
+            { id: randomUUID(), alumnoId, cursoId: destino.cursoId, cicloId: destino.cicloId, fecha: new Date(), aplicaDescuentoHermanos: alumno.aplicaDescuentoHermanos },
+            tx,
+          );
+        }
+        await this.alumnoRepo.actualizarParcial(alumnoId, { cursoId: destino.cursoId }, tx);
+        cursoIds.add(destino.cursoId);
+      } else {
+        await this.alumnoRepo.actualizarParcial(alumnoId, { estado: destino.tipo === "egresa" ? "egresado" : "inactivo" }, tx);
+      }
+    }
+    await this.recalcularDescuentos(familias, "baja", movimientos[0].alumnoId, tx, false);
+    await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: movimientos[0].alumnoId }, tx);
+    await this.anuncios.publicar(
+      "datos.cambiaron",
+      { dato: "alumnos", accion: "pase-de-anio", ids: { alumnoIds: movimientos.map((m) => m.alumnoId), cursoIds: [...cursoIds], padreIds: familias } },
+      tx,
+    );
   }
 }

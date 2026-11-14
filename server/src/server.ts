@@ -41,7 +41,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", usuarioRoutes(container.usuarioController));
-app.use("/api/ciclos", cicloRoutes(container.cicloController));
+app.use("/api/ciclos", cicloRoutes(container.cicloController, container.paseDeAnioController));
 app.use("/api/padres", padreRoutes(container.padreController));
 app.use("/api/profesores", profesorRoutes(container.profesorController));
 app.use("/api/alumnos", alumnoRoutes(container.alumnoController));
