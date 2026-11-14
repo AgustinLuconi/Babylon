@@ -30,6 +30,6 @@ export function textoDeAvisoDeDescuento(d: DatosDelTexto): string {
       if (d.destinatario === "instituto") return `${d.alumno} ${efecto} porque ${quien} cambió de responsable.${RIGE}`;
       return d.aplica
         ? `${d.alumno} ${efecto} porque se sumó un hermano a tu cargo.${RIGE}`
-        : `${d.alumno} ${efecto} porque ya no tiene hermanos activos a tu cargo.${RIGE}`;
+        : `${d.alumno} ${efecto} porque un hermano dejó de estar a tu cargo.${RIGE}`;
   }
 }

@@ -37,7 +37,7 @@ describe("textoDeAvisoDeDescuento", () => {
     ));
   test("cambio de responsable, otro alumno: la familia nunca nombra al que se movió", () => {
     const sale = textoDeAvisoDeDescuento({ ...base, destinatario: "familia", alumno: "Carla Pérez", aplica: false, causa: "cambio-responsable", alumnoDeLaCausa: "Zoe Ajena" });
-    assert.equal(sale, `Carla Pérez pasó a pagar la cuota completa porque ya no tiene hermanos activos a tu cargo.${S}`);
+    assert.equal(sale, `Carla Pérez pasó a pagar la cuota completa porque un hermano dejó de estar a tu cargo.${S}`);
     assert.ok(!sale.includes("Zoe Ajena"));
     const entra = textoDeAvisoDeDescuento({ ...base, destinatario: "familia", alumno: "Carla Pérez", aplica: true, causa: "cambio-responsable", alumnoDeLaCausa: "Zoe Ajena" });
     assert.equal(entra, `Carla Pérez pasó a tener 10% de descuento por hermanos porque se sumó un hermano a tu cargo.${S}`);
