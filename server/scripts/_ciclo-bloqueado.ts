@@ -63,9 +63,20 @@ const EXENTAS = [
   "PUT /api/alumnos/:id/responsable",
   "POST /api/observaciones",
   "POST /api/cuotas/pagos",
+  // El módulo de ciclos es el dueño de las inscripciones: sus rutas se clasifican una por una (una ruta nueva que escriba
+  // inscripciones tendría que pasar por la guarda y figurar en RECHAZADAS).
+  "POST /api/ciclos",
+  "PATCH /api/ciclos/:id/activar",
+  "PATCH /api/ciclos/:id/bloquear",
+  "PATCH /api/ciclos/:id/desbloquear",
+  "POST /api/ciclos/pase-de-anio/vista-previa",
+  "POST /api/ciclos/pase-de-anio/confirmar",
 ];
 // Módulos enteros sin datos que pertenezcan a un ciclo.
-const MODULOS_SIN_CICLO = ["/api/auth", "/api/ciclos", "/api/padres", "/api/profesores", "/api/documentos", "/api/chats", "/api/notificaciones", "/api/configuracion"];
+const MODULOS_SIN_CICLO = ["/api/auth", "/api/padres", "/api/profesores", "/api/documentos", "/api/chats", "/api/notificaciones", "/api/configuracion"];
+
+// Routers montados que solo tienen lecturas (el canal en vivo, SSE).
+const SIN_ESCRITURAS = new Set(["tiempoReal"]);
 
 // Todas las rutas de escritura declaradas en los *.routes.ts, con el prefijo con que las monta server.ts.
 function rutasDeEscritura(): string[] {
@@ -74,13 +85,22 @@ function rutasDeEscritura(): string[] {
   const montajes = [...server.matchAll(/app\.use\("(\/api\/[a-z-]+)",\s*(\w+)Routes\(/g)].map((x) => ({ prefijo: x[1], nombre: x[2] }));
   const importes = Object.fromEntries([...server.matchAll(/import \{ (\w+)Routes \} from "\.\/modules\/([^"]+)"/g)].map((x) => [x[1], x[2]]));
   const salida: string[] = [];
+  // Si algo no se reconoce, la prueba falla: nunca da verde sin haber mirado.
+  const totalMontajes = [...server.matchAll(/app\.use\(\s*["'`]\/api\//g)].length;
+  if (totalMontajes !== montajes.length) throw new Error(`server.ts monta ${totalMontajes} rutas pero se reconocieron ${montajes.length}`);
   for (const { prefijo, nombre } of montajes) {
     const archivo = importes[nombre];
-    if (!archivo) continue;
-    const texto = readFileSync(join(raiz, "modules", `${archivo}.ts`), "utf8");
-    for (const x of texto.matchAll(/router\.(post|put|patch|delete)\(\s*"([^"]*)"/g)) {
-      salida.push(`${x[1].toUpperCase()} ${prefijo}${x[2] === "/" ? "" : x[2]}`);
+    if (!archivo) {
+      if (SIN_ESCRITURAS.has(nombre)) continue;
+      throw new Error(`router montado de una forma no reconocida: ${nombre} (${prefijo})`);
     }
+    const texto = readFileSync(join(raiz, "modules", `${archivo}.ts`), "utf8");
+    const leidas = [...texto.matchAll(/router\.(post|put|patch|delete)\(\s*"([^"]*)"/g)];
+    const declaradas = [...texto.matchAll(/router\.(post|put|patch|delete)\b/g)].length;
+    if (/router\.route\(/.test(texto) || declaradas !== leidas.length) {
+      throw new Error(`${archivo}: hay rutas de escritura declaradas de una forma que la prueba no sabe leer (${declaradas} contra ${leidas.length} leídas)`);
+    }
+    for (const x of leidas) salida.push(`${x[1].toUpperCase()} ${prefijo}${x[2] === "/" ? "" : x[2]}`);
   }
   return salida;
 }

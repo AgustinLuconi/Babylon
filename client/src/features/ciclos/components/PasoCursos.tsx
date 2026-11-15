@@ -24,7 +24,7 @@ export function PasoCursos({ vista, copiar, onCopiar }: PasoCursosProps) {
           </span>
           <span className="text-xs text-muted-foreground">
             {curso.alumnos.length} {curso.alumnos.length === 1 ? "alumno activo" : "alumnos activos"}
-            {copiar.includes(curso.id) && reutiliza.get(curso.id) ? " · ya existe en el destino" : ""}
+            {copiar.includes(curso.id) && reutiliza.get(curso.id) ? ` · se usa «${vista.cursosDestino.find((d) => d.id === reutiliza.get(curso.id))?.nombre ?? "el que ya existe"}», que ya existe en el destino` : ""}
           </span>
         </label>
       ))}

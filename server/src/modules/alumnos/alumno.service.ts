@@ -79,11 +79,14 @@ export class AlumnoService {
     private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
 
-  // Inscribir o cambiar de curso solo admite cursos del ciclo activo (y, por coherencia, de un ciclo no bloqueado).
+  // Inscribir o cambiar de curso solo admite cursos del ciclo activo (y, por coherencia, de un ciclo no bloqueado). El ciclo
+  // del curso se lee con bloqueo compartido: una activación simultánea espera a que esta operación termine (o, si ya
+  // terminó, acá se ve su resultado), así nunca se inscribe en un ciclo con un curso de otro.
   private async exigirCursoDelCicloActivo(curso: Curso, tx: unknown): Promise<void> {
-    const activo = await this.cicloRepo.findActivo(tx);
-    if (!activo) throw new ValidationError("No hay un ciclo activo: activá un ciclo antes de inscribir o cambiar de curso");
-    if (curso.cicloId !== activo.id) {
+    const ciclo = await this.cicloRepo.bloquearParaLectura(curso.cicloId, tx);
+    if (!ciclo?.activo) {
+      const activo = await this.cicloRepo.findActivo(tx);
+      if (!activo) throw new ValidationError("No hay un ciclo activo: activá un ciclo antes de inscribir o cambiar de curso");
       throw new ValidationError(`El curso "${curso.nombre}" no es del ciclo activo (${activo.anio}): solo se puede elegir un curso del ciclo activo`);
     }
     await this.verificador.verificarCicloAbierto(curso.cicloId, tx);
@@ -246,9 +249,12 @@ export class AlumnoService {
     alumnoDeLaCausaId: string,
     tx: unknown,
     avisar = true,
+    // En qué ciclo se actualiza también la marca de la inscripción: por defecto el activo; el pase de año usa el de destino
+    // (así no se reescribe la historia del ciclo de origen).
+    cicloDeLaMarcaId?: string,
   ): Promise<string[]> {
     const familias = await this.bloquearFamilias(padreIds, tx);
-    const cicloActivo = await this.cicloRepo.findActivo(tx);
+    const cicloActivo = cicloDeLaMarcaId ? { id: cicloDeLaMarcaId } : await this.cicloRepo.findActivo(tx);
     const cambios: CambioDeDescuento[] = [];
     for (const padreId of familias) {
       const hermanos = await this.alumnoRepo.findByPadreId(padreId, tx);
@@ -503,7 +509,7 @@ export class AlumnoService {
   // fichas de los responsables antes que los alumnos, cada grupo en orden de id). Quien pasa recibe su inscripción del
   // ciclo de destino (con su marca de descuento actual) y su curso actual nuevo; quien egresa o no continúa cambia de
   // estado y conserva su último curso. Después se recalcula el descuento por hermanos de las familias, sin avisos.
-  async registrarPaseDeAnio(movimientos: MovimientoDePase[], tx: unknown): Promise<void> {
+  async registrarPaseDeAnio(movimientos: MovimientoDePase[], cicloDeDestinoId: string, tx: unknown): Promise<void> {
     if (movimientos.length === 0) return;
     const previos = new Map<string, Alumno>();
     for (const { alumnoId } of movimientos) {
@@ -514,12 +520,13 @@ export class AlumnoService {
     const familias = await this.bloquearFamilias([...previos.values()].map((a) => a.padreId), tx);
     for (const alumnoId of [...previos.keys()].sort()) await this.alumnoRepo.bloquear(alumnoId, tx);
 
+    // El ciclo de destino se verifica una sola vez (no una por alumno).
+    await this.verificador.verificarCicloAbierto(cicloDeDestinoId, tx);
     const cursoIds = new Set<string>();
     for (const { alumnoId, destino } of movimientos) {
       const alumno = (await this.alumnoRepo.findById(alumnoId, tx)) as Alumno;
       if (alumno.cursoId) cursoIds.add(alumno.cursoId);
       if (destino.tipo === "pasa") {
-        await this.verificador.verificarCicloAbierto(destino.cicloId, tx);
         if (!(await this.cicloRepo.findInscripcionByAlumnoYCiclo(alumnoId, destino.cicloId, tx))) {
           await this.cicloRepo.crearInscripcion(
             { id: randomUUID(), alumnoId, cursoId: destino.cursoId, cicloId: destino.cicloId, fecha: new Date(), aplicaDescuentoHermanos: alumno.aplicaDescuentoHermanos },
@@ -532,12 +539,15 @@ export class AlumnoService {
         await this.alumnoRepo.actualizarParcial(alumnoId, { estado: destino.tipo === "egresa" ? "egresado" : "inactivo" }, tx);
       }
     }
-    await this.recalcularDescuentos(familias, "baja", movimientos[0].alumnoId, tx, false);
+    const conMarcaNueva = await this.recalcularDescuentos(familias, "baja", movimientos[0].alumnoId, tx, false, cicloDeDestinoId);
     await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: movimientos[0].alumnoId }, tx);
     await this.anuncios.publicar(
       "datos.cambiaron",
       { dato: "alumnos", accion: "pase-de-anio", ids: { alumnoIds: movimientos.map((m) => m.alumnoId), cursoIds: [...cursoIds], padreIds: familias } },
       tx,
     );
+    // Los hermanos cuya marca cambió sin moverse no están en la señal del pase: se avisa aparte a sus pantallas.
+    const movidos = new Set(movimientos.map((m) => m.alumnoId));
+    await this.anunciarDescuento(conMarcaNueva.filter((id) => !movidos.has(id)), tx);
   }
 }

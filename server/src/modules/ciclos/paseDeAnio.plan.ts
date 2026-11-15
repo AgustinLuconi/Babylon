@@ -43,13 +43,17 @@ export function planificarPaseDeAnio(datos: DatosDelPlan): Plan {
   const invalidos = new Set<string>();
   const cursosSinDecision: string[] = [];
 
-  const copias = datos.copiar.flatMap((cursoOrigenId) => {
+  // Un curso que ya existe en el destino lo usa a lo sumo un curso del origen: si dos tienen el mismo nombre, el segundo se
+  // crea aparte (si no, los alumnos de cursos distintos quedarían juntos sin que nadie lo decida).
+  const reutilizados = new Set<string>();
+  const copias = [...copiar].flatMap((cursoOrigenId) => {
     const curso = datos.origen.find((c) => c.id === cursoOrigenId);
     if (!curso) {
       invalidos.add(`origen:${cursoOrigenId}`);
       return [];
     }
-    const existente = datos.cursosDestino.find((d) => normalizar(d.nombre) === normalizar(curso.nombre));
+    const existente = datos.cursosDestino.find((d) => !reutilizados.has(d.id) && normalizar(d.nombre) === normalizar(curso.nombre));
+    if (existente) reutilizados.add(existente.id);
     return [{ cursoOrigenId, reutilizaCursoId: existente?.id ?? null }];
   });
 

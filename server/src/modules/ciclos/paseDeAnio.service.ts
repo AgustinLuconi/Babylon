@@ -80,10 +80,9 @@ export class PaseDeAnioService {
     const cursosOrigen = await this.cursoRepo.findByCicloId(origen.id, tx);
     const inscripciones = await this.cicloRepo.findInscripcionesByCicloId(origen.id, tx);
     const alumnos = new Map<string, { id: string; nombre: string; cursoActualId: string | null; activo: boolean }>();
-    for (const { alumnoId } of inscripciones) {
-      if (alumnos.has(alumnoId)) continue;
-      const a = await this.alumnoRepo.findById(alumnoId, tx);
-      if (a) alumnos.set(alumnoId, { id: a.id, nombre: `${a.nombre} ${a.apellido}`, cursoActualId: a.cursoId ?? null, activo: a.estado === "activo" });
+    // Todos los alumnos en una sola consulta (no una por inscripción).
+    for (const a of await this.alumnoRepo.findByIds([...new Set(inscripciones.map((i) => i.alumnoId))], tx)) {
+      alumnos.set(a.id, { id: a.id, nombre: `${a.nombre} ${a.apellido}`, cursoActualId: a.cursoId ?? null, activo: a.estado === "activo" });
     }
     const origenPlan: CursoOrigen[] = cursosOrigen.map((curso) => ({
       id: curso.id,
@@ -185,7 +184,7 @@ export class PaseDeAnioService {
         if (d.tipo === "copia") return { alumnoId, destino: { tipo: "pasa", cursoId: copiaDe.get(d.copiaDe) as string, cicloId } };
         return { alumnoId, destino: { tipo: d.tipo === "egresan" ? "egresa" : "no-continua" } };
       });
-      await this.alumnoService.registrarPaseDeAnio(movimientos, tx);
+      await this.alumnoService.registrarPaseDeAnio(movimientos, cicloId, tx);
 
       if (input.cierre?.bloquearOrigen) await this.cicloService.bloquearEnTransaccion(origen.id, tx);
 

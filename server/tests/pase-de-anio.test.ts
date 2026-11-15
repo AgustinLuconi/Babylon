@@ -99,6 +99,28 @@ describe("planificarPaseDeAnio", () => {
   });
 });
 
+describe("planificarPaseDeAnio: casos de borde del pedido", () => {
+  test("un id repetido en copiarCursoIds no copia dos veces el mismo curso", () => {
+    const plan = planificarPaseDeAnio(datos({ copiar: ["k1", "k1", "k2"] }));
+    assert.deepEqual(plan.copias.map((c) => c.cursoOrigenId), ["k1", "k2"]);
+  });
+
+  test("dos cursos del origen con el mismo nombre no se juntan en un solo curso del destino", () => {
+    const origen = [
+      { id: "k1", nombre: "A1 (Niños)", alumnos: [alumno("a", "k1")] },
+      { id: "k2", nombre: "a1 (ninos)", alumnos: [alumno("b", "k2")] },
+    ];
+    const plan = planificarPaseDeAnio(
+      datos({ origen, cursosDestino: [{ id: "d1", nombre: "A1 (Niños)" }], decisiones: [{ cursoOrigenId: "k1", destino: { tipo: "copia", copiaDe: "k1" } }, { cursoOrigenId: "k2", destino: { tipo: "copia", copiaDe: "k2" } }] }),
+    );
+    // El curso que ya existe lo usa solo el primero; el segundo se crea aparte.
+    assert.deepEqual(plan.copias, [
+      { cursoOrigenId: "k1", reutilizaCursoId: "d1" },
+      { cursoOrigenId: "k2", reutilizaCursoId: null },
+    ]);
+  });
+});
+
 function planificarPorExcepcion() {
   return planificarPaseDeAnio(
     datos({

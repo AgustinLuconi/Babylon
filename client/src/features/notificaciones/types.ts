@@ -24,7 +24,7 @@ export type RecursoAviso =
   | { tipo: "cuotas-vencidas" }
   | { tipo: "documentacion-pendiente" }
   | { tipo: "datos-incompletos" }
-  | { tipo: "pase-de-anio" }
+  | { tipo: "pase-de-anio"; cicloId?: string }
   | { tipo: "evaluacion"; cursoId: string; evaluacionId: string }
   | { tipo: "asistencia"; cursoId: string; fecha: string }
   | { tipo: "cierre"; cursoId: string; periodo: string }

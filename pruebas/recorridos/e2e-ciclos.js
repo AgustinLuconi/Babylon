@@ -59,12 +59,13 @@ const api = async (metodo, ruta, tk, cuerpo) => {
     ok("se desbloqueó", q(`select bloqueado from "Ciclo" where id='${P}-ciclo-2098'`), "f");
 
     // El aviso de fin de año lleva al asistente
-    q(`insert into "Notificacion" (id, "usuarioId", rol, tipo, clase, clave, tono, texto, recurso, nivel, "creadaEn", "actualizadaEn") values ('${P}-aviso', '${P}-admin', 'admin', 'ciclo_por_cerrar', 'estado', 'ciclo-por-cerrar:${P}', 'warning', 'El ciclo 2098 terminó. Falta pasar de año: pasá a los alumnos y activá el ciclo nuevo.', '{"tipo":"pase-de-anio"}', 0, now(), now())`);
+    q(`insert into "Notificacion" (id, "usuarioId", rol, tipo, clase, clave, tono, texto, recurso, nivel, "creadaEn", "actualizadaEn") values ('${P}-aviso', '${P}-admin', 'admin', 'ciclo_por_cerrar', 'estado', 'ciclo-por-cerrar:${P}', 'warning', 'El ciclo 2098 terminó. Falta pasar de año: pasá a los alumnos y activá el ciclo nuevo.', '{"tipo":"pase-de-anio","cicloId":"${P}-ciclo-2098"}', 0, now(), now())`);
     await p.reload();
     await p.getByRole("button", { name: /Notificaciones/ }).click();
     await p.getByText("Falta pasar de año", { exact: false }).first().click();
     await p.waitForURL((u) => u.pathname === "/ciclos/pasar-de-anio", { timeout: 8000 });
     ok("el aviso lleva a la pantalla del asistente", new URL(p.url()).pathname, "/ciclos/pasar-de-anio");
+    ok("y deja elegido el ciclo del aviso como origen", await p.getByLabel("De qué ciclo se pasa").inputValue(), `${P}-ciclo-2098`);
 
     // El asistente de punta a punta
     await p.getByLabel("De qué ciclo se pasa").selectOption({ label: "2098" });

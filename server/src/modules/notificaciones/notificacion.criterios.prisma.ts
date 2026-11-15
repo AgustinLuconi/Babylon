@@ -135,7 +135,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     return (await this.staff(tx))
       .filter((d) => d.rol === "admin")
       .map((d) =>
-        aviso({ ...d, tipo: "ciclo_por_cerrar", clave: `ciclo-por-cerrar:${ciclo.id}`, tono: "warning", texto, recurso: { tipo: "pase-de-anio" }, nivel: 0 }),
+        aviso({ ...d, tipo: "ciclo_por_cerrar", clave: `ciclo-por-cerrar:${ciclo.id}`, tono: "warning", texto, recurso: { tipo: "pase-de-anio", cicloId: ciclo.id }, nivel: 0 }),
       );
   }
 

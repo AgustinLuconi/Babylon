@@ -51,7 +51,12 @@ export class ObservacionService {
     const esPredefinida = (CATEGORIAS_PREDEFINIDAS as string[]).includes(datos.categoria);
     if (!esPredefinida) {
       const categoriaPersonalizada = await this.observacionRepo.findCategoriaPersonalizadaById(datos.categoria);
-      if (!categoriaPersonalizada || categoriaPersonalizada.cursoId !== alumno.cursoId) {
+      // Vale si la categoría es del curso actual del alumno o de un curso en el que está (o estuvo) inscripto.
+      const delAlumno =
+        !!categoriaPersonalizada &&
+        (categoriaPersonalizada.cursoId === alumno.cursoId ||
+          (await this.alumnoRepo.findByCursoId(categoriaPersonalizada.cursoId)).some((a) => a.id === alumno.id));
+      if (!categoriaPersonalizada || !delAlumno) {
         throw new ValidationError("La categoría indicada no existe o no corresponde al curso del alumno");
       }
     }

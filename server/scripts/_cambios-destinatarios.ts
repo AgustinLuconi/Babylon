@@ -35,6 +35,14 @@ async function a(c: CambioDeDatos): Promise<string> {
   ok("configuración", await a({ dato: "configuracion", accion: "edicion", ids: {} }), staff);
   ok("ciclos: todos los roles", await a({ dato: "ciclos", accion: "activacion", ids: { cicloIds: [m.cicloId] } }), "admin,padre,profesor,secretario");
   ok("sesiones: la propia cuenta en todos sus roles", await a({ dato: "sesiones", accion: "inicio", ids: { usuarioIds: [m.multi] } }), "multi:admin,multi:profesor");
+  // Tras un pase de año el curso actual del alumno es otro: los profesores de los dos cursos (por inscripción) siguen enterándose.
+  await prisma.ciclo.create({ data: { id: `${P}-ciclo-2098`, anio: 2098, activo: false } });
+  await prisma.inscripcion.create({ data: { id: `${P}-h1-i98`, alumnoId: m.hijo1, cursoId: m.cursoMultiId, cicloId: `${P}-ciclo-2098`, fecha: new Date(), aplicaDescuentoHermanos: false } });
+  await prisma.alumno.update({ where: { id: m.hijo1 }, data: { cursoId: m.cursoMultiId } });
+  ok("observación de un alumno que pasó de curso: los profesores de sus dos cursos", await a({ dato: "observaciones", accion: "alta", ids: { alumnoIds: [m.hijo1], observacionIds: ["o1"] } }), `${staff},multi:profesor,padre:padre,profe:profesor`);
+  const r = await destinatarios.resolver({ dato: "asistencia", accion: "registro", ids: { cursoIds: [m.cursoId], alumnoIds: [m.hijo1] } });
+  ok("asistencia del curso viejo: su profesor recibe al alumno que ya está en otro curso", r.cuentas.find((x) => x.usuarioId === m.profe)?.ids.alumnoIds?.includes(m.hijo1) ?? false, true);
+  ok("asistencia del curso viejo: la familia de un alumno inscripto en él también", r.cuentas.some((x) => x.usuarioId === m.padre), true);
   await prisma.usuario.update({ where: { id: m.padre }, data: { estado: "inactivo" } });
   ok("una cuenta inactiva no recibe nada", await a({ dato: "cuotas", accion: "cobro", ids: { alumnoIds: [m.hijo1] } }), staff);
   await limpiarMundo(prisma);

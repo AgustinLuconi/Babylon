@@ -41,6 +41,12 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
     return fila ? aEntidad(fila) : null;
   }
 
+  async findByIds(ids: string[], tx?: unknown): Promise<Alumno[]> {
+    if (ids.length === 0) return [];
+    const filas = await this.client(tx).alumno.findMany({ where: { id: { in: ids } } });
+    return filas.map(aEntidad);
+  }
+
   async findByPadreId(padreId: string, tx?: unknown): Promise<Alumno[]> {
     const filas = await this.client(tx).alumno.findMany({ where: { padreId } });
     return filas.map(aEntidad);

@@ -5,6 +5,8 @@ import type { AlumnoConDatosFaltantes } from "./alumno.incompleto";
 export interface AlumnoRepository extends Repository<Alumno> {
   findByDni(dni: string, tx?: unknown): Promise<Alumno | null>;
   findByPadreId(padreId: string, tx?: unknown): Promise<Alumno[]>;
+  // Varios alumnos de una sola vez (los que no existen simplemente no vuelven).
+  findByIds(ids: string[], tx?: unknown): Promise<Alumno[]>;
   findByCursoId(cursoId: string, tx?: unknown): Promise<Alumno[]>;
   // Cuántos alumnos tiene cada curso en su lista (inscripciones, igual que `findByCursoId`): cursoId → cantidad.
   contarInscriptosPorCurso(tx?: unknown): Promise<Record<string, number>>;

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/core/components/ui/button";
 import { Panel } from "@/core/components/ui/panel";
+import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
 import { ApiError } from "@/core/lib/apiClient";
 import { descartarCambiosSinGuardar, useSinGuardar } from "@/core/sinGuardar/sinGuardar";
 import { PasoAlumnos, type DecisionDeCurso } from "../components/PasoAlumnos";
@@ -23,6 +24,10 @@ export default function PasarDeAnioPage() {
   const confirmar = useConfirmarPaseDeAnio();
   const [paso, setPaso] = useState(1);
   const [origenId, setOrigenId] = useState("");
+  // El aviso de fin de año abre el asistente con el ciclo ya elegido (?origen=): se usa una sola vez y no cuenta como algo sin guardar.
+  const { leer } = useFiltrosDeUrl();
+  const origenPedido = leer("origen");
+  const [origenPreseleccionado, setOrigenPreseleccionado] = useState<string | null>(null);
   const [destinoModo, setDestinoModo] = useState<"existente" | "nuevo">("existente");
   const [destinoCicloId, setDestinoCicloId] = useState("");
   const [anioNuevo, setAnioNuevo] = useState("");
@@ -61,7 +66,13 @@ export default function PasarDeAnioPage() {
     if (vista && !isPlaceholderData && copiar === null) setCopiar(vista.origen.filter((c) => c.alumnos.length > 0).map((c) => c.id));
   }, [vista, isPlaceholderData, copiar]);
 
-  useSinGuardar(resumen === null && (paso > 1 || origenId !== ""));
+  useEffect(() => {
+    if (origenPreseleccionado !== null || !origenPedido || !ciclos) return;
+    setOrigenPreseleccionado(origenPedido);
+    if (ciclos.some((c) => c.id === origenPedido && !c.bloqueado)) setOrigenId((actual) => actual || origenPedido);
+  }, [origenPedido, ciclos, origenPreseleccionado]);
+
+  useSinGuardar(resumen === null && (paso > 1 || (origenId !== "" && origenId !== origenPreseleccionado)));
 
   const cambiarCiclos = (cambio: () => void) => {
     cambio();
@@ -83,17 +94,24 @@ export default function PasarDeAnioPage() {
     (paso === 3 && !!vista && vista.cursosSinDecision.length === 0 && !hayInvalidos) ||
     (paso === 4 && !!vista && vista.cursosSinDecision.length === 0 && !hayInvalidos);
 
+  // Un solo envío a la vez: con un doble clic, TanStack solo avisa del último, y un segundo pedido contra el ciclo ya
+  // bloqueado mostraría un error aunque el pase se hubiera hecho.
+  const enviando = useRef(false);
   const onConfirmar = () => {
-    if (!input) return;
-    confirmar.mutate(
-      { ...input, cierre },
-      {
-        onSuccess: (r) => {
-          descartarCambiosSinGuardar();
-          setResumen(r);
-        },
-      },
-    );
+    if (!input || enviando.current) return;
+    enviando.current = true;
+    confirmar
+      .mutateAsync({ ...input, cierre })
+      .then((r) => {
+        descartarCambiosSinGuardar();
+        setResumen(r);
+      })
+      .catch(() => {
+        // El error se muestra con `confirmar.isError`.
+      })
+      .finally(() => {
+        enviando.current = false;
+      });
   };
 
   if (resumen) {

@@ -30,7 +30,7 @@ const criterios = new PrismaCriteriosDeAvisos(prisma, new PrismaDocumentoReposit
     const a = desde[0];
     ok("texto", a.texto, `El ciclo ${anio} terminó. Falta pasar de año: pasá a los alumnos y activá el ciclo nuevo.`);
     ok("clave con el ciclo", a.clave, `ciclo-por-cerrar:${m.cicloId}`);
-    ok("tono, nivel y recurso", `${a.tono}/${a.nivel}/${JSON.stringify(a.recurso)}`, `warning/0/${JSON.stringify({ tipo: "pase-de-anio" })}`);
+    ok("tono, nivel y recurso", `${a.tono}/${a.nivel}/${JSON.stringify(a.recurso)}`, `warning/0/${JSON.stringify({ tipo: "pase-de-anio", cicloId: m.cicloId })}`);
     ok("un año después también sigue pendiente", (await propios(new Date(`${anio + 1}-02-10T15:00:00Z`))).length, 2);
 
     // Con el ciclo activo bloqueado (forzado solo en esta prueba) no hay aviso
