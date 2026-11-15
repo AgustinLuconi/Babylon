@@ -20,7 +20,8 @@ import { cambiosParaEnviar, hayCambios } from "@/core/lib/diferencias";
 import { erroresDeCampo } from "@/core/lib/erroresDeCampo";
 import { normalizarTexto } from "@/core/lib/utils";
 import { textoOpcional, textoRequerido } from "@/core/lib/validacion";
-import { useAlumnos } from "@/features/alumnos/hooks/useAlumnos";
+import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
+import { useInscriptosPorCurso } from "@/features/cursos/hooks/useInscriptosPorCurso";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCuotas } from "@/features/cuotas/hooks/useCuotas";
 import { estadoMasUrgente, type Cuota, type EstadoCuota } from "@/features/cuotas/types";
@@ -108,7 +109,7 @@ const CUOTA_LABELS: Record<EstadoCuota, string> = {
 export default function CursosAdminPage() {
   const { data: cursos, isLoading } = useCursos();
   const { data: profesores } = useProfesores();
-  const { data: alumnos } = useAlumnos();
+  const { data: inscriptosPorCurso } = useInscriptosPorCurso();
   const { data: horarios } = useHorarios();
   const { data: ciclos } = useCiclos();
   const crearCurso = useCrearCurso();
@@ -168,14 +169,8 @@ export default function CursosAdminPage() {
     return mapa;
   }, [horarios]);
 
-  const alumnosPorCurso = useMemo(() => {
-    const mapa = new Map<string, number>();
-    for (const a of alumnos ?? []) {
-      if (!a.cursoId) continue;
-      mapa.set(a.cursoId, (mapa.get(a.cursoId) ?? 0) + 1);
-    }
-    return mapa;
-  }, [alumnos]);
+  // Cuántos alumnos tiene cada curso en su lista (por inscripciones).
+  const alumnosPorCurso = useMemo(() => new Map(Object.entries(inscriptosPorCurso ?? {})), [inscriptosPorCurso]);
 
   const profesoresConCurso = useMemo(() => {
     const ids = new Set((cursos ?? []).map((c) => c.profesorId));
@@ -582,10 +577,11 @@ export default function CursosAdminPage() {
 }
 
 function NominaCurso({ curso, onVolver }: { curso: Curso; onVolver: () => void }) {
-  const { data: alumnos } = useAlumnos();
+  const { data: alumnosDeLaNomina } = useAlumnosDelCurso(curso.id);
   const { data: cuotas } = useCuotas();
 
-  const alumnosDelCurso = useMemo(() => (alumnos ?? []).filter((a) => a.cursoId === curso.id), [alumnos, curso.id]);
+  // La nómina sale de las inscripciones: un curso de un ciclo viejo sigue mostrando a quienes cursaron en él.
+  const alumnosDelCurso = useMemo(() => alumnosDeLaNomina ?? [], [alumnosDeLaNomina]);
 
   const estadoCuotaPorAlumno = useMemo(() => {
     const porAlumno = new Map<string, Cuota[]>();

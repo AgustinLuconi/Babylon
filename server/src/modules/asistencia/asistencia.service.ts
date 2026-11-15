@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { AuthorizationError, EntityNotFoundError } from "../../core/errors";
 import type { Publicador, Rol, UnitOfWork } from "../../core/ports";
 import { sinAnuncios } from "../../core/eventos";
+import { cicloSiempreAbierto, type VerificadorDeCiclo } from "../ciclos/ciclo.guarda";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { AsistenciaRepository } from "./asistencia.repository";
@@ -22,6 +23,7 @@ export class AsistenciaService {
     private readonly alumnoRepo: AlumnoRepository,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosAsistencia & EventosCambios> = sinAnuncios(),
+    private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
 
   private async verificarDuenoDelCurso(cursoId: string, profesorId: string): Promise<void> {
@@ -42,6 +44,7 @@ export class AsistenciaService {
     await this.verificarDuenoDelCurso(datos.cursoId, profesorId);
 
     return this.unitOfWork.runInTransaction(async (tx) => {
+      await this.verificador.verificarCicloDelCurso(datos.cursoId, tx);
       const asistencias: Asistencia[] = [];
 
       for (const registro of datos.registros) {

@@ -113,7 +113,8 @@ export class CuotaService {
     const { mes, anio } = fechaHoraEnArgentina(hoy);
     if (!esMesLectivo(mes)) return null;
     const ciclo = await this.cicloRepo.findActivo(tx);
-    if (!ciclo || ciclo.anio !== anio) return null;
+    // Un ciclo bloqueado no recibe cuotas nuevas (el activo no se puede bloquear: esto es una red de seguridad).
+    if (!ciclo || ciclo.anio !== anio || ciclo.bloqueado) return null;
     const { valorCuota } = await this.configuracionRepo.obtener(tx);
     if (valorCuota === null) return null;
     return { mes, anio, ciclo, valorCuota, vencimiento: vencimientoDelMes(mes, anio, hoy) };

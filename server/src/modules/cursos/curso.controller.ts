@@ -41,6 +41,10 @@ export class CursoController {
     res.status(200).json(curso);
   };
 
+  contarInscriptos = async (_req: Request, res: Response) => {
+    res.status(200).json(await this.alumnoService.contarInscriptosPorCurso());
+  };
+
   listarHorarios = async (_req: Request, res: Response) => {
     const horarios = await this.cursoService.listarHorarios();
     res.status(200).json(horarios);

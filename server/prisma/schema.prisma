@@ -120,9 +120,11 @@ enum EstadoEvaluacion {
 }
 
 model Ciclo {
-  id     String  @id
-  anio   Int     @unique
-  activo Boolean
+  id        String  @id
+  anio      Int     @unique
+  activo    Boolean
+  // Un ciclo bloqueado no admite escrituras de lo que le pertenece (cursos, inscripciones, asistencia, notas…).
+  bloqueado Boolean @default(false)
 
   cursos        Curso[]
   inscripciones Inscripcion[]
@@ -449,6 +451,7 @@ enum TipoNotificacion {
   datos_incompletos
   descuento_hermanos_instituto
   descuento_hermanos
+  ciclo_por_cerrar
 }
 
 enum ClaseNotificacion {

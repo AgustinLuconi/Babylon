@@ -1,21 +1,9 @@
 import { z } from "zod";
+import type { TipoNotificacion } from "./notificacion.entity";
+import { TIPOS } from "./notificacion.tipos";
 
-export const tipoNotificacionSchema = z.enum([
-  "cuotas_vencidas",
-  "documentacion_pendiente",
-  "evaluacion_proxima",
-  "asistencia_pendiente",
-  "notas_sin_publicar",
-  "cierre_sin_publicar",
-  "cuota",
-  "documentacion_hijo",
-  "nota_publicada",
-  "cierre_publicado",
-  "observacion_nueva",
-  "mensajes_familia",
-  "mensajes_instituto",
-  "datos_incompletos",
-]);
+// Todos los tipos del catálogo (derivado de él: un tipo nuevo no puede quedar fuera del pedido de preferencias).
+export const tipoNotificacionSchema = z.enum(Object.keys(TIPOS) as [TipoNotificacion, ...TipoNotificacion[]]);
 
 export const historialSchema = z.object({
   filtro: z.enum(["todas", "no-leidas", "pendientes"]).default("todas"),

@@ -13,7 +13,7 @@ const falso = {
 } as unknown as NotificacionService;
 const tablero = new TableroDeAnuncios<EventosDelSistema>();
 suscribirAvisos(tablero, falso);
-const TODOS = "sync asistencia_pendiente,cierre_sin_publicar,cuota,cuotas_vencidas,datos_incompletos,documentacion_hijo,documentacion_pendiente,evaluacion_proxima,mensajes_familia,mensajes_instituto,notas_sin_publicar";
+const TODOS = "sync asistencia_pendiente,ciclo_por_cerrar,cierre_sin_publicar,cuota,cuotas_vencidas,datos_incompletos,documentacion_hijo,documentacion_pendiente,evaluacion_proxima,mensajes_familia,mensajes_instituto,notas_sin_publicar";
 
 const prueba = async <K extends keyof EventosDelSistema & string>(nombre: K, datos: EventosDelSistema[K], esperado: string) => {
   llamadas.length = 0;

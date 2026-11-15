@@ -20,4 +20,12 @@ export class CicloController {
     const ciclo = await this.cicloService.marcarActivo(String(req.params.id));
     res.status(200).json(ciclo);
   };
+
+  bloquear = async (req: Request, res: Response) => {
+    res.status(200).json(await this.cicloService.bloquearCiclo(String(req.params.id)));
+  };
+
+  desbloquear = async (req: Request, res: Response) => {
+    res.status(200).json(await this.cicloService.desbloquearCiclo(String(req.params.id)));
+  };
 }

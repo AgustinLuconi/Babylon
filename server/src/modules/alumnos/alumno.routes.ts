@@ -9,6 +9,7 @@ export function alumnoRoutes(controller: AlumnoController): Router {
   router.get("/incompletos", authMiddleware, requireRole("admin", "secretario"), controller.incompletos);
   router.get("/mios", authMiddleware, requireRole("padre"), controller.misHijos);
   router.post("/", authMiddleware, requireRole("admin", "secretario"), controller.inscribir);
+  router.get("/:id/historial-cursos", authMiddleware, requireRole("admin", "secretario", "padre"), controller.historialDeCursos);
   router.patch("/:id", authMiddleware, requireRole("admin", "secretario"), controller.actualizar);
   router.put("/:id/responsable", authMiddleware, requireRole("admin", "secretario"), controller.asignarResponsable);
 

@@ -4,8 +4,10 @@ import type { Publicador, UnitOfWork } from "../../core/ports";
 import { soloPresentes } from "../../core/cambios";
 import { hoyISOEnArgentina } from "../../core/fechas";
 import { sinAnuncios } from "../../core/eventos";
+import { cicloSiempreAbierto, type VerificadorDeCiclo } from "../ciclos/ciclo.guarda";
 import type { CicloRepository } from "../ciclos/ciclo.repository";
 import type { CuotaService } from "../cuotas/cuota.service";
+import type { Curso } from "../cursos/curso.entity";
 import type { CursoRepository } from "../cursos/curso.repository";
 import type { PadreRepository } from "../padres/padre.repository";
 import type { PadreService } from "../padres/padre.service";
@@ -18,6 +20,24 @@ import type { ActualizarAlumnoInput, NuevoAlumnoInput, ResponsableInput } from "
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { CambioDeDescuento, EventosAlumnos } from "./alumno.eventos";
 import { alumnosConDescuento, correccionesDeDescuento, type CausaDescuento } from "./alumno.hermanos";
+
+// Qué le pasa a cada alumno en el asistente "Pasar de año" (`registrarPaseDeAnio`).
+export interface MovimientoDePase {
+  alumnoId: string;
+  destino: { tipo: "pasa"; cursoId: string; cicloId: string } | { tipo: "egresa" } | { tipo: "no-continua" };
+}
+
+// Una fila del historial de cursos de un alumno: lo que dice su inscripción de cada ciclo.
+export interface HistorialDeCurso {
+  cicloId: string;
+  anio: number;
+  cursoId: string;
+  cursoNombre: string;
+  fecha: Date;
+  aplicaDescuentoHermanos: boolean;
+  // Es el curso que figura hoy como su curso actual.
+  actual: boolean;
+}
 
 export interface HijoConCurso extends Alumno {
   cursoNombre: string | null;
@@ -56,7 +76,21 @@ export class AlumnoService {
     private readonly cuotaService: CuotaService,
     private readonly unitOfWork: UnitOfWork,
     private readonly anuncios: Publicador<EventosAlumnos & EventosCambios> = sinAnuncios(),
+    private readonly verificador: VerificadorDeCiclo = cicloSiempreAbierto(),
   ) {}
+
+  // Inscribir o cambiar de curso solo admite cursos del ciclo activo (y, por coherencia, de un ciclo no bloqueado). El ciclo
+  // del curso se lee con bloqueo compartido: una activación simultánea espera a que esta operación termine (o, si ya
+  // terminó, acá se ve su resultado), así nunca se inscribe en un ciclo con un curso de otro.
+  private async exigirCursoDelCicloActivo(curso: Curso, tx: unknown): Promise<void> {
+    const ciclo = await this.cicloRepo.bloquearParaLectura(curso.cicloId, tx);
+    if (!ciclo?.activo) {
+      const activo = await this.cicloRepo.findActivo(tx);
+      if (!activo) throw new ValidationError("No hay un ciclo activo: activá un ciclo antes de inscribir o cambiar de curso");
+      throw new ValidationError(`El curso "${curso.nombre}" no es del ciclo activo (${activo.anio}): solo se puede elegir un curso del ciclo activo`);
+    }
+    await this.verificador.verificarCicloAbierto(curso.cicloId, tx);
+  }
 
   async listarAlumnos(): Promise<Alumno[]> {
     return this.alumnoRepo.findAll();
@@ -99,6 +133,35 @@ export class AlumnoService {
     const inscripciones = await this.cicloRepo.findInscripcionesByCicloId(cicloId);
     const alumnos = await Promise.all(inscripciones.map((i) => this.alumnoRepo.findById(i.alumnoId)));
     return alumnos.filter((a): a is Alumno => a !== null);
+  }
+
+  // El historial de cursos del alumno, un renglón por ciclo y el más nuevo primero (sale de las inscripciones).
+  // Con `padreId` (lo llama una familia) solo se devuelve el de su propio hijo.
+  async listarHistorialDeCursos(alumnoId: string, padreId?: string): Promise<HistorialDeCurso[]> {
+    const alumno = await this.alumnoRepo.findById(alumnoId);
+    if (!alumno) throw new EntityNotFoundError("Alumno", alumnoId);
+    if (padreId !== undefined && alumno.padreId !== padreId) {
+      throw new AuthorizationError("Un padre solo puede ver el historial de sus propios hijos");
+    }
+    const filas: HistorialDeCurso[] = [];
+    for (const inscripcion of await this.cicloRepo.findInscripcionesByAlumnoId(alumnoId)) {
+      const [curso, ciclo] = await Promise.all([this.cursoRepo.findById(inscripcion.cursoId), this.cicloRepo.findById(inscripcion.cicloId)]);
+      if (!curso || !ciclo) continue;
+      filas.push({
+        cicloId: ciclo.id,
+        anio: ciclo.anio,
+        cursoId: curso.id,
+        cursoNombre: curso.nombre,
+        fecha: inscripcion.fecha,
+        aplicaDescuentoHermanos: inscripcion.aplicaDescuentoHermanos,
+        actual: curso.id === alumno.cursoId,
+      });
+    }
+    return filas.sort((a, b) => b.anio - a.anio);
+  }
+
+  async contarInscriptosPorCurso(): Promise<Record<string, number>> {
+    return this.alumnoRepo.contarInscriptosPorCurso();
   }
 
   async listarPorCurso(cursoId: string, profesorId?: string): Promise<Alumno[]> {
@@ -185,9 +248,13 @@ export class AlumnoService {
     causa: CausaDescuento,
     alumnoDeLaCausaId: string,
     tx: unknown,
+    avisar = true,
+    // En qué ciclo se actualiza también la marca de la inscripción: por defecto el activo; el pase de año usa el de destino
+    // (así no se reescribe la historia del ciclo de origen).
+    cicloDeLaMarcaId?: string,
   ): Promise<string[]> {
     const familias = await this.bloquearFamilias(padreIds, tx);
-    const cicloActivo = await this.cicloRepo.findActivo(tx);
+    const cicloActivo = cicloDeLaMarcaId ? { id: cicloDeLaMarcaId } : await this.cicloRepo.findActivo(tx);
     const cambios: CambioDeDescuento[] = [];
     for (const padreId of familias) {
       const hermanos = await this.alumnoRepo.findByPadreId(padreId, tx);
@@ -199,7 +266,8 @@ export class AlumnoService {
         cambios.push({ alumnoId, aplica, causa, alumnoDeLaCausaId });
       }
     }
-    if (cambios.length > 0) await this.anuncios.publicar("alumnos.descuentoCambio", { cambios }, tx);
+    // El pase de año recalcula sin avisar: es una operación masiva, no algo que le pase a una familia.
+    if (avisar && cambios.length > 0) await this.anuncios.publicar("alumnos.descuentoCambio", { cambios }, tx);
     return cambios.map((c) => c.alumnoId);
   }
 
@@ -229,6 +297,7 @@ export class AlumnoService {
     return this.unitOfWork.runInTransaction(async (tx) => {
       const curso = await this.cursoRepo.findById(datos.cursoId, tx);
       if (!curso) throw new EntityNotFoundError("Curso", datos.cursoId);
+      await this.exigirCursoDelCicloActivo(curso, tx);
 
       const responsable = await this.resolverResponsable(datos.responsable, datos, null, curso.nivel, tx);
       // Con la ficha bloqueada, dos inscripciones simultáneas del mismo responsable se hacen de a una: la segunda ve a la
@@ -366,8 +435,10 @@ export class AlumnoService {
         (datos.nombre !== undefined || datos.apellido !== undefined || datos.dni !== undefined);
       if (sincroniza) await this.padreRepo.bloquear(actual.padreId as string, tx);
 
-      if (datos.cursoId && datos.cursoId !== actual.cursoId && !(await this.cursoRepo.findById(datos.cursoId, tx))) {
-        throw new EntityNotFoundError("Curso", datos.cursoId);
+      if (datos.cursoId && datos.cursoId !== actual.cursoId) {
+        const cursoNuevo = await this.cursoRepo.findById(datos.cursoId, tx);
+        if (!cursoNuevo) throw new EntityNotFoundError("Curso", datos.cursoId);
+        await this.exigirCursoDelCicloActivo(cursoNuevo, tx);
       }
       if (datos.dni && datos.dni !== actual.dni) {
         const otro = await this.alumnoRepo.findByDni(datos.dni, tx);
@@ -432,5 +503,51 @@ export class AlumnoService {
       await this.anunciarDescuento(conMarcaNueva, tx);
       return resultado;
     });
+  }
+
+  // Aplica el pase de año de varios alumnos dentro de la transacción del asistente. Bloqueos en el orden de siempre (las
+  // fichas de los responsables antes que los alumnos, cada grupo en orden de id). Quien pasa recibe su inscripción del
+  // ciclo de destino (con su marca de descuento actual) y su curso actual nuevo; quien egresa o no continúa cambia de
+  // estado y conserva su último curso. Después se recalcula el descuento por hermanos de las familias, sin avisos.
+  async registrarPaseDeAnio(movimientos: MovimientoDePase[], cicloDeDestinoId: string, tx: unknown): Promise<void> {
+    if (movimientos.length === 0) return;
+    const previos = new Map<string, Alumno>();
+    for (const { alumnoId } of movimientos) {
+      const alumno = await this.alumnoRepo.findById(alumnoId, tx);
+      if (!alumno) throw new EntityNotFoundError("Alumno", alumnoId);
+      previos.set(alumnoId, alumno);
+    }
+    const familias = await this.bloquearFamilias([...previos.values()].map((a) => a.padreId), tx);
+    for (const alumnoId of [...previos.keys()].sort()) await this.alumnoRepo.bloquear(alumnoId, tx);
+
+    // El ciclo de destino se verifica una sola vez (no una por alumno).
+    await this.verificador.verificarCicloAbierto(cicloDeDestinoId, tx);
+    const cursoIds = new Set<string>();
+    for (const { alumnoId, destino } of movimientos) {
+      const alumno = (await this.alumnoRepo.findById(alumnoId, tx)) as Alumno;
+      if (alumno.cursoId) cursoIds.add(alumno.cursoId);
+      if (destino.tipo === "pasa") {
+        if (!(await this.cicloRepo.findInscripcionByAlumnoYCiclo(alumnoId, destino.cicloId, tx))) {
+          await this.cicloRepo.crearInscripcion(
+            { id: randomUUID(), alumnoId, cursoId: destino.cursoId, cicloId: destino.cicloId, fecha: new Date(), aplicaDescuentoHermanos: alumno.aplicaDescuentoHermanos },
+            tx,
+          );
+        }
+        await this.alumnoRepo.actualizarParcial(alumnoId, { cursoId: destino.cursoId }, tx);
+        cursoIds.add(destino.cursoId);
+      } else {
+        await this.alumnoRepo.actualizarParcial(alumnoId, { estado: destino.tipo === "egresa" ? "egresado" : "inactivo" }, tx);
+      }
+    }
+    const conMarcaNueva = await this.recalcularDescuentos(familias, "baja", movimientos[0].alumnoId, tx, false, cicloDeDestinoId);
+    await this.anuncios.publicar("alumnos.cambiaron", { alumnoId: movimientos[0].alumnoId }, tx);
+    await this.anuncios.publicar(
+      "datos.cambiaron",
+      { dato: "alumnos", accion: "pase-de-anio", ids: { alumnoIds: movimientos.map((m) => m.alumnoId), cursoIds: [...cursoIds], padreIds: familias } },
+      tx,
+    );
+    // Los hermanos cuya marca cambió sin moverse no están en la señal del pase: se avisa aparte a sus pantallas.
+    const movidos = new Set(movimientos.map((m) => m.alumnoId));
+    await this.anunciarDescuento(conMarcaNueva.filter((id) => !movidos.has(id)), tx);
   }
 }

@@ -1,7 +1,8 @@
 import type { Rol } from "../../core/ports";
 import type { ClaseNotificacion, TipoEstado, TipoNotificacion } from "./notificacion.entity";
 
-type Grupo = "staff" | "profesor" | "padre";
+// "admin": avisos que solo recibe el administrador (la secretaría pertenece al grupo "staff" pero no los ve).
+type Grupo = "staff" | "admin" | "profesor" | "padre";
 
 // Catálogo de tipos de aviso: a qué rol le llegan, si son de estado o de evento y cómo se llaman en las preferencias.
 export const TIPOS: Record<TipoNotificacion, { grupo: Grupo; clase: ClaseNotificacion; etiqueta: string }> = {
@@ -19,6 +20,7 @@ export const TIPOS: Record<TipoNotificacion, { grupo: Grupo; clase: ClaseNotific
   mensajes_familia: { grupo: "staff", clase: "estado", etiqueta: "Mensajes nuevos de familias" },
   mensajes_instituto: { grupo: "padre", clase: "estado", etiqueta: "Mensajes nuevos del instituto" },
   datos_incompletos: { grupo: "staff", clase: "estado", etiqueta: "Datos incompletos de los alumnos" },
+  ciclo_por_cerrar: { grupo: "admin", clase: "estado", etiqueta: "Año lectivo por cerrar" },
   descuento_hermanos_instituto: { grupo: "staff", clase: "evento", etiqueta: "Cambios en el descuento por hermanos" },
   descuento_hermanos: { grupo: "padre", clase: "evento", etiqueta: "Cambios en el descuento por hermanos" },
 };
@@ -29,5 +31,5 @@ export const TIPOS_ESTADO = todos.filter((t) => TIPOS[t].clase === "estado") as 
 
 export function tiposDelRol(rol: Rol): TipoNotificacion[] {
   const grupo: Grupo = rol === "admin" || rol === "secretario" ? "staff" : rol;
-  return todos.filter((t) => TIPOS[t].grupo === grupo);
+  return todos.filter((t) => TIPOS[t].grupo === grupo || (rol === "admin" && TIPOS[t].grupo === "admin"));
 }

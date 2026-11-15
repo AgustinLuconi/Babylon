@@ -13,6 +13,9 @@ export function rutaDeAviso(recurso: RecursoAviso, rol: Rol): string {
       return conFiltros("/alumnos", { ciclo: "activo", documentacion: "pendiente" });
     case "datos-incompletos":
       return conFiltros("/alumnos", { ciclo: "activo", datos: "incompletos" });
+    case "pase-de-anio":
+      // Los avisos viejos no traen el ciclo: abren el asistente sin ciclo elegido.
+      return recurso.cicloId ? conFiltros("/ciclos/pasar-de-anio", { origen: recurso.cicloId }) : "/ciclos/pasar-de-anio";
     case "evaluacion":
       // Administración y secretaría ven las próximas evaluaciones en su panel.
       return rol === "profesor" ? conFiltros("/calificaciones", { curso: recurso.cursoId, evaluacion: recurso.evaluacionId }) : "/dashboard";

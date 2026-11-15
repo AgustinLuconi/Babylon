@@ -41,14 +41,27 @@ export class PrismaAlumnoRepository implements AlumnoRepository {
     return fila ? aEntidad(fila) : null;
   }
 
+  async findByIds(ids: string[], tx?: unknown): Promise<Alumno[]> {
+    if (ids.length === 0) return [];
+    const filas = await this.client(tx).alumno.findMany({ where: { id: { in: ids } } });
+    return filas.map(aEntidad);
+  }
+
   async findByPadreId(padreId: string, tx?: unknown): Promise<Alumno[]> {
     const filas = await this.client(tx).alumno.findMany({ where: { padreId } });
     return filas.map(aEntidad);
   }
 
+  // La lista de alumnos de un curso sale de las inscripciones (no de `Alumno.cursoId`, que es solo el curso actual):
+  // un curso de un ciclo viejo sigue mostrando para siempre a quienes cursaron en él.
   async findByCursoId(cursoId: string, tx?: unknown): Promise<Alumno[]> {
-    const filas = await this.client(tx).alumno.findMany({ where: { cursoId } });
+    const filas = await this.client(tx).alumno.findMany({ where: { inscripciones: { some: { cursoId } } } });
     return filas.map(aEntidad);
+  }
+
+  async contarInscriptosPorCurso(tx?: unknown): Promise<Record<string, number>> {
+    const grupos = await this.client(tx).inscripcion.groupBy({ by: ["cursoId"], _count: { _all: true } });
+    return Object.fromEntries(grupos.map((g) => [g.cursoId, g._count._all]));
   }
 
   async findAll(tx?: unknown): Promise<Alumno[]> {

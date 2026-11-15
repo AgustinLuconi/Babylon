@@ -149,17 +149,18 @@ export class PrismaDestinatariosDeCambios implements DestinatariosDeCambios {
       where: {
         usuario: activa("padre"),
         OR: [
-          { alumnos: { some: { OR: [{ id: { in: alumnoIds } }, { cursoId: { in: cursoIds }, estado: "activo" }] } } },
+          // La lista de un curso sale de las inscripciones (un alumno que pasó de año sigue en la lista del curso anterior).
+          { alumnos: { some: { OR: [{ id: { in: alumnoIds } }, { inscripciones: { some: { cursoId: { in: cursoIds } } }, estado: "activo" }] } } },
           { id: { in: padreIds } },
         ],
       },
-      select: { usuarioId: true, alumnos: { select: { id: true, cursoId: true } } },
+      select: { usuarioId: true, alumnos: { select: { id: true, cursoId: true, inscripciones: { select: { cursoId: true } } } } },
     });
     return padres.map((p) => ({
       usuarioId: p.usuarioId as string,
       rol: "padre" as const,
       alumnos: new Set(p.alumnos.map((a) => a.id)),
-      cursos: new Set(p.alumnos.map((a) => a.cursoId).filter((c): c is string => !!c)),
+      cursos: new Set(p.alumnos.flatMap((a) => [a.cursoId, ...a.inscripciones.map((i) => i.cursoId)]).filter((c): c is string => !!c)),
     }));
   }
 
@@ -171,9 +172,9 @@ export class PrismaDestinatariosDeCambios implements DestinatariosDeCambios {
     const profesores = await this.prisma.profesor.findMany({
       where: {
         usuario: activa("profesor"),
-        OR: [{ id: { in: profesorIds } }, { cursos: { some: { OR: [{ id: { in: cursoIds } }, { alumnos: { some: { id: { in: alumnoIds } } } }] } } }],
+        OR: [{ id: { in: profesorIds } }, { cursos: { some: { OR: [{ id: { in: cursoIds } }, { inscripciones: { some: { alumnoId: { in: alumnoIds } } } }] } } }],
       },
-      select: { id: true, usuarioId: true, cursos: { select: { id: true, alumnos: { select: { id: true } } } } },
+      select: { id: true, usuarioId: true, cursos: { select: { id: true, inscripciones: { select: { alumnoId: true } } } } },
     });
     return profesores.map((p) => {
       const nombrado = profesorIds.includes(p.id);
@@ -182,7 +183,8 @@ export class PrismaDestinatariosDeCambios implements DestinatariosDeCambios {
         rol: "profesor" as const,
         profesorId: p.id,
         cursos: new Set([...p.cursos.map((c) => c.id), ...(nombrado ? cursoIds : [])]),
-        alumnos: new Set(p.cursos.flatMap((c) => c.alumnos.map((a) => a.id))),
+        // Sus alumnos son los de las listas de sus cursos (por inscripciones).
+        alumnos: new Set(p.cursos.flatMap((c) => c.inscripciones.map((i) => i.alumnoId))),
       };
     });
   }

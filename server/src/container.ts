@@ -14,6 +14,9 @@ import { UsuarioController } from "./modules/usuarios/usuario.controller";
 import { PrismaCicloRepository } from "./modules/ciclos/ciclo.repository.prisma";
 import { CicloService } from "./modules/ciclos/ciclo.service";
 import { CicloController } from "./modules/ciclos/ciclo.controller";
+import { PaseDeAnioController } from "./modules/ciclos/paseDeAnio.controller";
+import { PaseDeAnioService } from "./modules/ciclos/paseDeAnio.service";
+import { crearVerificadorDeCiclo } from "./modules/ciclos/ciclo.guarda";
 
 import { PrismaPadreRepository } from "./modules/padres/padre.repository.prisma";
 import { PadreService } from "./modules/padres/padre.service";
@@ -94,6 +97,8 @@ const unitOfWork = new PrismaUnitOfWork(prisma);
 const tablero = new TableroDeAnuncios<EventosDelSistema>();
 
 // --- Servicios ---
+// Guarda del bloqueo de ciclos: la reciben los services que escriben algo que pertenece a un ciclo.
+const verificadorDeCiclo = crearVerificadorDeCiclo(cicloRepository, cursoRepository);
 const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
 const padreService = new PadreService(padreRepository, usuarioRepository, profesorRepository, alumnoRepository, unitOfWork, tablero);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, padreRepository, unitOfWork, tablero);
@@ -110,9 +115,11 @@ const alumnoService = new AlumnoService(
   cuotaService,
   unitOfWork,
   tablero,
+  verificadorDeCiclo,
 );
-const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork, tablero);
-const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork, tablero);
+const paseDeAnioService = new PaseDeAnioService(cicloService, cicloRepository, cursoRepository, alumnoRepository, alumnoService, unitOfWork, tablero, verificadorDeCiclo);
+const cursoService = new CursoService(cursoRepository, profesorRepository, cicloRepository, unitOfWork, tablero, verificadorDeCiclo);
+const asistenciaService = new AsistenciaService(asistenciaRepository, cursoRepository, alumnoRepository, unitOfWork, tablero, verificadorDeCiclo);
 const documentoService = new DocumentoService(documentoRepository, alumnoRepository, unitOfWork, tablero);
 const calificacionService = new CalificacionService(
   calificacionRepository,
@@ -120,8 +127,9 @@ const calificacionService = new CalificacionService(
   alumnoRepository,
   unitOfWork,
   tablero,
+  verificadorDeCiclo,
 );
-const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository, unitOfWork, tablero);
+const observacionService = new ObservacionService(observacionRepository, alumnoRepository, cursoRepository, usuarioRepository, unitOfWork, tablero, verificadorDeCiclo);
 const chatService = new ChatService(chatRepository, usuarioRepository, padreRepository, unitOfWork, tablero);
 const reporteService = new ReporteService(prisma, documentoRepository);
 const notificacionService = new NotificacionService(
@@ -146,11 +154,22 @@ export const container = {
   // Expuestos para la ruta en vivo (ver server.ts).
   canalEnVivo,
   validadorDeSesion,
+  // Expuesta para verificar los flujos (la barrida de la batería usa la misma guarda que los services).
+  verificadorDeCiclo,
+  // Expuestos para verificar las reglas de ciclo directamente sobre los services reales (scripts de la batería).
+  cicloService,
+  paseDeAnioService,
+  cursoService,
+  alumnoService,
+  asistenciaService,
+  calificacionService,
+  observacionService,
   // Expuesto para la depuración diaria de sesiones y para verificar los flujos.
   usuarioService,
   configuracionController: new ConfiguracionController(configuracionService),
   usuarioController: new UsuarioController(usuarioService),
   cicloController: new CicloController(cicloService),
+  paseDeAnioController: new PaseDeAnioController(paseDeAnioService),
   padreController: new PadreController(padreService),
   profesorController: new ProfesorController(profesorService),
   alumnoController: new AlumnoController(alumnoService, padreService),

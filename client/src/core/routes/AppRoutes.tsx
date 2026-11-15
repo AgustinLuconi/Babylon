@@ -20,6 +20,7 @@ import UsuariosPage from "@/features/usuarios/pages/UsuariosPage";
 import ProfesoresAdminPage from "@/features/profesores/pages/ProfesoresAdminPage";
 import ReportesPage from "@/features/dashboard/pages/ReportesPage";
 import ConfiguracionPage from "@/features/dashboard/pages/ConfiguracionPage";
+import PasarDeAnioPage from "@/features/ciclos/pages/PasarDeAnioPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 // El árbol de rutas, para el router de datos (App.tsx): `useBlocker` (cambios sin guardar) solo funciona con él.
@@ -47,6 +48,7 @@ export const rutas = (
             <Route path="/cursos-todos" element={<CursosAdminPage />} />
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
+            <Route path="/ciclos/pasar-de-anio" element={<PasarDeAnioPage />} />
           </Route>
 
           <Route element={<ProtectedRoute rolesPermitidos={["profesor"]} />}>

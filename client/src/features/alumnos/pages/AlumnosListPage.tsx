@@ -14,6 +14,7 @@ import { useCuotas } from "@/features/cuotas/hooks/useCuotas";
 import { estadoMasUrgente, type Cuota, type EstadoCuota } from "@/features/cuotas/types";
 import { usePadres } from "@/features/padres/hooks/usePadres";
 import { VINCULO_LABELS, type Padre, type VinculoPadre } from "@/features/padres/types";
+import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useCursos } from "@/features/cursos/hooks/useCursos";
 import { NIVEL_GRUPO, type Curso } from "@/features/cursos/types";
 import { elegir, useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
@@ -83,6 +84,9 @@ export default function AlumnosListPage() {
 
   const cursoPedido = leer("curso") ?? "todos";
   const filtroCurso = cursoPedido === "todos" || !cursosDelCiclo || cursosDelCiclo.some((c) => c.id === cursoPedido) ? cursoPedido : "todos";
+  // La lista de un curso sale de las inscripciones (un curso de un ciclo viejo sigue mostrando a quienes cursaron en él).
+  const { data: nominaDelCurso } = useAlumnosDelCurso(filtroCurso !== "todos" ? filtroCurso : undefined);
+  const idsDeLaNomina = useMemo(() => (nominaDelCurso ? new Set(nominaDelCurso.map((a) => a.id)) : null), [nominaDelCurso]);
 
   const padresPorId = useMemo(() => {
     const mapa = new Map<string, Padre>();
@@ -115,14 +119,14 @@ export default function AlumnosListPage() {
       const matchTexto =
         !termino || normalizarTexto(`${alumno.nombre} ${alumno.apellido} ${alumno.dni ?? ""}`).includes(termino);
       const matchCuota = filtroCuota === "todas" || estadoCuotaPorAlumno.get(alumno.id) === filtroCuota;
-      const matchCurso = filtroCurso === "todos" || alumno.cursoId === filtroCurso;
+      const matchCurso = filtroCurso === "todos" || (idsDeLaNomina ? idsDeLaNomina.has(alumno.id) : alumno.cursoId === filtroCurso);
       const faltan = faltantes?.[alumno.id] ?? [];
       const matchDocumentacion =
         filtroDocumentacion === "todos" || (filtroDocumentacion === "pendiente" ? faltan.length > 0 : faltan.includes(filtroDocumentacion));
       const matchDatos = filtroDatos === "todos" || (incompletos?.[alumno.id] ?? []).length > 0;
       return matchTexto && matchCuota && matchCurso && matchDocumentacion && matchDatos;
     });
-  }, [alumnos, busqueda, filtroCuota, filtroCurso, filtroDocumentacion, filtroDatos, faltantes, incompletos, estadoCuotaPorAlumno]);
+  }, [alumnos, busqueda, filtroCuota, filtroCurso, idsDeLaNomina, filtroDocumentacion, filtroDatos, faltantes, incompletos, estadoCuotaPorAlumno]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas);

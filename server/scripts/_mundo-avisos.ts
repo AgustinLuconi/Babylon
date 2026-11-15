@@ -56,6 +56,9 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.documento.deleteMany({ where: deAlumnos });
   await prisma.inscripcion.deleteMany({ where: { OR: [deAlumnos, deCursos] } });
   await prisma.alumno.deleteMany({ where: { id: { in: alumnoIds } } });
+  // Avisos de descuento sobre alumnos que ya no existen (las pruebas que inscriben por la API los dejan en las cuentas reales
+  // de administración; la clave lleva el id del alumno: "descuento:<alumnoId>:…").
+  await prisma.$executeRaw`DELETE FROM "Notificacion" WHERE tipo::text IN ('descuento_hermanos', 'descuento_hermanos_instituto') AND split_part(clave, ':', 2) NOT IN (SELECT id FROM "Alumno")`;
   await prisma.categoriaPersonalizada.deleteMany({ where: deCursos });
   await prisma.horario.deleteMany({ where: deCursos });
   await prisma.curso.deleteMany({ where: { id: { in: cursoIds } } });
@@ -64,6 +67,8 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.padre.deleteMany({ where: { id: { in: padreIds } } });
   await prisma.profesor.deleteMany({ where: { id: { in: profesorIds } } });
   await prisma.usuario.deleteMany({ where: { OR: [{ id: { startsWith: P } }, { email: { startsWith: P } }] } });
+  // Ciclos de prueba (año 2098/2099): sus cursos e inscripciones ya se borraron arriba.
+  await prisma.ciclo.deleteMany({ where: { id: { startsWith: P } } });
 }
 
 export async function crearMundo(prisma: PrismaClient): Promise<Mundo> {
