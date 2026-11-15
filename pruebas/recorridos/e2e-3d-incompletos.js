@@ -8,6 +8,8 @@ const API = "http://localhost:4000";
 const q = (sql) => execSync(`docker exec babylon-postgres psql -U babylon -d babylon -tAc "${sql.replace(/"/g, '\\"')}"`).toString().trim();
 const email = (x) => `prueba-tmp-av-${x}@prueba.babylon.test`;
 const P = "prueba-tmp-av";
+// La lista pagina de a 8 y el ciclo activo ya tiene todos los alumnos reales: se busca por el apellido de los de prueba para verlos.
+const buscar = (p) => p.getByPlaceholder("Buscar por nombre, apellido o DNI…").fill("Pruebaav");
 
 (async () => {
   const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
@@ -27,6 +29,7 @@ const P = "prueba-tmp-av";
 
     // 1. Filtro y marca
     await a.goto(`${BASE}/alumnos?ciclo=activo&datos=incompletos`);
+    await buscar(a);
     await a.waitForSelector("[data-datos-incompletos]");
     const fila = a.locator("tr", { hasText: "Tomasav" }).first();
     ok("lista: el alumno figura con la marca", await fila.locator("[data-datos-incompletos]").count(), 1);
@@ -37,6 +40,7 @@ const P = "prueba-tmp-av";
     q(`update "Alumno" set "vinculoResponsable"='madre' where id='${P}-alumno-ajeno'`);
     await fetch(`${API}/api/alumnos/${P}-alumno-ajeno`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin}` }, body: JSON.stringify({ direccion: "Calle 1" }) });
     await a.goto(`${BASE}/alumnos?ciclo=activo&datos=incompletos`);
+    await buscar(a);
     await a.waitForSelector("[data-datos-incompletos]");
     ok("lista: un alumno completo no figura con el filtro", await a.locator("tr", { hasText: "Ajenoav" }).count(), 0);
     await a.getByLabel("Datos").selectOption("todos");
@@ -56,6 +60,7 @@ const P = "prueba-tmp-av";
     // 3. Legajo: cartel y completar. Una segunda pestaña mira la lista filtrada y se actualiza sola.
     const b2 = await ctx.newPage();
     await b2.goto(`${BASE}/alumnos?ciclo=activo&datos=incompletos`);
+    await buscar(b2);
     await b2.locator("tr", { hasText: "Tomasav" }).first().waitFor();
     await a.goto(`${BASE}/alumnos/${P}-hijo1`);
     const cartel = a.locator("[data-datos-incompletos]");
