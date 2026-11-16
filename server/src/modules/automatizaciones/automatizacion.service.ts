@@ -17,6 +17,7 @@ export interface ReglaConEstado {
   unidad: string;
   umbralMinimo: number;
   umbralMaximo: number;
+  conNumero: boolean;
   activa: boolean;
   umbral: number;
   enAlerta: number;
@@ -52,11 +53,13 @@ export class AutomatizacionService {
   // revisiones simultáneas van de a una. Con la regla apagada no se espera ninguna alerta (se cierran las abiertas).
   async evaluar(reglas: ReglaId[], tx: unknown, causa: CausaDeRevision = "revision", ahora: Date = new Date()): Promise<void> {
     const cambiadas: ReglaId[] = [];
-    for (const regla of [...new Set(reglas)].sort()) {
+    // En el orden del catálogo (no alfabético): las reglas base primero y `alumno_en_riesgo` al final, que lee sus alertas. Es
+    // también el orden de los bloqueos, el mismo en todas las operaciones.
+    for (const regla of REGLA_IDS.filter((r) => reglas.includes(r))) {
       await this.repo.bloquearRegla(regla, tx);
       const config = await this.repo.obtenerConfig(regla, tx);
       const abiertas = await this.repo.findAbiertas(regla, tx);
-      const { esperadas, poblacion } = config.activa ? await this.evaluadores[regla].evaluar(config.umbral, tx) : { esperadas: [], poblacion: new Set<string>() };
+      const { esperadas, poblacion } = config.activa ? await this.evaluadores[regla].evaluar(config.umbral, tx, ahora) : { esperadas: [], poblacion: new Set<string>() };
       const cambios = reconciliarAlertas({ abiertas, esperadas, poblacion, causa: config.activa ? causa : "regla-apagada", nuevoId: randomUUID });
 
       await this.repo.crearAlertas(
@@ -96,6 +99,7 @@ export class AutomatizacionService {
       unidad: def.unidad,
       umbralMinimo: def.umbralMinimo,
       umbralMaximo: def.umbralMaximo,
+      conNumero: def.conNumero,
       activa: config.activa,
       umbral: config.umbral,
       enAlerta: await this.repo.contarAbiertas(regla, tx),
@@ -114,6 +118,7 @@ export class AutomatizacionService {
   async actualizar(reglaId: string, cambios: ActualizarAutomatizacionInput): Promise<ReglaConEstado> {
     const regla = this.reglaDe(reglaId);
     const def = REGLAS[regla];
+    if (cambios.umbral !== undefined && !def.conNumero) throw new ValidationError("Esta regla no tiene número: usa los de las otras reglas");
     if (cambios.umbral !== undefined && (cambios.umbral < def.umbralMinimo || cambios.umbral > def.umbralMaximo)) {
       throw new ValidationError(`El número tiene que estar entre ${def.umbralMinimo} y ${def.umbralMaximo}`);
     }

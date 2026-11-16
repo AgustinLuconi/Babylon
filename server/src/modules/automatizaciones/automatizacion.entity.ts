@@ -88,6 +88,6 @@ export interface EvaluacionDeRegla {
   poblacion: Set<string>;
 }
 export interface EvaluadorDeRegla {
-  evaluar(umbral: number, tx?: unknown): Promise<EvaluacionDeRegla>;
+  evaluar(umbral: number, tx?: unknown, ahora?: Date): Promise<EvaluacionDeRegla>;
 }
 export type EvaluadoresDeReglas = Record<ReglaId, EvaluadorDeRegla>;

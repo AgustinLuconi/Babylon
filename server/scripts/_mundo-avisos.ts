@@ -50,12 +50,13 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.cuota.deleteMany({ where: deAlumnos });
   await prisma.asistencia.deleteMany({ where: { OR: [deCursos, deAlumnos] } });
   await prisma.calificacion.deleteMany({ where: { OR: [{ evaluacion: deCursos }, deAlumnos] } });
+  // Las alertas van antes que las evaluaciones: una alerta de "evaluación sin notas" la referencia.
+  await prisma.alertaAutomatica.deleteMany({ where: { OR: [deAlumnos, deCursos, { evaluacion: deCursos }] } });
   await prisma.evaluacion.deleteMany({ where: deCursos });
   await prisma.notaCierre.deleteMany({ where: { OR: [deCursos, deAlumnos] } });
   await prisma.observacion.deleteMany({ where: deAlumnos });
   await prisma.documento.deleteMany({ where: deAlumnos });
   await prisma.inscripcion.deleteMany({ where: { OR: [deAlumnos, deCursos] } });
-  await prisma.alertaAutomatica.deleteMany({ where: { OR: [deAlumnos, deCursos] } });
   await prisma.alumno.deleteMany({ where: { id: { in: alumnoIds } } });
   // Avisos de descuento sobre alumnos que ya no existen (las pruebas que inscriben por la API los dejan en las cuentas reales
   // de administración; la clave lleva el id del alumno: "descuento:<alumnoId>:…").
