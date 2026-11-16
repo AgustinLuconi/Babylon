@@ -175,9 +175,6 @@ export class PaseDeAnioService {
         await this.anuncios.publicar("datos.cambiaron", { dato: "cursos", accion: "alta", ids: { cursoIds: [...copiaDe.values()] } }, tx);
       }
 
-      // Activar el destino antes de mover a los alumnos: así el recálculo de descuentos actualiza las inscripciones nuevas.
-      if (input.cierre?.activarDestino) await this.cicloService.activarEnTransaccion(destinoCiclo.id, tx);
-
       const cicloId = destinoCiclo.id;
       const movimientos: MovimientoDePase[] = plan.movimientos.map(({ alumnoId, destino: d }) => {
         if (d.tipo === "curso") return { alumnoId, destino: { tipo: "pasa", cursoId: d.cursoId, cicloId } };
@@ -185,6 +182,11 @@ export class PaseDeAnioService {
         return { alumnoId, destino: { tipo: d.tipo === "egresan" ? "egresa" : "no-continua" } };
       });
       await this.alumnoService.registrarPaseDeAnio(movimientos, cicloId, tx);
+
+      // El destino se activa DESPUÉS de mover a los alumnos: cuando las reglas de automatizaciones lo ven activo, los alumnos que
+      // pasan ya están inscriptos en él y su deuda sigue igual (las alertas y los avisos no se cierran y se vuelven a abrir). El
+      // recálculo de descuentos no depende de esto: escribe la marca en la inscripción del ciclo de destino.
+      if (input.cierre?.activarDestino) await this.cicloService.activarEnTransaccion(destinoCiclo.id, tx);
 
       if (input.cierre?.bloquearOrigen) await this.cicloService.bloquearEnTransaccion(origen.id, tx);
 

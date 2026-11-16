@@ -80,6 +80,13 @@ const abiertas = (regla, alumno) => Number(q(`select count(*) from "AlertaAutoma
     await admin.locator('[title="Ausente (justificada)"]').first().waitFor({ timeout: 8000 });
     ok("el calendario del legajo muestra la ausencia justificada", await admin.locator('[title="Ausente (justificada)"]').count(), 1);
 
+    // La familia ve la ausencia justificada como tal en su lista de asistencia (no solo en el calendario)
+    const familia = await b.newPage({ viewport: { width: 1280, height: 1100 } });
+    await entrar(familia, "padre");
+    await familia.goto(`${BASE}/mis-hijos/asistencia?hijo=${P}-hijo1`);
+    await familia.getByText("Ausente (justificada)").first().waitFor({ timeout: 8000 });
+    ok("la familia ve 'Ausente (justificada)' en su lista de asistencia", await familia.getByText("Ausente (justificada)").count() > 0, true);
+
     // 5. Deuda: dos cuotas vencidas de Lunaav (se revisa al guardar la regla, como lo haría cualquier cambio de cuotas)
     for (const mes of [1, 2]) q(`insert into "Cuota" (id, "alumnoId", mes, anio, "montoBase", descuento, "montoFinal", vencimiento, estado) values ('${P}-q${mes}', '${P}-hijo2', ${mes}, 2080, 1000, 0, 1000, '2080-03-10', 'vencida')`);
     await fetch(`${API}/api/automatizaciones/deuda_cuotas`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ umbral: 2 }) });

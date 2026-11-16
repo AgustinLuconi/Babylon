@@ -145,10 +145,13 @@ const notificacionService = new NotificacionService(
   unitOfWork,
 );
 
-suscribirAvisos(tablero, notificacionService);
+// ORDEN: automatizaciones se suscribe ANTES que los avisos. Así, en cada operación, los bloqueos se toman siempre en el mismo
+// orden (primero la regla, después los avisos alumno_con_* que salen de sus alertas, después el resto de los tipos) y dos
+// operaciones simultáneas (guardar asistencia y editar un curso, cobrar y activar un ciclo…) nunca se traban entre sí.
 // Automatizaciones: las reglas se revisan con los anuncios de cuotas, asistencia, alumnos y ciclos.
 const automatizacionService = new AutomatizacionService(new PrismaAutomatizacionRepository(prisma), new PrismaEvaluadoresDeReglas(prisma), unitOfWork, tablero);
 suscribirAutomatizaciones(tablero, automatizacionService);
+suscribirAvisos(tablero, notificacionService);
 // Sesiones cerradas por cualquier camino: después de confirmar, el canal corta las conexiones en vivo que ya no valen.
 tablero.alConfirmarse("sesiones.cerradas", ({ usuarioId, motivo }) => canalEnVivo.revisarSesiones(usuarioId, motivo));
 suscribirChatEnVivo(tablero, canalEnVivo);
