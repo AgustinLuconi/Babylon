@@ -245,6 +245,8 @@ model Asistencia {
   estado         EstadoAsistencia
   minutosRetraso Int?
   motivo         String?
+  // Una ausencia justificada exige motivo y corta la racha de inasistencias seguidas.
+  justificada    Boolean          @default(false)
 
   alumno Alumno @relation(fields: [alumnoId], references: [id])
   curso  Curso  @relation(fields: [cursoId], references: [id])

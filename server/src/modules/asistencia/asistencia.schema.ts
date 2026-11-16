@@ -13,8 +13,15 @@ export const registrarAsistenciaMasivaSchema = z
             estado: z.enum(["presente", "tarde", "ausente"]),
             minutosRetraso: z.number().int().nonnegative().max(600).optional(),
             motivo: textoOpcional(200),
+            // Solo una ausencia se justifica, y entonces el motivo es obligatorio.
+            justificada: z.boolean().optional(),
           })
-          .strict(),
+          .strict()
+          .superRefine((registro, ctx) => {
+            if (registro.justificada !== true) return;
+            if (registro.estado !== "ausente") ctx.addIssue({ code: "custom", path: ["justificada"], message: "Solo una ausencia se puede justificar" });
+            if (!registro.motivo) ctx.addIssue({ code: "custom", path: ["motivo"], message: "Para justificar la ausencia hay que escribir el motivo" });
+          }),
       )
       .min(1, "Debe incluir al menos un alumno"),
   })
