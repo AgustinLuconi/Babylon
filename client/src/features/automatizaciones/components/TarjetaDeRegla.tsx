@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Interruptor } from "@/core/components/ui/interruptor";
@@ -14,8 +14,13 @@ export function TarjetaDeRegla({ regla }: { regla: ReglaConEstado }) {
   const actualizar = useActualizarAutomatizacion();
   const [umbral, setUmbral] = useState(String(regla.umbral));
   const [verHistorial, setVerHistorial] = useState(false);
-  // Si otra persona (o la propia revisión) cambia el número, el campo se pone al día.
-  useEffect(() => setUmbral(String(regla.umbral)), [regla.umbral]);
+  // Si otra persona cambia el número, el campo se pone al día solo si no se había tocado: lo que se está escribiendo se conserva.
+  const guardadoAntes = useRef(String(regla.umbral));
+  useEffect(() => {
+    const anterior = guardadoAntes.current;
+    guardadoAntes.current = String(regla.umbral);
+    setUmbral((escrito) => (escrito === anterior ? String(regla.umbral) : escrito));
+  }, [regla.umbral]);
 
   const numero = Number(umbral);
   const valido = umbral.trim() !== "" && Number.isInteger(numero) && numero >= regla.umbralMinimo && numero <= regla.umbralMaximo;

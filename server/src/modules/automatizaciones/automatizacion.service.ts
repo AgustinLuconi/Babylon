@@ -63,7 +63,8 @@ export class AutomatizacionService {
       );
       for (const { id, nivel } of cambios.actualizar) await this.repo.actualizarNivel(id, nivel, tx);
       await this.repo.cerrarAlertas(cambios.cerrar, ahora, tx);
-      await this.repo.actualizarConfig(regla, { ultimaRevisionEn: ahora }, tx);
+      // Con la regla apagada no se revisó nada: la última revisión sigue siendo la de la última vez que estuvo encendida.
+      if (config.activa) await this.repo.actualizarConfig(regla, { ultimaRevisionEn: ahora }, tx);
       if (cambios.abrir.length + cambios.actualizar.length + cambios.cerrar.length > 0) cambiadas.push(regla);
     }
     if (cambiadas.length > 0) {

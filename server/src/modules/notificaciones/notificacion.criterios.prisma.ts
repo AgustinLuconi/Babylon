@@ -184,15 +184,18 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     const alertas = await this.alertasAbiertas("inasistencias_seguidas", tx);
     if (alertas.length === 0) return [];
     const cuentas = await this.cuentasDeProfesores(tx);
+    // La fecha de la última falta de todas las alertas en una sola consulta (no una por alerta).
+    const ultimas = await this.db(tx).asistencia.groupBy({
+      by: ["alumnoId", "cursoId"],
+      where: { alumnoId: { in: [...new Set(alertas.map((a) => a.alumnoId))] }, cursoId: { in: [...new Set(alertas.flatMap((a) => (a.cursoId ? [a.cursoId] : [])))] }, estado: "ausente", justificada: false },
+      _max: { fecha: true },
+    });
+    const ultimaFalta = new Map(ultimas.map((u) => [`${u.alumnoId}:${u.cursoId}`, u._max.fecha]));
     const avisos: AvisoEsperado[] = [];
     for (const a of alertas) {
       const usuarioId = a.curso ? cuentas.get(a.curso.profesorId) : undefined;
       if (!usuarioId || !a.cursoId) continue;
-      const ultima = await this.db(tx).asistencia.findFirst({
-        where: { alumnoId: a.alumnoId, cursoId: a.cursoId, estado: "ausente", justificada: false },
-        orderBy: { fecha: "desc" },
-        select: { fecha: true },
-      });
+      const ultima = ultimaFalta.get(`${a.alumnoId}:${a.cursoId}`);
       avisos.push(
         aviso({
           usuarioId,
@@ -201,7 +204,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
           clave: `alerta:inasistencias_seguidas:${a.alumnoId}:${a.cursoId}`,
           tono: "warning",
           texto: textoDeAlertaDeFaltas(`${a.alumno.nombre} ${a.alumno.apellido}`, a.nivel, a.curso?.nombre ?? ""),
-          recurso: { tipo: "asistencia", cursoId: a.cursoId, fecha: (ultima?.fecha ?? a.abiertaEn).toISOString().slice(0, 10) },
+          recurso: { tipo: "asistencia", cursoId: a.cursoId, fecha: (ultima ?? a.abiertaEn).toISOString().slice(0, 10) },
           nivel: a.nivel,
         }),
       );

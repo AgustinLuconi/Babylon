@@ -93,6 +93,8 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
       return `${quien} bloqueó un ciclo lectivo`;
     case "ciclos/desbloqueo":
       return `${quien} desbloqueó un ciclo lectivo`;
+    case "automatizaciones/edicion":
+      return `${quien} cambió una automatización`;
     default:
       return null;
   }

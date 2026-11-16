@@ -37,10 +37,9 @@ export class PrismaEvaluadoresDeReglas implements EvaluadoresDeReglas {
         if (pares.has(clave)) porPar.set(clave, [...(porPar.get(clave) ?? []), r]);
       }
       const esperadas: AlertaEsperada[] = [];
-      for (const [clave, filas] of porPar) {
+      for (const filas of porPar.values()) {
         const racha = rachaDeInasistencias(filas);
         if (racha >= umbral) esperadas.push({ alumnoId: filas[0].alumnoId, cursoId: filas[0].cursoId, nivel: racha });
-        void clave;
       }
       return { esperadas, poblacion: new Set(pares.keys()) };
     },

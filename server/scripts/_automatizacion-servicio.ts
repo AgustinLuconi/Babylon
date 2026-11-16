@@ -63,8 +63,10 @@ const abiertas = async (regla: ReglaId, alumnoId: string) => (await alertas(regl
     await prisma.cuota.updateMany({ where: { alumnoId: m.hijo2 }, data: { estado: "vencida" } });
     await revisar(["deuda_cuotas"]);
     ok("vuelve a deber: se abre otra fila (el historial no se mezcla)", `${(await alertas("deuda_cuotas", m.hijo2)).length} ${(await abiertas("deuda_cuotas", m.hijo2)).length}`, "2 1");
+    const revisionAntes = (await prisma.automatizacion.findUniqueOrThrow({ where: { regla: "deuda_cuotas" } })).ultimaRevisionEn?.getTime();
     await config("deuda_cuotas", { activa: false });
     await revisar(["deuda_cuotas"], "regla-apagada");
+    ok("con la regla apagada la última revisión no se actualiza", (await prisma.automatizacion.findUniqueOrThrow({ where: { regla: "deuda_cuotas" } })).ultimaRevisionEn?.getTime(), revisionAntes);
     const apagada = await alertas("deuda_cuotas", m.hijo2);
     ok("apagar la regla cierra sus alertas con regla-apagada", `${(await abiertas("deuda_cuotas", m.hijo2)).length} ${apagada[apagada.length - 1].motivoCierre}`, "0 regla-apagada");
     await config("deuda_cuotas", { activa: true });
