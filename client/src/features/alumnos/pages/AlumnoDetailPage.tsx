@@ -159,10 +159,12 @@ export default function AlumnoDetailPage() {
     return Array.from(mapa.values()).sort((a, b) => b.anio - a.anio || b.mes - a.mes);
   }, [asistencias]);
   const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
-  // Al cambiar de curso se vuelve al mes más reciente de ese curso.
+  // Al cambiar de curso se pasa directo al mes más reciente de ese curso (sin pasar por "ningún mes", que haría desaparecer el
+  // calendario por un instante).
   useEffect(() => {
-    setMesAsistencia(null);
-  }, [vista.cursoId]);
+    const ahora = new Date();
+    setMesAsistencia(mesesConRegistros[0] ?? { anio: ahora.getFullYear(), mes: ahora.getMonth() + 1 });
+  }, [vista.cursoId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (mesAsistencia) return;
     if (mesesConRegistros.length > 0) {

@@ -4,6 +4,13 @@ import type { TipoEstado } from "./notificacion.entity";
 import type { NotificacionService } from "./notificacion.service";
 import { TIPOS_ESTADO } from "./notificacion.tipos";
 
+// Qué tipos de aviso salen de las alertas de cada regla de automatizaciones (ids de regla como texto: este módulo no importa
+// nada del de automatizaciones).
+const TIPOS_POR_REGLA: Record<string, TipoEstado[]> = {
+  deuda_cuotas: ["alumno_con_deuda"],
+  inasistencias_seguidas: ["alumno_con_faltas", "alumno_con_faltas_profesor"],
+};
+
 // Qué avisos revisa cada anuncio. Todo corre dentro de la transacción de la operación: si guardar los avisos falla, la
 // operación entera se deshace (y no sale ninguna señal).
 export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, avisos: NotificacionService): void {
@@ -20,7 +27,9 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
   });
   tablero.alPublicarse("documentos.cambiaron", sincronizar(["documentacion_hijo", "documentacion_pendiente"]));
   tablero.alPublicarse("asistencia.registrada", sincronizar(["asistencia_pendiente"]));
-  tablero.alPublicarse("cursos.cambiaron", sincronizar(["asistencia_pendiente", "evaluacion_proxima", "notas_sin_publicar", "cierre_sin_publicar"]));
+  // Reasignar un curso cambia a quién le llega el aviso de inasistencias de sus alumnos.
+  tablero.alPublicarse("cursos.cambiaron", sincronizar(["asistencia_pendiente", "evaluacion_proxima", "notas_sin_publicar", "cierre_sin_publicar", "alumno_con_faltas_profesor"]));
+  tablero.alPublicarse("alertas.cambiaron", ({ reglaIds }, tx) => avisos.sincronizar([...new Set(reglaIds.flatMap((r) => TIPOS_POR_REGLA[r] ?? []))], tx));
   tablero.alPublicarse("ciclo.activado", sincronizar(TIPOS_ESTADO));
   tablero.alPublicarse("cuenta.cambio", async ({ usuarioId, rolesQuitados }, tx) => {
     if (rolesQuitados && rolesQuitados.length > 0) await avisos.borrarDeRoles(usuarioId, rolesQuitados, tx);

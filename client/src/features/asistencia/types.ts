@@ -11,6 +11,8 @@ export interface RegistroAsistenciaMasiva {
   estado: EstadoAsistencia;
   minutosRetraso?: number;
   motivo?: string;
+  // Solo una ausencia se justifica, y entonces el motivo es obligatorio.
+  justificada?: boolean;
 }
 
 export interface RegistrarAsistenciaMasivaInput {
@@ -27,4 +29,10 @@ export interface Asistencia {
   estado: EstadoAsistencia;
   minutosRetraso?: number;
   motivo?: string;
+  justificada: boolean;
+}
+
+// Cómo se nombra un registro: una ausencia justificada lo dice.
+export function etiquetaDeAsistencia(r: { estado: EstadoAsistencia; justificada: boolean }): string {
+  return r.estado === "ausente" && r.justificada ? "Ausente (justificada)" : ESTADO_ASISTENCIA_LABELS[r.estado];
 }

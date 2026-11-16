@@ -39,6 +39,10 @@ async function borrar() {
   await prisma.cuota.deleteMany(w);
   await prisma.asistencia.deleteMany(w);
   await prisma.inscripcion.deleteMany(w);
+  // Las alertas automáticas de los alumnos de prueba y sus avisos (la clave del aviso lleva el id del alumno): sin esto la
+  // restricción de clave foránea impide borrar a los alumnos.
+  await prisma.alertaAutomatica.deleteMany({ where: { alumnoId: { startsWith: P } } });
+  await prisma.notificacion.deleteMany({ where: { tipo: { in: ["alumno_con_deuda", "alumno_con_faltas", "alumno_con_faltas_profesor"] }, clave: { contains: `:${P}` } } });
   await prisma.horario.deleteMany(w);
   await prisma.alumno.deleteMany(w);
   await prisma.curso.deleteMany(w);

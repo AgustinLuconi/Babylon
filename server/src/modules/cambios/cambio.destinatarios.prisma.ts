@@ -102,6 +102,8 @@ export class PrismaDestinatariosDeCambios implements DestinatariosDeCambios {
       // GET /api/profesores es solo de administración.
       case "profesores":
       case "usuarios":
+      // El panel de Automatizaciones es solo de administración.
+      case "automatizaciones":
         roles = ["admin"];
         break;
       // Activar otro ciclo cambia todo lo que ven todos; un ciclo nuevo solo lo leen administración, secretaría y profesores.

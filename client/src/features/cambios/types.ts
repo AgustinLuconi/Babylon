@@ -18,7 +18,8 @@ export type TipoDato =
   | "usuarios"
   | "configuracion"
   | "ciclos"
-  | "sesiones";
+  | "sesiones"
+  | "automatizaciones";
 
 export type AccionCambio =
   | "cobro"

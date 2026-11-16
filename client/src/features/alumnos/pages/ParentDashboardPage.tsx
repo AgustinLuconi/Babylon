@@ -19,6 +19,7 @@ import { HistorialDeCursos } from "../components/HistorialDeCursos";
 import { SelectorDeAnio } from "../components/SelectorDeAnio";
 import { useVistaDeCurso } from "../hooks/useVistaDeCurso";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
+import { etiquetaDeAsistencia } from "@/features/asistencia/types";
 import { useCuotasPorAlumno } from "@/features/cuotas/hooks/useCuotasPorAlumno";
 import type { EstadoCuota } from "@/features/cuotas/types";
 import { useAutorizarImagen } from "@/features/documentos/hooks/useAutorizarImagen";
@@ -134,9 +135,12 @@ export default function ParentDashboardPage() {
     return Array.from(mapa.values()).sort((a, b) => b.anio - a.anio || b.mes - a.mes);
   }, [asistencia]);
   const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
+  // Al cambiar de hijo o de curso se pasa directo al mes más reciente de ese curso (sin pasar por "ningún mes", que haría
+  // desaparecer el calendario por un instante).
   useEffect(() => {
-    setMesAsistencia(null);
-  }, [kid?.id, vista.cursoId]);
+    const ahora = new Date();
+    setMesAsistencia(mesesConRegistros[0] ?? { anio: ahora.getFullYear(), mes: ahora.getMonth() + 1 });
+  }, [kid?.id, vista.cursoId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (mesAsistencia) return;
     if (mesesConRegistros.length > 0) {
@@ -561,8 +565,8 @@ export default function ParentDashboardPage() {
                         {a.estado === "tarde" && a.minutosRetraso !== undefined && (
                           <span className="text-[11.5px] text-muted-foreground">{a.minutosRetraso} min.</span>
                         )}
-                        <Badge variant={a.estado === "presente" ? "success" : a.estado === "tarde" ? "warning" : "danger"}>
-                          {a.estado === "presente" ? "Presente" : a.estado === "tarde" ? "Tarde" : "Ausente"}
+                        <Badge variant={a.estado === "presente" ? "success" : a.estado === "tarde" ? "warning" : a.justificada ? "neutral" : "danger"}>
+                          {etiquetaDeAsistencia(a)}
                         </Badge>
                       </div>
                     </div>

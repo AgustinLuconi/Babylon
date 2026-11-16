@@ -61,6 +61,7 @@ export class AsistenciaService {
             estado: registro.estado,
             minutosRetraso: registro.minutosRetraso,
             motivo: registro.motivo,
+            justificada: registro.estado === "ausente" && registro.justificada === true,
           };
           await this.asistenciaRepo.update(existente.id, actualizada, tx);
           asistencias.push(actualizada);
@@ -75,6 +76,7 @@ export class AsistenciaService {
           estado: registro.estado,
           minutosRetraso: registro.minutosRetraso,
           motivo: registro.motivo,
+          justificada: registro.estado === "ausente" && registro.justificada === true,
         };
         await this.asistenciaRepo.create(asistencia, tx);
         asistencias.push(asistencia);

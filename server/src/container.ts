@@ -58,6 +58,12 @@ import { PrismaCalificacionRepository } from "./modules/calificaciones/calificac
 import { CalificacionService } from "./modules/calificaciones/calificacion.service";
 import { CalificacionController } from "./modules/calificaciones/calificacion.controller";
 
+import { PrismaAutomatizacionRepository } from "./modules/automatizaciones/automatizacion.repository.prisma";
+import { PrismaEvaluadoresDeReglas } from "./modules/automatizaciones/automatizacion.evaluadores.prisma";
+import { AutomatizacionController } from "./modules/automatizaciones/automatizacion.controller";
+import { AutomatizacionService } from "./modules/automatizaciones/automatizacion.service";
+import { suscribirAutomatizaciones } from "./modules/automatizaciones/automatizacion.suscripciones";
+
 import { PrismaObservacionRepository } from "./modules/observaciones/observacion.repository.prisma";
 import { ObservacionService } from "./modules/observaciones/observacion.service";
 import { ObservacionController } from "./modules/observaciones/observacion.controller";
@@ -139,6 +145,12 @@ const notificacionService = new NotificacionService(
   unitOfWork,
 );
 
+// ORDEN: automatizaciones se suscribe ANTES que los avisos. Así, en cada operación, los bloqueos se toman siempre en el mismo
+// orden (primero la regla, después los avisos alumno_con_* que salen de sus alertas, después el resto de los tipos) y dos
+// operaciones simultáneas (guardar asistencia y editar un curso, cobrar y activar un ciclo…) nunca se traban entre sí.
+// Automatizaciones: las reglas se revisan con los anuncios de cuotas, asistencia, alumnos y ciclos.
+const automatizacionService = new AutomatizacionService(new PrismaAutomatizacionRepository(prisma), new PrismaEvaluadoresDeReglas(prisma), unitOfWork, tablero);
+suscribirAutomatizaciones(tablero, automatizacionService);
 suscribirAvisos(tablero, notificacionService);
 // Sesiones cerradas por cualquier camino: después de confirmar, el canal corta las conexiones en vivo que ya no valen.
 tablero.alConfirmarse("sesiones.cerradas", ({ usuarioId, motivo }) => canalEnVivo.revisarSesiones(usuarioId, motivo));
@@ -149,6 +161,8 @@ suscribirDifusionDeCambios(tablero, canalEnVivo, new PrismaDestinatariosDeCambio
 export const container = {
   // Expuesto para la tarea periódica de cuotas (ver server.ts).
   cuotaService,
+  // Expuesto para la revisión diaria de las automatizaciones y para verificar sus reglas.
+  automatizacionService,
   // Expuesto para las tareas periódicas de avisos y para verificar con fechas fijas.
   notificacionService,
   // Expuestos para la ruta en vivo (ver server.ts).
@@ -182,4 +196,5 @@ export const container = {
   chatController: new ChatController(chatService, padreService),
   reporteController: new ReporteController(reporteService),
   notificacionController: new NotificacionController(notificacionService),
+  automatizacionController: new AutomatizacionController(automatizacionService),
 };

@@ -8,4 +8,5 @@ export interface Asistencia {
   estado: EstadoAsistencia;
   minutosRetraso?: number;
   motivo?: string;
+  justificada: boolean;
 }

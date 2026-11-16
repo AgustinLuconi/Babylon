@@ -1,5 +1,6 @@
 import type { EventosAlumnos } from "./modules/alumnos/alumno.eventos";
 import type { EventosAsistencia } from "./modules/asistencia/asistencia.eventos";
+import type { EventosAutomatizaciones } from "./modules/automatizaciones/automatizacion.eventos";
 import type { EventosCalificaciones } from "./modules/calificaciones/calificacion.eventos";
 import type { EventosCambios } from "./modules/cambios/cambio.eventos";
 import type { EventosChats } from "./modules/chats/chat.eventos";
@@ -13,6 +14,7 @@ import type { EventosUsuarios } from "./modules/usuarios/usuario.eventos";
 // Catálogo de todos los anuncios del sistema (solo tipos, al lado de container.ts, que arma el tablero con este mapa).
 export type EventosDelSistema = EventosAlumnos &
   EventosAsistencia &
+  EventosAutomatizaciones &
   EventosCalificaciones &
   EventosCambios &
   EventosChats &

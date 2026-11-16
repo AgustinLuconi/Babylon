@@ -14,6 +14,7 @@ import { useThemeStore } from "@/core/store/themeStore";
 import { formatMonto } from "@/core/lib/utils";
 import { useActualizarConfiguracion } from "@/features/configuracion/hooks/useActualizarConfiguracion";
 import { useConfiguracion } from "@/features/configuracion/hooks/useConfiguracion";
+import { PanelAutomatizaciones } from "@/features/automatizaciones/components/PanelAutomatizaciones";
 import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useBloquearCiclo } from "@/features/ciclos/hooks/useBloquearCiclo";
 import { useCrearCiclo } from "@/features/ciclos/hooks/useCrearCiclo";
@@ -234,6 +235,8 @@ export default function ConfiguracionPage() {
           )}
         </div>
       </Panel>
+
+      <PanelAutomatizaciones />
 
       {confirmando && (
         <Modal

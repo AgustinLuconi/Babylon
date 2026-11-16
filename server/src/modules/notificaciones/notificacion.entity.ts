@@ -12,7 +12,10 @@ export type TipoEstado =
   | "mensajes_familia"
   | "mensajes_instituto"
   | "datos_incompletos"
-  | "ciclo_por_cerrar";
+  | "ciclo_por_cerrar"
+  | "alumno_con_deuda"
+  | "alumno_con_faltas"
+  | "alumno_con_faltas_profesor";
 export type TipoEvento =
   | "nota_publicada"
   | "cierre_publicado"

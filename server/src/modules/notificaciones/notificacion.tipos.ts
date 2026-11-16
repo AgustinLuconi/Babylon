@@ -21,6 +21,9 @@ export const TIPOS: Record<TipoNotificacion, { grupo: Grupo; clase: ClaseNotific
   mensajes_instituto: { grupo: "padre", clase: "estado", etiqueta: "Mensajes nuevos del instituto" },
   datos_incompletos: { grupo: "staff", clase: "estado", etiqueta: "Datos incompletos de los alumnos" },
   ciclo_por_cerrar: { grupo: "admin", clase: "estado", etiqueta: "Año lectivo por cerrar" },
+  alumno_con_deuda: { grupo: "staff", clase: "estado", etiqueta: "Alumnos con cuotas vencidas" },
+  alumno_con_faltas: { grupo: "staff", clase: "estado", etiqueta: "Alumnos con inasistencias seguidas" },
+  alumno_con_faltas_profesor: { grupo: "profesor", clase: "estado", etiqueta: "Alumnos con inasistencias seguidas en mis cursos" },
   descuento_hermanos_instituto: { grupo: "staff", clase: "evento", etiqueta: "Cambios en el descuento por hermanos" },
   descuento_hermanos: { grupo: "padre", clase: "evento", etiqueta: "Cambios en el descuento por hermanos" },
 };
