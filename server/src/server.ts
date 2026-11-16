@@ -27,6 +27,7 @@ import { chatRoutes } from "./modules/chats/chat.routes";
 import { reporteRoutes } from "./modules/reportes/reporte.routes";
 import { notificacionRoutes } from "./modules/notificaciones/notificacion.routes";
 import { iniciarAvisosPeriodicos } from "./modules/notificaciones/notificacion.scheduler";
+import { iniciarAutomatizaciones } from "./modules/automatizaciones/automatizacion.scheduler";
 
 const app = express();
 
@@ -64,4 +65,5 @@ app.listen(config.PORT, "0.0.0.0", () => {
   iniciarMantenimientoDeCuotas(container.cuotaService);
   iniciarDepuracionDeSesiones(container.usuarioService);
   iniciarAvisosPeriodicos(container.notificacionService);
+  iniciarAutomatizaciones(container.automatizacionService);
 });

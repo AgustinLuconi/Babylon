@@ -204,6 +204,7 @@ model Alumno {
   notasCierre    NotaCierre[]
   observaciones  Observacion[]
   inscripciones  Inscripcion[]
+  alertas        AlertaAutomatica[]
 }
 
 model Curso {
@@ -225,6 +226,7 @@ model Curso {
   notasCierre              NotaCierre[]
   categoriasPersonalizadas CategoriaPersonalizada[]
   inscripciones            Inscripcion[]
+  alertas                  AlertaAutomatica[]
 }
 
 model Horario {
@@ -504,4 +506,33 @@ model NotificacionDesactivada {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@id([usuarioId, rol, tipo])
+}
+
+// Configuración de cada regla de automatización. La regla (su nombre, su descripción y su rango) vive en el código; acá solo
+// lo que el administrador cambia: si está encendida y el número. La fila se crea la primera vez que se lee.
+model Automatizacion {
+  regla            String    @id
+  activa           Boolean   @default(true)
+  umbral           Int
+  ultimaRevisionEn DateTime?
+}
+
+// Registro permanente de alertas: una fila por episodio (abierta → resuelta). Es la fuente de verdad de qué alertas están
+// abiertas ahora y el historial del panel. Hay a lo sumo una abierta por regla, alumno y curso (índice único parcial hecho
+// a mano en la migración, que Prisma no puede expresar).
+model AlertaAutomatica {
+  id           String    @id
+  regla        String
+  alumnoId     String
+  cursoId      String?
+  nivel        Int
+  abiertaEn    DateTime
+  resueltaEn   DateTime?
+  motivoCierre String?
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  curso  Curso? @relation(fields: [cursoId], references: [id])
+
+  @@index([regla, resueltaEn])
+  @@index([alumnoId])
 }

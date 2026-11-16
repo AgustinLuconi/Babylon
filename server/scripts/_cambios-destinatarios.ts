@@ -32,6 +32,7 @@ async function a(c: CambioDeDatos): Promise<string> {
   ok("profesores: solo administración (secretaría no puede leer docentes)", await a({ dato: "profesores", accion: "edicion", ids: { profesorIds: [m.profesorId] } }), "admin");
   ok("alta de ciclo: sin familias (no pueden leer ciclos)", await a({ dato: "ciclos", accion: "alta", ids: { cicloIds: [m.cicloId] } }), "admin,profesor,secretario");
   ok("usuarios: solo administración", await a({ dato: "usuarios", accion: "alta", ids: { usuarioIds: [m.secre] } }), "admin");
+  ok("automatizaciones: solo administración", await a({ dato: "automatizaciones", accion: "estado", ids: {} }), "admin");
   ok("configuración", await a({ dato: "configuracion", accion: "edicion", ids: {} }), staff);
   ok("ciclos: todos los roles", await a({ dato: "ciclos", accion: "activacion", ids: { cicloIds: [m.cicloId] } }), "admin,padre,profesor,secretario");
   ok("sesiones: la propia cuenta en todos sus roles", await a({ dato: "sesiones", accion: "inicio", ids: { usuarioIds: [m.multi] } }), "multi:admin,multi:profesor");

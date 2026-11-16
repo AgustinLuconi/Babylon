@@ -20,6 +20,7 @@ const CLAVES: Record<Exclude<TipoDato, "ciclos">, QueryKey[]> = {
   usuarios: [["usuarios"], ["sin-cuenta"]],
   configuracion: [["configuracion"]],
   sesiones: [["sesiones"]],
+  automatizaciones: [["automatizaciones"]],
 };
 
 // Activar otro ciclo lectivo cambia todo lo que muestran las pantallas.
