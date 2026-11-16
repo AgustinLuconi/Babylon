@@ -72,6 +72,7 @@ reales / restos de prueba / valor de cuota). Debe decir `3/148/0/null`.
 | `e2e-responsable-ya-registrado` | Inscribir con un responsable que ya existe: el aviso en vivo por DNI, celular o email, vincular directo a esa ficha, y que no se crea una ficha duplicada |
 | `e2e-descuento-hermanos` | Descuento por hermanos: el legajo dice si lo tiene y quién paga completo; una baja de otra persona lo actualiza sin recargar y llega el aviso a la campana |
 | `e2e-ciclos` | Ciclos: el administrador bloquea y desbloquea un ciclo (etiqueta), un profesor recibe 409 al guardar en un ciclo bloqueado, el asistente Pasar de año de punta a punta (el curso viejo sigue mostrando a su alumno, y el legajo muestra el historial de cursos y deja ver las notas de un año anterior, igual que el panel de la familia, que además muestra el historial de cursos; las observaciones se reparten por año) y el aviso de fin de año lleva al asistente |
+| `e2e-automatizaciones` | Automatizaciones: tres ausencias seguidas generan el aviso para administración y para el profesor del curso, justificar exige el motivo y corta la racha, dos cuotas vencidas generan el aviso de deuda, y el panel de Configuración cuenta, cambia el número y muestra el historial |
 | `e2e-chat-editar` | Corregir y eliminar mensajes del chat, quién puede, plazo de 15 minutos |
 | `e2e-chat-detalles`, `e2e-chat-revision` | Chat en vivo: "Visto", no leídos, reintentos, conversación nueva |
 | `e2e-3bc-vivo` | Lo en vivo de 3b y 3c: avisos del chat y "quién hizo qué" |
