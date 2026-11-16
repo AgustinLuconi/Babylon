@@ -5,6 +5,7 @@ import type { CambioDeDescuento } from "../alumnos/alumno.eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "../documentos/documento.repository";
 import type { CriteriosDeAvisos } from "./notificacion.criterios";
+import { textoDeAlertaDeDeuda, textoDeAlertaDeFaltas } from "./notificacion.alertas";
 import { textoDeAvisoDeDescuento } from "./notificacion.descuento";
 import type { AvisoEsperado, Destinatario, TipoEstado } from "./notificacion.entity";
 
@@ -64,6 +65,12 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         return this.datosIncompletos(tx);
       case "ciclo_por_cerrar":
         return this.cicloPorCerrar(ahora, tx);
+      case "alumno_con_deuda":
+        return this.alumnosConDeuda(tx);
+      case "alumno_con_faltas":
+        return this.alumnosConFaltas(tx);
+      case "alumno_con_faltas_profesor":
+        return this.alumnosConFaltasParaProfesores(tx);
     }
   }
 
@@ -123,6 +130,83 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     return (await this.staff(tx)).map((d) =>
       aviso({ ...d, tipo: "datos_incompletos", clave: "datos-incompletos", tono: "warning", texto, recurso: { tipo: "datos-incompletos" }, nivel: n }),
     );
+  }
+
+  // ── Alertas automáticas ──────────────────────────────────────────────────
+  // Los avisos salen de las alertas abiertas del módulo de automatizaciones (su registro es la fuente de verdad).
+  private alertasAbiertas(regla: "deuda_cuotas" | "inasistencias_seguidas", tx?: unknown) {
+    return this.db(tx).alertaAutomatica.findMany({
+      where: { regla, resueltaEn: null },
+      include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true, profesorId: true } } },
+    });
+  }
+
+  private async alumnosConDeuda(tx?: unknown): Promise<AvisoEsperado[]> {
+    const alertas = await this.alertasAbiertas("deuda_cuotas", tx);
+    if (alertas.length === 0) return [];
+    const staff = await this.staff(tx);
+    return alertas.flatMap((a) =>
+      staff.map((d) =>
+        aviso({
+          ...d,
+          tipo: "alumno_con_deuda",
+          clave: `alerta:deuda_cuotas:${a.alumnoId}`,
+          tono: "danger",
+          texto: textoDeAlertaDeDeuda(`${a.alumno.nombre} ${a.alumno.apellido}`, a.nivel),
+          recurso: { tipo: "alumno", alumnoId: a.alumnoId },
+          nivel: a.nivel,
+        }),
+      ),
+    );
+  }
+
+  private async alumnosConFaltas(tx?: unknown): Promise<AvisoEsperado[]> {
+    const alertas = await this.alertasAbiertas("inasistencias_seguidas", tx);
+    if (alertas.length === 0) return [];
+    const staff = await this.staff(tx);
+    return alertas.flatMap((a) =>
+      staff.map((d) =>
+        aviso({
+          ...d,
+          tipo: "alumno_con_faltas",
+          clave: `alerta:inasistencias_seguidas:${a.alumnoId}:${a.cursoId}`,
+          tono: "warning",
+          texto: textoDeAlertaDeFaltas(`${a.alumno.nombre} ${a.alumno.apellido}`, a.nivel, a.curso?.nombre ?? ""),
+          recurso: { tipo: "alumno", alumnoId: a.alumnoId },
+          nivel: a.nivel,
+        }),
+      ),
+    );
+  }
+
+  // Al profesor **actual** del curso (si el curso se reasigna, el aviso pasa al nuevo): lo lleva a la asistencia de la última falta.
+  private async alumnosConFaltasParaProfesores(tx?: unknown): Promise<AvisoEsperado[]> {
+    const alertas = await this.alertasAbiertas("inasistencias_seguidas", tx);
+    if (alertas.length === 0) return [];
+    const cuentas = await this.cuentasDeProfesores(tx);
+    const avisos: AvisoEsperado[] = [];
+    for (const a of alertas) {
+      const usuarioId = a.curso ? cuentas.get(a.curso.profesorId) : undefined;
+      if (!usuarioId || !a.cursoId) continue;
+      const ultima = await this.db(tx).asistencia.findFirst({
+        where: { alumnoId: a.alumnoId, cursoId: a.cursoId, estado: "ausente", justificada: false },
+        orderBy: { fecha: "desc" },
+        select: { fecha: true },
+      });
+      avisos.push(
+        aviso({
+          usuarioId,
+          rol: "profesor",
+          tipo: "alumno_con_faltas_profesor",
+          clave: `alerta:inasistencias_seguidas:${a.alumnoId}:${a.cursoId}`,
+          tono: "warning",
+          texto: textoDeAlertaDeFaltas(`${a.alumno.nombre} ${a.alumno.apellido}`, a.nivel, a.curso?.nombre ?? ""),
+          recurso: { tipo: "asistencia", cursoId: a.cursoId, fecha: (ultima?.fecha ?? a.abiertaEn).toISOString().slice(0, 10) },
+          nivel: a.nivel,
+        }),
+      );
+    }
+    return avisos;
   }
 
   // El año lectivo (marzo a noviembre) terminó y el ciclo activo sigue sin cerrarse: lo ve solo el administrador.

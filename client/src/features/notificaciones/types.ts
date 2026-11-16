@@ -15,7 +15,10 @@ export type TipoNotificacion =
   | "datos_incompletos"
   | "descuento_hermanos_instituto"
   | "descuento_hermanos"
-  | "ciclo_por_cerrar";
+  | "ciclo_por_cerrar"
+  | "alumno_con_deuda"
+  | "alumno_con_faltas"
+  | "alumno_con_faltas_profesor";
 
 export type TonoNotificacion = "danger" | "warning" | "info";
 

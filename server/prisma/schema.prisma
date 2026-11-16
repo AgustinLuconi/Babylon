@@ -456,6 +456,9 @@ enum TipoNotificacion {
   descuento_hermanos_instituto
   descuento_hermanos
   ciclo_por_cerrar
+  alumno_con_deuda
+  alumno_con_faltas
+  alumno_con_faltas_profesor
 }
 
 enum ClaseNotificacion {

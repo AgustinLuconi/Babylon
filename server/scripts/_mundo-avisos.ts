@@ -60,6 +60,8 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   // Avisos de descuento sobre alumnos que ya no existen (las pruebas que inscriben por la API los dejan en las cuentas reales
   // de administración; la clave lleva el id del alumno: "descuento:<alumnoId>:…").
   await prisma.$executeRaw`DELETE FROM "Notificacion" WHERE tipo::text IN ('descuento_hermanos', 'descuento_hermanos_instituto') AND split_part(clave, ':', 2) NOT IN (SELECT id FROM "Alumno")`;
+  // Lo mismo con los avisos de las alertas automáticas (clave "alerta:<regla>:<alumnoId>[:<cursoId>]").
+  await prisma.$executeRaw`DELETE FROM "Notificacion" WHERE tipo::text IN ('alumno_con_deuda', 'alumno_con_faltas', 'alumno_con_faltas_profesor') AND split_part(clave, ':', 3) NOT IN (SELECT id FROM "Alumno")`;
   await prisma.categoriaPersonalizada.deleteMany({ where: deCursos });
   await prisma.horario.deleteMany({ where: deCursos });
   await prisma.curso.deleteMany({ where: { id: { in: cursoIds } } });
