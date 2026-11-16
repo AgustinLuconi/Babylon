@@ -27,6 +27,7 @@ import { chatRoutes } from "./modules/chats/chat.routes";
 import { reporteRoutes } from "./modules/reportes/reporte.routes";
 import { notificacionRoutes } from "./modules/notificaciones/notificacion.routes";
 import { iniciarAvisosPeriodicos } from "./modules/notificaciones/notificacion.scheduler";
+import { automatizacionRoutes } from "./modules/automatizaciones/automatizacion.routes";
 import { iniciarAutomatizaciones } from "./modules/automatizaciones/automatizacion.scheduler";
 
 const app = express();
@@ -56,6 +57,7 @@ app.use("/api/observaciones", observacionRoutes(container.observacionController)
 app.use("/api/chats", chatRoutes(container.chatController));
 app.use("/api/reportes", reporteRoutes(container.reporteController));
 app.use("/api/notificaciones", notificacionRoutes(container.notificacionController));
+app.use("/api/automatizaciones", automatizacionRoutes(container.automatizacionController));
 app.use("/api/tiempo-real", tiempoRealRoutes(container.canalEnVivo, container.validadorDeSesion));
 
 app.use(errorHandler);

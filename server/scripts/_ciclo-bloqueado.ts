@@ -73,7 +73,7 @@ const EXENTAS = [
   "POST /api/ciclos/pase-de-anio/confirmar",
 ];
 // Módulos enteros sin datos que pertenezcan a un ciclo.
-const MODULOS_SIN_CICLO = ["/api/auth", "/api/padres", "/api/profesores", "/api/documentos", "/api/chats", "/api/notificaciones", "/api/configuracion"];
+const MODULOS_SIN_CICLO = ["/api/auth", "/api/padres", "/api/profesores", "/api/documentos", "/api/chats", "/api/notificaciones", "/api/configuracion", "/api/automatizaciones"];
 
 // Routers montados que solo tienen lecturas (el canal en vivo, SSE).
 const SIN_ESCRITURAS = new Set(["tiempoReal"]);

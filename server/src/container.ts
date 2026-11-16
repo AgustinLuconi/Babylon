@@ -60,6 +60,7 @@ import { CalificacionController } from "./modules/calificaciones/calificacion.co
 
 import { PrismaAutomatizacionRepository } from "./modules/automatizaciones/automatizacion.repository.prisma";
 import { PrismaEvaluadoresDeReglas } from "./modules/automatizaciones/automatizacion.evaluadores.prisma";
+import { AutomatizacionController } from "./modules/automatizaciones/automatizacion.controller";
 import { AutomatizacionService } from "./modules/automatizaciones/automatizacion.service";
 import { suscribirAutomatizaciones } from "./modules/automatizaciones/automatizacion.suscripciones";
 
@@ -192,4 +193,5 @@ export const container = {
   chatController: new ChatController(chatService, padreService),
   reporteController: new ReporteController(reporteService),
   notificacionController: new NotificacionController(notificacionService),
+  automatizacionController: new AutomatizacionController(automatizacionService),
 };
