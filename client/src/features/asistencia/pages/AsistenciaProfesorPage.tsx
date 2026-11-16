@@ -110,11 +110,13 @@ export default function AsistenciaProfesorPage() {
   const [estados, setEstados] = useState<Record<string, EstadoAsistencia>>({});
   const [minutos, setMinutos] = useState<Record<string, number>>({});
   const [motivos, setMotivos] = useState<Record<string, string>>({});
+  const [justificadas, setJustificadas] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setEstados({});
     setMinutos({});
     setMotivos({});
+    setJustificadas({});
     tomarAsistencia.reset();
   }, [cursoId, fecha]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -160,6 +162,10 @@ export default function AsistenciaProfesorPage() {
   const minutosEfectivo = (alumnoId: string): number | undefined =>
     minutos[alumnoId] ?? registroExistente(alumnoId)?.minutosRetraso;
   const motivoEfectivo = (alumnoId: string): string => motivos[alumnoId] ?? registroExistente(alumnoId)?.motivo ?? "";
+  const justificadaEfectiva = (alumnoId: string): boolean => justificadas[alumnoId] ?? registroExistente(alumnoId)?.justificada ?? false;
+  // Una ausencia justificada sin motivo no se puede guardar.
+  const faltaMotivo = (alumnoId: string): boolean =>
+    estadoEfectivo(alumnoId) === "ausente" && justificadaEfectiva(alumnoId) && motivoEfectivo(alumnoId).trim() === "";
   // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo).
   useSinGuardar(
     (alumnos ?? []).some((a) => {
@@ -167,7 +173,8 @@ export default function AsistenciaProfesorPage() {
       return (
         (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
         (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
-        (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? ""))
+        (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? "")) ||
+        (justificadas[a.id] !== undefined && justificadas[a.id] !== (guardado?.justificada ?? false))
       );
     }),
   );
@@ -201,6 +208,7 @@ export default function AsistenciaProfesorPage() {
         estado,
         minutosRetraso: estado === "tarde" ? minutosEfectivo(a.id) : undefined,
         motivo: estado === "ausente" ? motivoEfectivo(a.id).trim() || undefined : undefined,
+        justificada: estado === "ausente" && justificadaEfectiva(a.id) ? true : undefined,
       };
     });
     tomarAsistencia.mutate(
@@ -376,13 +384,23 @@ export default function AsistenciaProfesorPage() {
                   </div>
                 )}
                 {estado === "ausente" && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-2">
+                    <label className="flex items-center gap-2 text-[12.5px]">
+                      <input
+                        type="checkbox"
+                        checked={justificadaEfectiva(alumno.id)}
+                        onChange={(e) => setJustificadas((actual) => ({ ...actual, [alumno.id]: e.target.checked }))}
+                      />
+                      Justificada
+                    </label>
                     <Input
                       value={motivoEfectivo(alumno.id)}
                       onChange={(e) => setMotivos((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
-                      placeholder="Motivo de ausencia (opcional)"
+                      placeholder={justificadaEfectiva(alumno.id) ? "Motivo de la ausencia (obligatorio)" : "Motivo de ausencia (opcional)"}
+                      aria-invalid={faltaMotivo(alumno.id)}
                       className="h-8 text-[12.5px]"
                     />
+                    {faltaMotivo(alumno.id) && <p className="text-[11.5px] text-destructive">Escribí el motivo para justificar la ausencia</p>}
                   </div>
                 )}
               </div>
@@ -409,7 +427,7 @@ export default function AsistenciaProfesorPage() {
           ) : (
             <Button
               className="w-full justify-center"
-              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido}
+              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
               onClick={onGuardar}
             >
               {tomarAsistencia.isPending
