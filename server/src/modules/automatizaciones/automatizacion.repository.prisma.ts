@@ -65,12 +65,12 @@ export class PrismaAutomatizacionRepository implements AutomatizacionRepository 
         orderBy: [{ abiertaEn: "desc" }, { id: "desc" }],
         skip: (Math.max(1, pagina) - 1) * porPagina,
         take: porPagina,
-        include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true } } },
+        include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true } }, evaluacion: { select: { nombre: true } } },
       }),
     ]);
     return {
       total,
-      filas: filas.map((f) => ({ ...aAlerta(f), alumnoNombre: `${f.alumno.nombre} ${f.alumno.apellido}`, cursoNombre: f.curso?.nombre ?? null })),
+      filas: filas.map((f) => ({ ...aAlerta(f), alumnoNombre: f.alumno ? `${f.alumno.nombre} ${f.alumno.apellido}` : null, evaluacionNombre: f.evaluacion?.nombre ?? null, cursoNombre: f.curso?.nombre ?? null })),
     };
   }
 }

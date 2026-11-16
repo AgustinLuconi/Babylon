@@ -25,8 +25,10 @@ export interface ReglaConEstado {
 
 export interface AlertaDelHistorial {
   id: string;
-  alumnoId: string;
-  alumnoNombre: string;
+  alumnoId: string | null;
+  alumnoNombre: string | null;
+  evaluacionId: string | null;
+  evaluacionNombre: string | null;
   cursoNombre: string | null;
   nivel: number;
   abiertaEn: Date;
@@ -58,7 +60,7 @@ export class AutomatizacionService {
       const cambios = reconciliarAlertas({ abiertas, esperadas, poblacion, causa: config.activa ? causa : "regla-apagada", nuevoId: randomUUID });
 
       await this.repo.crearAlertas(
-        cambios.abrir.map((a) => ({ id: a.id, regla, alumnoId: a.alumnoId, cursoId: a.cursoId, nivel: a.nivel, abiertaEn: ahora, resueltaEn: null, motivoCierre: null })),
+        cambios.abrir.map((a) => ({ id: a.id, regla, alumnoId: a.alumnoId, cursoId: a.cursoId, evaluacionId: a.evaluacionId ?? null, nivel: a.nivel, abiertaEn: ahora, resueltaEn: null, motivoCierre: null })),
         tx,
       );
       for (const { id, nivel } of cambios.actualizar) await this.repo.actualizarNivel(id, nivel, tx);
@@ -134,7 +136,7 @@ export class AutomatizacionService {
     return {
       total,
       porPagina: ALERTAS_POR_PAGINA,
-      alertas: filas.map((f) => ({ id: f.id, alumnoId: f.alumnoId, alumnoNombre: f.alumnoNombre, cursoNombre: f.cursoNombre, nivel: f.nivel, abiertaEn: f.abiertaEn, resueltaEn: f.resueltaEn, motivoCierre: f.motivoCierre })),
+      alertas: filas.map((f) => ({ id: f.id, alumnoId: f.alumnoId, alumnoNombre: f.alumnoNombre, evaluacionId: f.evaluacionId, evaluacionNombre: f.evaluacionNombre, cursoNombre: f.cursoNombre, nivel: f.nivel, abiertaEn: f.abiertaEn, resueltaEn: f.resueltaEn, motivoCierre: f.motivoCierre })),
     };
   }
 }

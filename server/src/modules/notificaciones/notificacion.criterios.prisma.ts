@@ -135,10 +135,12 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
   // ── Alertas automáticas ──────────────────────────────────────────────────
   // Los avisos salen de las alertas abiertas del módulo de automatizaciones (su registro es la fuente de verdad).
   private alertasAbiertas(regla: "deuda_cuotas" | "inasistencias_seguidas", tx?: unknown) {
-    return this.db(tx).alertaAutomatica.findMany({
-      where: { regla, resueltaEn: null },
-      include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true, profesorId: true } } },
-    });
+    return this.db(tx).alertaAutomatica
+      .findMany({
+        where: { regla, resueltaEn: null, alumnoId: { not: null } },
+        include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true, profesorId: true } } },
+      })
+      .then((filas) => filas.flatMap(({ alumnoId, alumno, ...resto }) => (alumnoId && alumno ? [{ ...resto, alumnoId, alumno }] : [])));
   }
 
   private async alumnosConDeuda(tx?: unknown): Promise<AvisoEsperado[]> {

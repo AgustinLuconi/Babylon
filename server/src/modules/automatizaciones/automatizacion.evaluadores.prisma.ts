@@ -44,4 +44,8 @@ export class PrismaEvaluadoresDeReglas implements EvaluadoresDeReglas {
       return { esperadas, poblacion: new Set(pares.keys()) };
     },
   };
+
+  // Se completan en la tarea siguiente.
+  readonly evaluacion_sin_notas = { evaluar: async (): Promise<EvaluacionDeRegla> => ({ esperadas: [], poblacion: new Set<string>() }) };
+  readonly alumno_en_riesgo = { evaluar: async (): Promise<EvaluacionDeRegla> => ({ esperadas: [], poblacion: new Set<string>() }) };
 }

@@ -313,8 +313,9 @@ model Evaluacion {
   // Cuándo pasó a \"publicada\" (null en las publicadas antes de que existiera el campo).
   publicadaEn DateTime?
 
-  curso          Curso          @relation(fields: [cursoId], references: [id])
+  curso          Curso               @relation(fields: [cursoId], references: [id])
   calificaciones Calificacion[]
+  alertas        AlertaAutomatica[]
 }
 
 model Calificacion {
@@ -526,16 +527,20 @@ model Automatizacion {
 model AlertaAutomatica {
   id           String    @id
   regla        String
-  alumnoId     String
+  alumnoId     String?
   cursoId      String?
+  // El sujeto es un alumno o una evaluación (exactamente uno de los dos: restricción CHECK en la migración).
+  evaluacionId String?
   nivel        Int
   abiertaEn    DateTime
   resueltaEn   DateTime?
   motivoCierre String?
 
-  alumno Alumno @relation(fields: [alumnoId], references: [id])
-  curso  Curso? @relation(fields: [cursoId], references: [id])
+  alumno     Alumno?     @relation(fields: [alumnoId], references: [id], onDelete: Restrict)
+  curso      Curso?      @relation(fields: [cursoId], references: [id])
+  evaluacion Evaluacion? @relation(fields: [evaluacionId], references: [id], onDelete: Restrict)
 
   @@index([regla, resueltaEn])
   @@index([alumnoId])
+  @@index([evaluacionId])
 }
