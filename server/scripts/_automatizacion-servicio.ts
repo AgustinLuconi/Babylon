@@ -18,6 +18,7 @@ const alertas = (regla: ReglaId, alumnoId: string) => prisma.alertaAutomatica.fi
 const abiertas = async (regla: ReglaId, alumnoId: string) => (await alertas(regla, alumnoId)).filter((a) => a.resueltaEn === null);
 
 (async () => {
+  const inicio = new Date();
   const m = await crearMundo(prisma);
   const activoOriginal = m.cicloId;
   try {
@@ -117,8 +118,13 @@ const abiertas = async (regla: ReglaId, alumnoId: string) => (await alertas(regl
     await prisma.ciclo.updateMany({ where: { activo: true }, data: { activo: false } });
     await prisma.ciclo.update({ where: { id: activoOriginal }, data: { activo: true } });
     await limpiarMundo(prisma);
+    // La prueba revisa la base entera: lo que abrió o cerró sobre alumnos reales se deshace (se borra lo abierto desde el inicio y
+    // se reabre lo que cerró) y se revisa de nuevo para que el estado quede como lo calculan las reglas.
+    await prisma.alertaAutomatica.deleteMany({ where: { abiertaEn: { gte: inicio } } });
+    await prisma.alertaAutomatica.updateMany({ where: { resueltaEn: { gte: inicio } }, data: { resueltaEn: null, motivoCierre: null } });
     await prisma.automatizacion.upsert({ where: { regla: "deuda_cuotas" }, update: { activa: true, umbral: 2 }, create: { regla: "deuda_cuotas", activa: true, umbral: 2 } });
     await prisma.automatizacion.upsert({ where: { regla: "inasistencias_seguidas" }, update: { activa: true, umbral: 3 }, create: { regla: "inasistencias_seguidas", activa: true, umbral: 3 } });
+    await uow.runInTransaction((tx) => servicio.evaluar(["deuda_cuotas", "inasistencias_seguidas"], tx));
     await prisma.$disconnect();
     process.exit(0);
   }
