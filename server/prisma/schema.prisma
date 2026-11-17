@@ -460,6 +460,9 @@ enum TipoNotificacion {
   alumno_con_deuda
   alumno_con_faltas
   alumno_con_faltas_profesor
+  alumno_en_riesgo
+  evaluacion_sin_notas
+  evaluacion_sin_notas_profesor
 }
 
 enum ClaseNotificacion {

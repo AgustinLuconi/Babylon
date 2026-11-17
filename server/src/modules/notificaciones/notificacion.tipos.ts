@@ -24,6 +24,9 @@ export const TIPOS: Record<TipoNotificacion, { grupo: Grupo; clase: ClaseNotific
   alumno_con_deuda: { grupo: "staff", clase: "estado", etiqueta: "Alumnos con cuotas vencidas" },
   alumno_con_faltas: { grupo: "staff", clase: "estado", etiqueta: "Alumnos con inasistencias seguidas" },
   alumno_con_faltas_profesor: { grupo: "profesor", clase: "estado", etiqueta: "Alumnos con inasistencias seguidas en mis cursos" },
+  alumno_en_riesgo: { grupo: "staff", clase: "estado", etiqueta: "Alumnos en riesgo (deuda e inasistencias)" },
+  evaluacion_sin_notas: { grupo: "staff", clase: "estado", etiqueta: "Evaluaciones sin notas" },
+  evaluacion_sin_notas_profesor: { grupo: "profesor", clase: "estado", etiqueta: "Evaluaciones sin notas en mis cursos" },
   descuento_hermanos_instituto: { grupo: "staff", clase: "evento", etiqueta: "Cambios en el descuento por hermanos" },
   descuento_hermanos: { grupo: "padre", clase: "evento", etiqueta: "Cambios en el descuento por hermanos" },
 };
