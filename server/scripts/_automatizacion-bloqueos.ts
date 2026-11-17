@@ -48,6 +48,39 @@ const mensaje = (e: unknown) => (e instanceof Error ? e.message : String(e));
     ok("guardar la asistencia (A) no se traba con editar un curso", resA, "ok");
     ok("la alerta de inasistencias quedó abierta", await prisma.alertaAutomatica.count({ where: { regla: "inasistencias_seguidas", alumnoId: m.hijo1, resueltaEn: null } }), 1);
 
+    // Cobrar la deuda de un alumno en riesgo cierra la alerta de deuda y, con ella, la de riesgo; los avisos de los dos tipos se
+    // sincronizan juntos y en orden. H hace de "crear una cuenta" (sincroniza todos los tipos en orden alfabético): retiene el
+    // aviso de deuda y, más tarde, pide el de riesgo. Si el cobro tomara el de riesgo antes que el de deuda, se trabarían.
+    await prisma.automatizacion.upsert({ where: { regla: "deuda_cuotas" }, update: { activa: true, umbral: 2 }, create: { regla: "deuda_cuotas", activa: true, umbral: 2 } });
+    await prisma.automatizacion.upsert({ where: { regla: "alumno_en_riesgo" }, update: { activa: true }, create: { regla: "alumno_en_riesgo", activa: true, umbral: 1 } });
+    await prisma.cuota.createMany({
+      data: [1, 2].map((i) => ({ id: `${P}-qr${i}`, alumnoId: m.hijo1, mes: i, anio: 2080, montoBase: 1000, descuento: 0, montoFinal: 1000, vencimiento: new Date("2080-03-10T00:00:00Z"), estado: "vencida" as const })),
+    });
+    await uow.runInTransaction((tx) => container.automatizacionService.evaluar(["deuda_cuotas"], tx));
+    ok("antes del cobro el alumno está en riesgo", await prisma.alertaAutomatica.count({ where: { regla: "alumno_en_riesgo", alumnoId: m.hijo1, resueltaEn: null } }), 1);
+    let retenido2!: () => void;
+    const yaRetiene2 = new Promise<void>((r) => (retenido2 = r));
+    let soltar2!: () => void;
+    const compuerta2 = new Promise<void>((r) => (soltar2 = r));
+    const h2 = uow
+      .runInTransaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('avisos:alumno_con_deuda', 0))`;
+        retenido2();
+        await compuerta2;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('avisos:alumno_en_riesgo', 0))`;
+      })
+      .then(() => "ok", (e) => mensaje(e));
+    await yaRetiene2;
+    const cobro = container.cuotaService
+      .registrarPago({ cuotaIds: [`${P}-qr1`, `${P}-qr2`], metodo: "efectivo", registradoPor: m.admin })
+      .then(() => "ok", (e) => mensaje(e));
+    await espera(700);
+    soltar2();
+    const [resH2, resCobro] = await Promise.all([h2, cobro]);
+    ok("crear una cuenta (H) no se traba con el cobro que cierra deuda y riesgo", resH2, "ok");
+    ok("el cobro no se traba con crear una cuenta", resCobro, "ok");
+    ok("el cobro cerró la alerta de riesgo", await prisma.alertaAutomatica.count({ where: { regla: "alumno_en_riesgo", alumnoId: m.hijo1, resueltaEn: null } }), 0);
+
     // Las cuatro reglas a la vez: lo que hace un cambio de alumnos (revisar todas y sincronizar todos los avisos), cargar notas
     // (revisa evaluación sin notas) y editar un curso (idem, y avisos del profesor), 15 veces en paralelo. Todo en el orden del
     // catálogo: ningún par se traba (Postgres abortaría una de las dos con "deadlock detected").

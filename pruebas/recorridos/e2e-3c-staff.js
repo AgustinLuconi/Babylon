@@ -57,7 +57,9 @@ const filas = (p, texto) => p.locator(`tbody tr:has-text("${texto}")`).count();
   admin.on("request", (r) => {
     if (new URL(r.url()).pathname === "/api/cuotas") pedidosDeCuotas++;
   });
-  for (const m of [3, 4, 5, 6, 7]) await pedir("POST", "/api/cuotas/pagos", secreTk, { cuotaIds: [`prueba-tmp-av-cb${m}`], metodo: "efectivo" });
+  // Los cinco pedidos salen a la vez: lo que se prueba es que el navegador junta las señales, no cuánto tarda cada cobro en el servidor
+  // (con las automatizaciones cada cobro revisa reglas y tarda más que los 300 ms de espera del navegador entre señales).
+  await Promise.all([3, 4, 5, 6, 7].map((m) => pedir("POST", "/api/cuotas/pagos", secreTk, { cuotaIds: [`prueba-tmp-av-cb${m}`], metodo: "efectivo" })));
   await admin.waitForTimeout(2500);
   ok("2: un solo mensaje para los cinco", await admin.locator("[data-mensaje-cambio]:has-text('Pruebaav cobró 5 cuotas')").count(), 1);
   ok("2: una sola recarga de la lista", pedidosDeCuotas, 1);

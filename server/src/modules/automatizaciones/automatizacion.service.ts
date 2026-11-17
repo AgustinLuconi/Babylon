@@ -55,7 +55,12 @@ export class AutomatizacionService {
     const cambiadas: ReglaId[] = [];
     // En el orden del catálogo (no alfabético): las reglas base primero y `alumno_en_riesgo` al final, que lee sus alertas. Es
     // también el orden de los bloqueos, el mismo en todas las operaciones.
-    for (const regla of REGLA_IDS.filter((r) => reglas.includes(r))) {
+    // `alumno_en_riesgo` se lee de las alertas de deuda e inasistencias: si se revisa alguna de las dos, se revisa también el
+    // riesgo, en la misma operación y con la misma causa. Así todo sale en un único `alertas.cambiaron` y los avisos de todos
+    // los tipos afectados se bloquean juntos y en orden (una cascada por anuncio los tomaría en otro orden).
+    const aRevisar = new Set(reglas);
+    if (aRevisar.has("deuda_cuotas") || aRevisar.has("inasistencias_seguidas")) aRevisar.add("alumno_en_riesgo");
+    for (const regla of REGLA_IDS.filter((r) => aRevisar.has(r))) {
       await this.repo.bloquearRegla(regla, tx);
       const config = await this.repo.obtenerConfig(regla, tx);
       const abiertas = await this.repo.findAbiertas(regla, tx);
