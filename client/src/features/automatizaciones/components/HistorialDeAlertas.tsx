@@ -21,7 +21,7 @@ export function HistorialDeAlertas({ regla }: { regla: ReglaId }) {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Alumno</th>
+              <th>Alumno o evaluación</th>
               <th>Curso</th>
               <th>Nivel</th>
               <th>Abierta</th>
@@ -33,9 +33,13 @@ export function HistorialDeAlertas({ regla }: { regla: ReglaId }) {
             {data.alertas.map((a) => (
               <tr key={a.id}>
                 <td>
-                  <Link to={`/alumnos/${a.alumnoId}`} className="underline">
-                    {a.alumnoNombre}
-                  </Link>
+                  {a.alumnoId ? (
+                    <Link to={`/alumnos/${a.alumnoId}`} className="underline">
+                      {a.alumnoNombre}
+                    </Link>
+                  ) : (
+                    (a.evaluacionNombre ?? "—")
+                  )}
                 </td>
                 <td>{a.cursoNombre ?? "—"}</td>
                 <td className="tnum">{a.nivel}</td>

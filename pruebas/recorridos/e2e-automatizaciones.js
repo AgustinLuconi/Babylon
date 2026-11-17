@@ -29,7 +29,7 @@ const abiertas = (regla, alumno) => Number(q(`select count(*) from "AlertaAutoma
 
 (async () => {
   const inicio = q("select now()");
-  q(`insert into "Automatizacion" (regla, activa, umbral) values ('deuda_cuotas', true, 2), ('inasistencias_seguidas', true, 3) on conflict (regla) do update set activa = true, umbral = excluded.umbral`);
+  q(`insert into "Automatizacion" (regla, activa, umbral) values ('deuda_cuotas', true, 2), ('inasistencias_seguidas', true, 3), ('evaluacion_sin_notas', true, 7), ('alumno_en_riesgo', true, 1) on conflict (regla) do update set activa = true, umbral = excluded.umbral`);
   const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
   const admin = await b.newPage({ viewport: { width: 1280, height: 1100 } });
   const profe = await b.newPage({ viewport: { width: 1280, height: 1100 } });
@@ -110,11 +110,35 @@ const abiertas = (regla, alumno) => Number(q(`select count(*) from "AlertaAutoma
     ok("el historial muestra la alerta cerrada por cambio de número", `${await tarjeta.getByText("Lunaav Pruebaav").count() > 0} ${await tarjeta.getByText("Cambio de número").count() > 0}`, "true true");
     ok("la otra regla tiene su tarjeta", await admin.locator('[data-regla="inasistencias_seguidas"]').count(), 1);
     ok("secretaría no ve el panel", (await fetch(`${API}/api/automatizaciones`, { headers: { Authorization: `Bearer ${await token("secre")}` } })).status, 403);
+
+    // 7. Reglas extra: tarjetas, evaluación sin notas (aviso del profesor e historial con la evaluación como sujeto)
+    const sinNotas = admin.locator('[data-regla="evaluacion_sin_notas"]');
+    const riesgo = admin.locator('[data-regla="alumno_en_riesgo"]');
+    ok("el panel tiene las tarjetas de las dos reglas nuevas", `${await sinNotas.count()} ${await riesgo.count()}`, "1 1");
+    ok("evaluación sin notas muestra su rango", await sinNotas.getByText("de 1 a 30").count() > 0, true);
+    ok("alumno en riesgo no tiene campo de número ni botón Guardar", `${await riesgo.getByLabel(/Número/).count()} ${await riesgo.getByRole("button", { name: "Guardar" }).count()}`, "0 0");
+    q(`insert into "Evaluacion" (id, "cursoId", nombre, tipo, fecha, periodo, estado) values ('${P}-ev1', '${P}-curso', 'Pruebaav examen', 'examen', current_date - 9, 'julio', 'borrador')`);
+    await fetch(`${API}/api/automatizaciones/evaluacion_sin_notas`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ umbral: 7 }) });
+    const fechaEv = q(`select to_char(current_date - 9, 'DD/MM')`);
+    const textoEv = `Pruebaav examen (Pruebaav Kids) del ${fechaEv} todavía no tiene notas`;
+    await profe.goto(`${BASE}/notificaciones`);
+    await profe.getByText(textoEv).first().waitFor({ timeout: 8000 });
+    ok("el profesor del curso ve el aviso de evaluación sin notas", await profe.getByText(textoEv).count(), 1);
+    await profe.getByText(textoEv).first().click();
+    await profe.waitForURL((u) => u.pathname === "/calificaciones", { timeout: 8000 });
+    ok("el aviso lleva a Calificaciones de ese curso y evaluación", `${new URL(profe.url()).searchParams.get("curso")} ${new URL(profe.url()).searchParams.get("evaluacion")}`, `${P}-curso ${P}-ev1`);
+    await admin.goto(`${BASE}/configuracion`);
+    await sinNotas.waitFor({ timeout: 8000 });
+    await sinNotas.getByRole("button", { name: "Ver historial" }).click();
+    await sinNotas.getByText("Pruebaav examen").first().waitFor({ timeout: 8000 });
+    ok("el historial muestra la evaluación y el curso, sin enlace a un alumno", `${await sinNotas.getByText("Pruebaav examen").count() > 0} ${await sinNotas.getByText("Pruebaav Kids").count() > 0} ${await sinNotas.locator('a[href^="/alumnos/"]').count()}`, "true true 0");
   } finally {
     await b.close();
     // Se deshace lo que la prueba abrió o cerró sobre alumnos reales y se vuelve a dejar la regla en su número.
     q(`delete from "AlertaAutomatica" where "abiertaEn" >= '${inicio}'`);
+    q(`delete from "Notificacion" where clave like 'alerta:evaluacion_sin_notas:${P}-%'`);
+    q(`delete from "Evaluacion" where id = '${P}-ev1'`);
     q(`update "AlertaAutomatica" set "resueltaEn" = null, "motivoCierre" = null where "resueltaEn" >= '${inicio}'`);
-    q(`insert into "Automatizacion" (regla, activa, umbral) values ('deuda_cuotas', true, 2), ('inasistencias_seguidas', true, 3) on conflict (regla) do update set activa = true, umbral = excluded.umbral`);
+    q(`insert into "Automatizacion" (regla, activa, umbral) values ('deuda_cuotas', true, 2), ('inasistencias_seguidas', true, 3), ('evaluacion_sin_notas', true, 7), ('alumno_en_riesgo', true, 1) on conflict (regla) do update set activa = true, umbral = excluded.umbral`);
   }
 })().catch((e) => { console.log(`sin excepciones: ${e.message.split("\n")[0]} (esperado ninguna)`); process.exit(1); });

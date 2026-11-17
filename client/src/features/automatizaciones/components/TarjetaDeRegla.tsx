@@ -44,17 +44,19 @@ export function TarjetaDeRegla({ regla }: { regla: ReglaConEstado }) {
             onClick={() => actualizar.mutate({ regla: regla.id, cambios: { activa: !regla.activa } })}
           />
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1.5">
-            <label className="label" htmlFor={`umbral-${regla.id}`}>
-              Número ({regla.unidad}, de {regla.umbralMinimo} a {regla.umbralMaximo})
-            </label>
-            <Input id={`umbral-${regla.id}`} type="number" min={regla.umbralMinimo} max={regla.umbralMaximo} value={umbral} onChange={(e) => setUmbral(e.target.value)} className="tnum w-28" />
+        {regla.conNumero && (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <label className="label" htmlFor={`umbral-${regla.id}`}>
+                Número ({regla.unidad}, de {regla.umbralMinimo} a {regla.umbralMaximo})
+              </label>
+              <Input id={`umbral-${regla.id}`} type="number" min={regla.umbralMinimo} max={regla.umbralMaximo} value={umbral} onChange={(e) => setUmbral(e.target.value)} className="tnum w-28" />
+            </div>
+            <Button disabled={!cambio || !valido || actualizar.isPending} onClick={() => actualizar.mutate({ regla: regla.id, cambios: { umbral: numero } })}>
+              Guardar
+            </Button>
           </div>
-          <Button disabled={!cambio || !valido || actualizar.isPending} onClick={() => actualizar.mutate({ regla: regla.id, cambios: { umbral: numero } })}>
-            Guardar
-          </Button>
-        </div>
+        )}
         {cambio && !valido && <p className="text-[12px] text-destructive">El número tiene que ser entero y estar entre {regla.umbralMinimo} y {regla.umbralMaximo}.</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-muted-foreground">
