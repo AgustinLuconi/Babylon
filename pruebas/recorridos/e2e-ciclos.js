@@ -65,6 +65,8 @@ const api = async (metodo, ruta, tk, cuerpo) => {
     await p.getByText("Falta pasar de año", { exact: false }).first().click();
     await p.waitForURL((u) => u.pathname === "/ciclos/pasar-de-anio", { timeout: 8000 });
     ok("el aviso lleva a la pantalla del asistente", new URL(p.url()).pathname, "/ciclos/pasar-de-anio");
+    // El select se llena cuando llegan los ciclos: se espera a que tenga valor en vez de leerlo en el mismo instante.
+    await p.waitForFunction(() => document.querySelector("select")?.value, null, { timeout: 8000 }).catch(() => {});
     ok("y deja elegido el ciclo del aviso como origen", await p.getByLabel("De qué ciclo se pasa").inputValue(), `${P}-ciclo-2098`);
 
     // El asistente de punta a punta
