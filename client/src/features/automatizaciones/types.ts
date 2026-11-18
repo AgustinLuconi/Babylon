@@ -11,6 +11,9 @@ export interface ReglaConEstado {
   umbralMaximo: number;
   // false: la regla no tiene número que se elija (alumno en riesgo usa los de las otras).
   conNumero: boolean;
+  sujetoSingular: string;
+  sujetoPlural: string;
+  conNivel: boolean;
   activa: boolean;
   umbral: number;
   enAlerta: number;

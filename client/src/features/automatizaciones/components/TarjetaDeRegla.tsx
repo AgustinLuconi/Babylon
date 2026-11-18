@@ -61,7 +61,7 @@ export function TarjetaDeRegla({ regla }: { regla: ReglaConEstado }) {
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-muted-foreground">
           <span>
-            <strong className="tnum text-foreground">{regla.enAlerta}</strong> {regla.enAlerta === 1 ? "alumno en alerta" : "alumnos en alerta"} ahora · Última revisión:{" "}
+            <strong className="tnum text-foreground">{regla.enAlerta}</strong> {regla.enAlerta === 1 ? regla.sujetoSingular : regla.sujetoPlural} en alerta ahora · Última revisión:{" "}
             {regla.ultimaRevisionEn ? formatFechaHora(regla.ultimaRevisionEn) : "todavía no se revisó"}
           </span>
           <Button variant="outline" size="sm" onClick={() => setVerHistorial(!verHistorial)}>
@@ -71,7 +71,7 @@ export function TarjetaDeRegla({ regla }: { regla: ReglaConEstado }) {
       </div>
       {verHistorial && (
         <div className="border-t" style={{ borderColor: "var(--border-hex)" }}>
-          <HistorialDeAlertas regla={regla.id} />
+          <HistorialDeAlertas regla={regla.id} conNivel={regla.conNivel} />
         </div>
       )}
     </div>

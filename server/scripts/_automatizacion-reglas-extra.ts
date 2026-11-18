@@ -74,6 +74,17 @@ const haceDias = (n: number) => {
     const cerrada5 = (await alertasDe("evaluacion_sin_notas", { evaluacionId: idEvaluacion(5) }))[0];
     ok("al desactivar el curso se cierra como ya-no-corresponde", `${(await abiertasEv(5)).length} ${cerrada5.motivoCierre}`, "0 ya-no-corresponde");
     await prisma.curso.update({ where: { id: m.cursoId }, data: { estado: "activo" } });
+    await revisar(["evaluacion_sin_notas"]);
+    ok("con el curso activo y alumnos activos, la evaluación sin notas está abierta", (await abiertasEv(5)).length, 1);
+    await prisma.alumno.updateMany({ where: { id: { in: [m.hijo1, m.hijo2] } }, data: { estado: "inactivo" } });
+    await revisar(["evaluacion_sin_notas"]);
+    const cerrada5b = (await alertasDe("evaluacion_sin_notas", { evaluacionId: idEvaluacion(5) })).at(-1);
+    ok("un curso sin alumnos activos no alerta (no hay a quién ponerle nota): se cierra como ya-no-corresponde", `${(await abiertasEv(5)).length} ${cerrada5b?.motivoCierre}`, "0 ya-no-corresponde");
+    await prisma.alumno.updateMany({ where: { id: { in: [m.hijo1, m.hijo2] } }, data: { estado: "activo" } });
+    await revisar(["evaluacion_sin_notas"]);
+    ok("al volver a haber alumnos activos, se vuelve a abrir", (await abiertasEv(5)).length, 1);
+    const catalogo = (await servicio.listar()).map((r) => `${r.id}:${r.sujetoSingular}/${r.sujetoPlural}:${r.conNivel}`).join(",");
+    ok("el catálogo dice qué cuenta cada regla y si el nivel dice algo", catalogo, "deuda_cuotas:alumno/alumnos:true,inasistencias_seguidas:alumno/alumnos:true,evaluacion_sin_notas:evaluación/evaluaciones:false,alumno_en_riesgo:alumno/alumnos:false");
 
     // ── Alumno en riesgo ─────────────────────────────────────────────────────
     await prisma.cuota.createMany({

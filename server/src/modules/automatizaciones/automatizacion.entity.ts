@@ -16,6 +16,11 @@ export interface DefinicionDeRegla {
   unidad: string;
   // false: la regla no tiene número que el administrador elija (alumno en riesgo usa los de las otras dos).
   conNumero: boolean;
+  // Qué cuenta la regla ("3 alumnos en alerta" / "2 evaluaciones en alerta").
+  sujetoSingular: string;
+  sujetoPlural: string;
+  // false: el nivel es siempre 1 y no dice nada (evaluación sin notas, riesgo): el historial no muestra la columna.
+  conNivel: boolean;
 }
 
 export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
@@ -28,6 +33,9 @@ export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
     umbralMaximo: 12,
     unidad: "cuotas vencidas",
     conNumero: true,
+    sujetoSingular: "alumno",
+    sujetoPlural: "alumnos",
+    conNivel: true,
   },
   inasistencias_seguidas: {
     id: "inasistencias_seguidas",
@@ -38,6 +46,9 @@ export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
     umbralMaximo: 10,
     unidad: "inasistencias seguidas",
     conNumero: true,
+    sujetoSingular: "alumno",
+    sujetoPlural: "alumnos",
+    conNivel: true,
   },
   evaluacion_sin_notas: {
     id: "evaluacion_sin_notas",
@@ -48,6 +59,9 @@ export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
     umbralMaximo: 30,
     unidad: "días sin notas",
     conNumero: true,
+    sujetoSingular: "evaluación",
+    sujetoPlural: "evaluaciones",
+    conNivel: false,
   },
   alumno_en_riesgo: {
     id: "alumno_en_riesgo",
@@ -58,6 +72,9 @@ export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
     umbralMaximo: 1,
     unidad: "alertas",
     conNumero: false,
+    sujetoSingular: "alumno",
+    sujetoPlural: "alumnos",
+    conNivel: false,
   },
 };
 

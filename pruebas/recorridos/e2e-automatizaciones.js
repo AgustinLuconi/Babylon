@@ -116,6 +116,8 @@ const abiertas = (regla, alumno) => Number(q(`select count(*) from "AlertaAutoma
     const riesgo = admin.locator('[data-regla="alumno_en_riesgo"]');
     ok("el panel tiene las tarjetas de las dos reglas nuevas", `${await sinNotas.count()} ${await riesgo.count()}`, "1 1");
     ok("evaluación sin notas muestra su rango", await sinNotas.getByText("de 1 a 30").count() > 0, true);
+    ok("evaluación sin notas cuenta evaluaciones, no alumnos", `${await sinNotas.getByText(/evaluaci(ón|ones) en alerta/).count() > 0} ${await sinNotas.getByText(/alumnos? en alerta/).count()}`, "true 0");
+    ok("alumno en riesgo cuenta alumnos", await riesgo.getByText(/alumnos? en alerta/).count() > 0, true);
     ok("alumno en riesgo no tiene campo de número ni botón Guardar", `${await riesgo.getByLabel(/Número/).count()} ${await riesgo.getByRole("button", { name: "Guardar" }).count()}`, "0 0");
     q(`insert into "Evaluacion" (id, "cursoId", nombre, tipo, fecha, periodo, estado) values ('${P}-ev1', '${P}-curso', 'Pruebaav examen', 'examen', current_date - 9, 'julio', 'borrador')`);
     await fetch(`${API}/api/automatizaciones/evaluacion_sin_notas`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ umbral: 7 }) });
@@ -131,6 +133,9 @@ const abiertas = (regla, alumno) => Number(q(`select count(*) from "AlertaAutoma
     await sinNotas.waitFor({ timeout: 8000 });
     await sinNotas.getByRole("button", { name: "Ver historial" }).click();
     await sinNotas.getByText("Pruebaav examen").first().waitFor({ timeout: 8000 });
+    await tarjeta.getByRole("button", { name: "Ver historial" }).click();
+    await tarjeta.getByRole("columnheader", { name: "Nivel" }).waitFor({ timeout: 8000 });
+    ok("el historial de evaluación sin notas no tiene columna Nivel (siempre sería 1); el de deuda sí", `${await sinNotas.getByRole("columnheader", { name: "Nivel" }).count()} ${await tarjeta.getByRole("columnheader", { name: "Nivel" }).count()}`, "0 1");
     ok("el historial muestra la evaluación y el curso, sin enlace a un alumno", `${await sinNotas.getByText("Pruebaav examen").count() > 0} ${await sinNotas.getByText("Pruebaav Kids").count() > 0} ${await sinNotas.locator('a[href^="/alumnos/"]').count()}`, "true true 0");
   } finally {
     await b.close();

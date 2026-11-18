@@ -54,7 +54,8 @@ export class PrismaEvaluadoresDeReglas implements EvaluadoresDeReglas {
     evaluar: async (umbral: number, tx?: unknown, ahora: Date = new Date()): Promise<EvaluacionDeRegla> => {
       const hoy = inicioDeHoyUtc(ahora);
       const evaluaciones = await this.db(tx).evaluacion.findMany({
-        where: { curso: { estado: "activo", ciclo: { activo: true } } },
+        // Un curso sin alumnos activos no entra: no hay a quién ponerle nota.
+        where: { curso: { estado: "activo", ciclo: { activo: true }, inscripciones: { some: { alumno: { estado: "activo" } } } } },
         select: { id: true, cursoId: true, fecha: true, _count: { select: { calificaciones: true } } },
       });
       const clave = (e: { cursoId: string; id: string }) => claveDeAlerta({ alumnoId: null, cursoId: e.cursoId, evaluacionId: e.id });

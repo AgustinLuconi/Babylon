@@ -18,6 +18,9 @@ export interface ReglaConEstado {
   umbralMinimo: number;
   umbralMaximo: number;
   conNumero: boolean;
+  sujetoSingular: string;
+  sujetoPlural: string;
+  conNivel: boolean;
   activa: boolean;
   umbral: number;
   enAlerta: number;
@@ -105,6 +108,9 @@ export class AutomatizacionService {
       umbralMinimo: def.umbralMinimo,
       umbralMaximo: def.umbralMaximo,
       conNumero: def.conNumero,
+      sujetoSingular: def.sujetoSingular,
+      sujetoPlural: def.sujetoPlural,
+      conNivel: def.conNivel,
       activa: config.activa,
       umbral: config.umbral,
       enAlerta: await this.repo.contarAbiertas(regla, tx),
