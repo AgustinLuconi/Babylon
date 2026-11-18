@@ -30,8 +30,8 @@ const resumen = (esperadas: { alumnoId: string; cursoId: string | null; nivel: n
     ok("deuda con 3: solo el de 3", resumen((await evaluadores.deuda_cuotas.evaluar(3)).esperadas), "alumno-ajeno:3");
     ok("deuda con 1: entra también el de 1", resumen((await evaluadores.deuda_cuotas.evaluar(1)).esperadas), "alumno-ajeno:3,hijo1:1,hijo2:2");
     const poblacion = (await evaluadores.deuda_cuotas.evaluar(2)).poblacion;
-    ok("deuda: la población incluye a los inscriptos aunque no deban", poblacion.has(`${m.hijo1}|`), true);
-    ok("deuda: sin inscripción en el ciclo activo no está en la población", poblacion.has(`${sinInscripcion}|`), false);
+    ok("deuda: la población incluye a los inscriptos aunque no deban", poblacion.has(`${m.hijo1}||`), true);
+    ok("deuda: sin inscripción en el ciclo activo no está en la población", poblacion.has(`${sinInscripcion}||`), false);
     await prisma.alumno.update({ where: { id: m.hijo2 }, data: { estado: "inactivo" } });
     ok("deuda: un alumno inactivo no entra", resumen((await evaluadores.deuda_cuotas.evaluar(2)).esperadas), "alumno-ajeno:3");
     await prisma.alumno.update({ where: { id: m.hijo2 }, data: { estado: "activo" } });
@@ -53,7 +53,7 @@ const resumen = (esperadas: { alumnoId: string; cursoId: string | null; nivel: n
     ok("inasistencias con 2: entra también la de 2", resumen((await evaluadores.inasistencias_seguidas.evaluar(2)).esperadas), `alumno-ajeno@curso-multi:2,hijo1@curso:4`);
     ok("inasistencias con 5: nadie", resumen((await evaluadores.inasistencias_seguidas.evaluar(5)).esperadas), "");
     const pob = (await evaluadores.inasistencias_seguidas.evaluar(3)).poblacion;
-    ok("inasistencias: la población son los pares (alumno, curso de su inscripción)", `${pob.has(`${m.hijo2}|${m.cursoId}`)} ${pob.has(`${m.hijo1}|${m.cursoMultiId}`)}`, "true false");
+    ok("inasistencias: la población son los pares (alumno, curso de su inscripción)", `${pob.has(`${m.hijo2}|${m.cursoId}|`)} ${pob.has(`${m.hijo1}|${m.cursoMultiId}|`)}`, "true false");
     await falta(m.alumnoAjeno, m.cursoMultiId, 4, "tarde");
     ok("llegar tarde corta la racha", resumen((await evaluadores.inasistencias_seguidas.evaluar(2)).esperadas), `hijo1@curso:4`);
   } catch (e) {

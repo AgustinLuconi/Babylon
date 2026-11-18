@@ -32,7 +32,7 @@ const deHijo2 = (pagina: any) => (pagina.alertas as any[]).filter((a) => a.alumn
 
     // Permisos
     const lista = await pedir("GET", "/api/automatizaciones", "admin");
-    ok("administración: lista las dos reglas", `${lista.status} ${lista.d.map((r: any) => r.id).join(",")}`, "200 deuda_cuotas,inasistencias_seguidas");
+    ok("administración: lista las cuatro reglas", `${lista.status} ${lista.d.map((r: any) => r.id).join(",")}`, "200 deuda_cuotas,inasistencias_seguidas,evaluacion_sin_notas,alumno_en_riesgo");
     const deuda = lista.d.find((r: any) => r.id === "deuda_cuotas");
     ok("la regla de deuda trae su catálogo y su estado", `${deuda.nombre}|${deuda.unidad}|${deuda.umbralMinimo}-${deuda.umbralMaximo}|${deuda.activa}|${deuda.umbral}|${typeof deuda.enAlerta}`, "Alumno con deuda|cuotas vencidas|1-12|true|2|number");
     for (const cuenta of ["secre", "profe", "padre"] as Cuenta[]) {

@@ -17,6 +17,10 @@ export interface ReglaConEstado {
   unidad: string;
   umbralMinimo: number;
   umbralMaximo: number;
+  conNumero: boolean;
+  sujetoSingular: string;
+  sujetoPlural: string;
+  conNivel: boolean;
   activa: boolean;
   umbral: number;
   enAlerta: number;
@@ -25,8 +29,10 @@ export interface ReglaConEstado {
 
 export interface AlertaDelHistorial {
   id: string;
-  alumnoId: string;
-  alumnoNombre: string;
+  alumnoId: string | null;
+  alumnoNombre: string | null;
+  evaluacionId: string | null;
+  evaluacionNombre: string | null;
   cursoNombre: string | null;
   nivel: number;
   abiertaEn: Date;
@@ -50,15 +56,22 @@ export class AutomatizacionService {
   // revisiones simultáneas van de a una. Con la regla apagada no se espera ninguna alerta (se cierran las abiertas).
   async evaluar(reglas: ReglaId[], tx: unknown, causa: CausaDeRevision = "revision", ahora: Date = new Date()): Promise<void> {
     const cambiadas: ReglaId[] = [];
-    for (const regla of [...new Set(reglas)].sort()) {
+    // En el orden del catálogo (no alfabético): las reglas base primero y `alumno_en_riesgo` al final, que lee sus alertas. Es
+    // también el orden de los bloqueos, el mismo en todas las operaciones.
+    // `alumno_en_riesgo` se lee de las alertas de deuda e inasistencias: si se revisa alguna de las dos, se revisa también el
+    // riesgo, en la misma operación y con la misma causa. Así todo sale en un único `alertas.cambiaron` y los avisos de todos
+    // los tipos afectados se bloquean juntos y en orden (una cascada por anuncio los tomaría en otro orden).
+    const aRevisar = new Set(reglas);
+    if (aRevisar.has("deuda_cuotas") || aRevisar.has("inasistencias_seguidas")) aRevisar.add("alumno_en_riesgo");
+    for (const regla of REGLA_IDS.filter((r) => aRevisar.has(r))) {
       await this.repo.bloquearRegla(regla, tx);
       const config = await this.repo.obtenerConfig(regla, tx);
       const abiertas = await this.repo.findAbiertas(regla, tx);
-      const { esperadas, poblacion } = config.activa ? await this.evaluadores[regla].evaluar(config.umbral, tx) : { esperadas: [], poblacion: new Set<string>() };
+      const { esperadas, poblacion } = config.activa ? await this.evaluadores[regla].evaluar(config.umbral, tx, ahora) : { esperadas: [], poblacion: new Set<string>() };
       const cambios = reconciliarAlertas({ abiertas, esperadas, poblacion, causa: config.activa ? causa : "regla-apagada", nuevoId: randomUUID });
 
       await this.repo.crearAlertas(
-        cambios.abrir.map((a) => ({ id: a.id, regla, alumnoId: a.alumnoId, cursoId: a.cursoId, nivel: a.nivel, abiertaEn: ahora, resueltaEn: null, motivoCierre: null })),
+        cambios.abrir.map((a) => ({ id: a.id, regla, alumnoId: a.alumnoId, cursoId: a.cursoId, evaluacionId: a.evaluacionId ?? null, nivel: a.nivel, abiertaEn: ahora, resueltaEn: null, motivoCierre: null })),
         tx,
       );
       for (const { id, nivel } of cambios.actualizar) await this.repo.actualizarNivel(id, nivel, tx);
@@ -94,6 +107,10 @@ export class AutomatizacionService {
       unidad: def.unidad,
       umbralMinimo: def.umbralMinimo,
       umbralMaximo: def.umbralMaximo,
+      conNumero: def.conNumero,
+      sujetoSingular: def.sujetoSingular,
+      sujetoPlural: def.sujetoPlural,
+      conNivel: def.conNivel,
       activa: config.activa,
       umbral: config.umbral,
       enAlerta: await this.repo.contarAbiertas(regla, tx),
@@ -112,6 +129,7 @@ export class AutomatizacionService {
   async actualizar(reglaId: string, cambios: ActualizarAutomatizacionInput): Promise<ReglaConEstado> {
     const regla = this.reglaDe(reglaId);
     const def = REGLAS[regla];
+    if (cambios.umbral !== undefined && !def.conNumero) throw new ValidationError("Esta regla no tiene número: usa los de las otras reglas");
     if (cambios.umbral !== undefined && (cambios.umbral < def.umbralMinimo || cambios.umbral > def.umbralMaximo)) {
       throw new ValidationError(`El número tiene que estar entre ${def.umbralMinimo} y ${def.umbralMaximo}`);
     }
@@ -134,7 +152,7 @@ export class AutomatizacionService {
     return {
       total,
       porPagina: ALERTAS_POR_PAGINA,
-      alertas: filas.map((f) => ({ id: f.id, alumnoId: f.alumnoId, alumnoNombre: f.alumnoNombre, cursoNombre: f.cursoNombre, nivel: f.nivel, abiertaEn: f.abiertaEn, resueltaEn: f.resueltaEn, motivoCierre: f.motivoCierre })),
+      alertas: filas.map((f) => ({ id: f.id, alumnoId: f.alumnoId, alumnoNombre: f.alumnoNombre, evaluacionId: f.evaluacionId, evaluacionNombre: f.evaluacionNombre, cursoNombre: f.cursoNombre, nivel: f.nivel, abiertaEn: f.abiertaEn, resueltaEn: f.resueltaEn, motivoCierre: f.motivoCierre })),
     };
   }
 }

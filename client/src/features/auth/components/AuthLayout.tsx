@@ -72,7 +72,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <BrandPanel />
 
-      <div className="flex min-h-screen flex-1 flex-col bg-white lg:min-h-0">
+      <div className="flex min-h-screen flex-1 flex-col bg-background lg:min-h-0">
         <div className="px-6 py-6 lg:hidden" style={{ background: "#0F3D2E" }}>
           <div className="flex items-center gap-3">
             <img src={logoTintaBlanca} alt="Babylon English Institute" style={{ width: 34, height: 34, objectFit: "contain" }} />

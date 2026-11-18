@@ -1,5 +1,5 @@
 // Mismos nombres que en el server (no comparten código).
-export type ReglaId = "deuda_cuotas" | "inasistencias_seguidas";
+export type ReglaId = "deuda_cuotas" | "inasistencias_seguidas" | "evaluacion_sin_notas" | "alumno_en_riesgo";
 export type MotivoCierre = "resuelta" | "regla-apagada" | "cambio-de-numero" | "ya-no-corresponde";
 
 export interface ReglaConEstado {
@@ -9,6 +9,11 @@ export interface ReglaConEstado {
   unidad: string;
   umbralMinimo: number;
   umbralMaximo: number;
+  // false: la regla no tiene número que se elija (alumno en riesgo usa los de las otras).
+  conNumero: boolean;
+  sujetoSingular: string;
+  sujetoPlural: string;
+  conNivel: boolean;
   activa: boolean;
   umbral: number;
   enAlerta: number;
@@ -17,8 +22,11 @@ export interface ReglaConEstado {
 
 export interface AlertaDelHistorial {
   id: string;
-  alumnoId: string;
-  alumnoNombre: string;
+  // El sujeto de la alerta es un alumno o una evaluación.
+  alumnoId: string | null;
+  alumnoNombre: string | null;
+  evaluacionId: string | null;
+  evaluacionNombre: string | null;
   cursoNombre: string | null;
   nivel: number;
   abiertaEn: string;

@@ -2,7 +2,8 @@ import type { AlertaEsperada, MotivoCierre, ReglaId } from "./automatizacion.rec
 
 export type { AlertaEsperada, MotivoCierre, ReglaId };
 
-export const REGLA_IDS: ReglaId[] = ["deuda_cuotas", "inasistencias_seguidas"];
+// El orden importa: es el orden en que se revisan (y se toman los bloqueos). `alumno_en_riesgo` lee las alertas de las anteriores.
+export const REGLA_IDS: ReglaId[] = ["deuda_cuotas", "inasistencias_seguidas", "evaluacion_sin_notas", "alumno_en_riesgo"];
 
 // Una regla vive en el código: su nombre, su descripción y el rango del número que el administrador puede elegir.
 export interface DefinicionDeRegla {
@@ -13,6 +14,13 @@ export interface DefinicionDeRegla {
   umbralMinimo: number;
   umbralMaximo: number;
   unidad: string;
+  // false: la regla no tiene número que el administrador elija (alumno en riesgo usa los de las otras dos).
+  conNumero: boolean;
+  // Qué cuenta la regla ("3 alumnos en alerta" / "2 evaluaciones en alerta").
+  sujetoSingular: string;
+  sujetoPlural: string;
+  // false: el nivel es siempre 1 y no dice nada (evaluación sin notas, riesgo): el historial no muestra la columna.
+  conNivel: boolean;
 }
 
 export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
@@ -24,6 +32,10 @@ export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
     umbralMinimo: 1,
     umbralMaximo: 12,
     unidad: "cuotas vencidas",
+    conNumero: true,
+    sujetoSingular: "alumno",
+    sujetoPlural: "alumnos",
+    conNivel: true,
   },
   inasistencias_seguidas: {
     id: "inasistencias_seguidas",
@@ -33,6 +45,36 @@ export const REGLAS: Record<ReglaId, DefinicionDeRegla> = {
     umbralMinimo: 2,
     umbralMaximo: 10,
     unidad: "inasistencias seguidas",
+    conNumero: true,
+    sujetoSingular: "alumno",
+    sujetoPlural: "alumnos",
+    conNivel: true,
+  },
+  evaluacion_sin_notas: {
+    id: "evaluacion_sin_notas",
+    nombre: "Evaluación sin notas",
+    descripcion: "Avisa cuando pasaron tantos días o más de la fecha de una evaluación y todavía no se cargó ninguna nota.",
+    umbralPorDefecto: 7,
+    umbralMinimo: 1,
+    umbralMaximo: 30,
+    unidad: "días sin notas",
+    conNumero: true,
+    sujetoSingular: "evaluación",
+    sujetoPlural: "evaluaciones",
+    conNivel: false,
+  },
+  alumno_en_riesgo: {
+    id: "alumno_en_riesgo",
+    nombre: "Alumno en riesgo",
+    descripcion: "Avisa cuando un alumno tiene a la vez una alerta de deuda y una de inasistencias seguidas.",
+    umbralPorDefecto: 1,
+    umbralMinimo: 1,
+    umbralMaximo: 1,
+    unidad: "alertas",
+    conNumero: false,
+    sujetoSingular: "alumno",
+    sujetoPlural: "alumnos",
+    conNivel: false,
   },
 };
 
@@ -47,8 +89,9 @@ export interface ConfigDeRegla {
 export interface AlertaAutomatica {
   id: string;
   regla: ReglaId;
-  alumnoId: string;
+  alumnoId: string | null;
   cursoId: string | null;
+  evaluacionId: string | null;
   nivel: number;
   abiertaEn: Date;
   resueltaEn: Date | null;
@@ -62,6 +105,6 @@ export interface EvaluacionDeRegla {
   poblacion: Set<string>;
 }
 export interface EvaluadorDeRegla {
-  evaluar(umbral: number, tx?: unknown): Promise<EvaluacionDeRegla>;
+  evaluar(umbral: number, tx?: unknown, ahora?: Date): Promise<EvaluacionDeRegla>;
 }
 export type EvaluadoresDeReglas = Record<ReglaId, EvaluadorDeRegla>;

@@ -15,7 +15,10 @@ export type TipoEstado =
   | "ciclo_por_cerrar"
   | "alumno_con_deuda"
   | "alumno_con_faltas"
-  | "alumno_con_faltas_profesor";
+  | "alumno_con_faltas_profesor"
+  | "alumno_en_riesgo"
+  | "evaluacion_sin_notas"
+  | "evaluacion_sin_notas_profesor";
 export type TipoEvento =
   | "nota_publicada"
   | "cierre_publicado"

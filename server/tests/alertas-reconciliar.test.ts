@@ -48,4 +48,32 @@ describe("reconciliarAlertas", () => {
   test("las claves distinguen curso nulo de curso con id", () => {
     assert.notEqual(claveDeAlerta({ alumnoId: "a", cursoId: null }), claveDeAlerta({ alumnoId: "a", cursoId: "c1" }));
   });
+
+  test("una evaluación es un sujeto propio: mismo curso y distinta evaluación abren dos alertas", () => {
+    const e = (evaluacionId: string): AlertaEsperada => ({ alumnoId: null, cursoId: "c", evaluacionId, nivel: 1 });
+    const r = reconciliarAlertas({ ...base, esperadas: [e("e1"), e("e2")] });
+    assert.equal(r.abrir.length, 2);
+  });
+  test("una evaluación abierta y esperada no se abre ni se actualiza de nuevo", () => {
+    const r = reconciliarAlertas({
+      ...base,
+      abiertas: [{ id: "x", alumnoId: null, cursoId: "c", evaluacionId: "e1", nivel: 1 }],
+      esperadas: [{ alumnoId: null, cursoId: "c", evaluacionId: "e1", nivel: 1 }],
+    });
+    assert.deepEqual([r.abrir, r.actualizar, r.cerrar], [[], [], []]);
+  });
+  test("una evaluación que ya no se espera se cierra: resuelta si sigue en la población, ya-no-corresponde si no", () => {
+    const abierta = { id: "x", alumnoId: null, cursoId: "c", evaluacionId: "e1", nivel: 1 };
+    const clave = claveDeAlerta(abierta);
+    assert.deepEqual(reconciliarAlertas({ ...base, abiertas: [abierta], poblacion: new Set([clave]) }).cerrar, [{ id: "x", motivo: "resuelta" }]);
+    assert.deepEqual(reconciliarAlertas({ ...base, abiertas: [abierta] }).cerrar, [{ id: "x", motivo: "ya-no-corresponde" }]);
+  });
+  test("la evaluación distingue una alerta de otra aunque el curso sea el mismo", () => {
+    const r = reconciliarAlertas({
+      ...base,
+      abiertas: [{ id: "x", alumnoId: null, cursoId: "c", evaluacionId: "e1", nivel: 1 }],
+      esperadas: [{ alumnoId: null, cursoId: "c", evaluacionId: "e2", nivel: 1 }],
+    });
+    assert.deepEqual([r.abrir.length, r.cerrar.length], [1, 1]);
+  });
 });

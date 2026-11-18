@@ -10,7 +10,12 @@ export function suscribirAutomatizaciones(tablero: TableroDeAnuncios<EventosDelS
 
   tablero.alPublicarse("cuotas.cambiaron", revisar(["deuda_cuotas"]));
   tablero.alPublicarse("asistencia.registrada", revisar(["inasistencias_seguidas"]));
-  // Baja, reactivación o cambio de curso de un alumno; activar otro ciclo (cambia quiénes están inscriptos en el activo).
-  tablero.alPublicarse("alumnos.cambiaron", revisar(REGLA_IDS));
+  // Una nota cargada cierra la alerta de la evaluación; una evaluación nueva o un curso que se activa/desactiva la cambian.
+  tablero.alPublicarse("calificaciones.cargadas", revisar(["evaluacion_sin_notas"]));
+  tablero.alPublicarse("evaluacion.creada", revisar(["evaluacion_sin_notas"]));
+  tablero.alPublicarse("cursos.cambiaron", revisar(["evaluacion_sin_notas"]));
+  // Baja, reactivación o cambio de curso de un alumno. La población de "evaluación sin notas" no depende de los alumnos: no se
+  // revisa acá. Activar otro ciclo cambia quiénes están inscriptos y qué evaluaciones cuentan: se revisa todo.
+  tablero.alPublicarse("alumnos.cambiaron", revisar(["deuda_cuotas", "inasistencias_seguidas"]));
   tablero.alPublicarse("ciclo.activado", revisar(REGLA_IDS));
 }

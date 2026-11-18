@@ -33,6 +33,9 @@ async function borrar() {
   await prisma.documento.deleteMany(w);
   await prisma.calificacion.deleteMany(w);
   await prisma.notaCierre.deleteMany(w);
+  // Las alertas van antes que las evaluaciones y los alumnos: las referencian (clave foránea). Una de "evaluación sin notas" tiene
+  // la evaluación y el curso, no el alumno.
+  await prisma.alertaAutomatica.deleteMany({ where: { OR: [{ alumnoId: { startsWith: P } }, { evaluacionId: { startsWith: P } }, { cursoId: { startsWith: P } }] } });
   await prisma.evaluacion.deleteMany(w);
   // También los pagos registrados desde la app sobre cuotas de prueba (tienen un id al azar): si no, la cuota no se borra.
   await prisma.pago.deleteMany({ where: { OR: [{ id: { startsWith: P } }, { cuotaId: { startsWith: P } }] } });
@@ -41,8 +44,12 @@ async function borrar() {
   await prisma.inscripcion.deleteMany(w);
   // Las alertas automáticas de los alumnos de prueba y sus avisos (la clave del aviso lleva el id del alumno): sin esto la
   // restricción de clave foránea impide borrar a los alumnos.
-  await prisma.alertaAutomatica.deleteMany({ where: { alumnoId: { startsWith: P } } });
-  await prisma.notificacion.deleteMany({ where: { tipo: { in: ["alumno_con_deuda", "alumno_con_faltas", "alumno_con_faltas_profesor"] }, clave: { contains: `:${P}` } } });
+  await prisma.notificacion.deleteMany({
+    where: {
+      tipo: { in: ["alumno_con_deuda", "alumno_con_faltas", "alumno_con_faltas_profesor", "alumno_en_riesgo", "evaluacion_sin_notas", "evaluacion_sin_notas_profesor"] },
+      clave: { contains: `:${P}` },
+    },
+  });
   await prisma.horario.deleteMany(w);
   await prisma.alumno.deleteMany(w);
   await prisma.curso.deleteMany(w);

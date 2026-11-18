@@ -5,3 +5,8 @@ export const textoDeAlertaDeDeuda = (alumno: string, cuotas: number): string => 
 
 export const textoDeAlertaDeFaltas = (alumno: string, faltas: number, curso: string): string =>
   `${alumno} tiene ${cantidad(faltas, "inasistencia seguida", "inasistencias seguidas")} en ${curso}`;
+
+export const textoDeAlertaDeRiesgo = (alumno: string): string => `${alumno} tiene deuda e inasistencias seguidas`;
+
+// `fecha` ya viene como dd/mm.
+export const textoDeEvaluacionSinNotas = (evaluacion: string, curso: string, fecha: string): string => `${evaluacion} (${curso}) del ${fecha} todavía no tiene notas`;

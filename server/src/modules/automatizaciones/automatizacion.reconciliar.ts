@@ -1,20 +1,24 @@
-export type ReglaId = "deuda_cuotas" | "inasistencias_seguidas";
+export type ReglaId = "deuda_cuotas" | "inasistencias_seguidas" | "evaluacion_sin_notas" | "alumno_en_riesgo";
 export type MotivoCierre = "resuelta" | "regla-apagada" | "cambio-de-numero" | "ya-no-corresponde";
 
 // Lo que una regla dice que tiene que estar en alerta ahora. `cursoId` es null en las reglas que no son de un curso.
 export interface AlertaEsperada {
-  alumnoId: string;
+  alumnoId: string | null;
+  // El sujeto es un alumno o una evaluación; las reglas de alumnos no lo informan (se toma como null).
+  evaluacionId?: string | null;
   cursoId: string | null;
   nivel: number;
 }
 export interface AlertaAbierta {
   id: string;
-  alumnoId: string;
+  alumnoId: string | null;
+  evaluacionId?: string | null;
   cursoId: string | null;
   nivel: number;
 }
 
-export const claveDeAlerta = (a: { alumnoId: string; cursoId: string | null }): string => `${a.alumnoId}|${a.cursoId ?? ""}`;
+export const claveDeAlerta = (a: { alumnoId: string | null; cursoId: string | null; evaluacionId?: string | null }): string =>
+  `${a.alumnoId ?? ""}|${a.cursoId ?? ""}|${a.evaluacionId ?? ""}`;
 
 // Reglas de vida de las alertas (puras: no leen ni escriben nada):
 // - lo esperado que no está abierto se abre (una fila nueva: cada episodio es una alerta distinta);

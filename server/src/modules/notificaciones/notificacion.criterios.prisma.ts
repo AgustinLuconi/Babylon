@@ -5,7 +5,7 @@ import type { CambioDeDescuento } from "../alumnos/alumno.eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "../documentos/documento.repository";
 import type { CriteriosDeAvisos } from "./notificacion.criterios";
-import { textoDeAlertaDeDeuda, textoDeAlertaDeFaltas } from "./notificacion.alertas";
+import { textoDeAlertaDeDeuda, textoDeAlertaDeFaltas, textoDeAlertaDeRiesgo, textoDeEvaluacionSinNotas } from "./notificacion.alertas";
 import { textoDeAvisoDeDescuento } from "./notificacion.descuento";
 import type { AvisoEsperado, Destinatario, TipoEstado } from "./notificacion.entity";
 
@@ -71,6 +71,12 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
         return this.alumnosConFaltas(tx);
       case "alumno_con_faltas_profesor":
         return this.alumnosConFaltasParaProfesores(tx);
+      case "alumno_en_riesgo":
+        return this.alumnosEnRiesgo(tx);
+      case "evaluacion_sin_notas":
+        return this.evaluacionesSinNotas(tx);
+      case "evaluacion_sin_notas_profesor":
+        return this.evaluacionesSinNotasParaProfesores(tx);
     }
   }
 
@@ -134,11 +140,13 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
 
   // ── Alertas automáticas ──────────────────────────────────────────────────
   // Los avisos salen de las alertas abiertas del módulo de automatizaciones (su registro es la fuente de verdad).
-  private alertasAbiertas(regla: "deuda_cuotas" | "inasistencias_seguidas", tx?: unknown) {
-    return this.db(tx).alertaAutomatica.findMany({
-      where: { regla, resueltaEn: null },
-      include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true, profesorId: true } } },
-    });
+  private alertasAbiertas(regla: "deuda_cuotas" | "inasistencias_seguidas" | "alumno_en_riesgo", tx?: unknown) {
+    return this.db(tx).alertaAutomatica
+      .findMany({
+        where: { regla, resueltaEn: null, alumnoId: { not: null } },
+        include: { alumno: { select: { nombre: true, apellido: true } }, curso: { select: { nombre: true, profesorId: true } } },
+      })
+      .then((filas) => filas.flatMap(({ alumnoId, alumno, ...resto }) => (alumnoId && alumno ? [{ ...resto, alumnoId, alumno }] : [])));
   }
 
   private async alumnosConDeuda(tx?: unknown): Promise<AvisoEsperado[]> {
@@ -210,6 +218,77 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
       );
     }
     return avisos;
+  }
+
+  private async alumnosEnRiesgo(tx?: unknown): Promise<AvisoEsperado[]> {
+    const alertas = await this.alertasAbiertas("alumno_en_riesgo", tx);
+    if (alertas.length === 0) return [];
+    const staff = await this.staff(tx);
+    return alertas.flatMap((a) =>
+      staff.map((d) =>
+        aviso({
+          ...d,
+          tipo: "alumno_en_riesgo",
+          clave: `alerta:alumno_en_riesgo:${a.alumnoId}`,
+          tono: "danger",
+          texto: textoDeAlertaDeRiesgo(`${a.alumno.nombre} ${a.alumno.apellido}`),
+          recurso: { tipo: "alumno", alumnoId: a.alumnoId },
+          nivel: a.nivel,
+        }),
+      ),
+    );
+  }
+
+  // Las alertas abiertas de "evaluación sin notas" con lo que hace falta para armar el aviso (el sujeto es la evaluación).
+  private evaluacionesSinNotasAbiertas(tx?: unknown) {
+    return this.db(tx)
+      .alertaAutomatica.findMany({
+        where: { regla: "evaluacion_sin_notas", resueltaEn: null, evaluacionId: { not: null } },
+        include: { evaluacion: { select: { nombre: true, fecha: true } }, curso: { select: { nombre: true, profesorId: true } } },
+      })
+      .then((filas) => filas.flatMap(({ evaluacionId, evaluacion, cursoId, curso, ...resto }) => (evaluacionId && evaluacion && cursoId && curso ? [{ ...resto, evaluacionId, evaluacion, cursoId, curso }] : [])));
+  }
+
+  private async evaluacionesSinNotas(tx?: unknown): Promise<AvisoEsperado[]> {
+    const alertas = await this.evaluacionesSinNotasAbiertas(tx);
+    if (alertas.length === 0) return [];
+    const staff = await this.staff(tx);
+    return alertas.flatMap((a) =>
+      staff.map((d) =>
+        aviso({
+          ...d,
+          tipo: "evaluacion_sin_notas",
+          clave: `alerta:evaluacion_sin_notas:${a.evaluacionId}`,
+          tono: "warning",
+          texto: textoDeEvaluacionSinNotas(a.evaluacion.nombre, a.curso.nombre, diaMes(a.evaluacion.fecha)),
+          recurso: { tipo: "evaluacion", cursoId: a.cursoId, evaluacionId: a.evaluacionId },
+          nivel: a.nivel,
+        }),
+      ),
+    );
+  }
+
+  // Al profesor **actual** del curso (si se reasigna, el aviso pasa al nuevo).
+  private async evaluacionesSinNotasParaProfesores(tx?: unknown): Promise<AvisoEsperado[]> {
+    const alertas = await this.evaluacionesSinNotasAbiertas(tx);
+    if (alertas.length === 0) return [];
+    const cuentas = await this.cuentasDeProfesores(tx);
+    return alertas.flatMap((a) => {
+      const usuarioId = cuentas.get(a.curso.profesorId);
+      if (!usuarioId) return [];
+      return [
+        aviso({
+          usuarioId,
+          rol: "profesor",
+          tipo: "evaluacion_sin_notas_profesor",
+          clave: `alerta:evaluacion_sin_notas:${a.evaluacionId}`,
+          tono: "warning",
+          texto: textoDeEvaluacionSinNotas(a.evaluacion.nombre, a.curso.nombre, diaMes(a.evaluacion.fecha)),
+          recurso: { tipo: "evaluacion", cursoId: a.cursoId, evaluacionId: a.evaluacionId },
+          nivel: a.nivel,
+        }),
+      ];
+    });
   }
 
   // El año lectivo (marzo a noviembre) terminó y el ciclo activo sigue sin cerrarse: lo ve solo el administrador.

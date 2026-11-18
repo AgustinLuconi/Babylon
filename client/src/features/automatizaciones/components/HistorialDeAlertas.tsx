@@ -6,7 +6,7 @@ import { useAlertasDeRegla } from "../hooks/useAlertasDeRegla";
 import { MOTIVO_LABELS, type ReglaId } from "../types";
 
 // Las alertas de una regla, las más nuevas primero (el registro es permanente, la campana guarda solo 30 días).
-export function HistorialDeAlertas({ regla }: { regla: ReglaId }) {
+export function HistorialDeAlertas({ regla, conNivel }: { regla: ReglaId; conNivel: boolean }) {
   const [pagina, setPagina] = useState(1);
   const { data, isLoading, isError } = useAlertasDeRegla(regla, pagina);
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / data.porPagina)) : 1;
@@ -21,9 +21,9 @@ export function HistorialDeAlertas({ regla }: { regla: ReglaId }) {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Alumno</th>
+              <th>Alumno o evaluación</th>
               <th>Curso</th>
-              <th>Nivel</th>
+              {conNivel && <th>Nivel</th>}
               <th>Abierta</th>
               <th>Resuelta</th>
               <th>Motivo</th>
@@ -33,12 +33,16 @@ export function HistorialDeAlertas({ regla }: { regla: ReglaId }) {
             {data.alertas.map((a) => (
               <tr key={a.id}>
                 <td>
-                  <Link to={`/alumnos/${a.alumnoId}`} className="underline">
-                    {a.alumnoNombre}
-                  </Link>
+                  {a.alumnoId ? (
+                    <Link to={`/alumnos/${a.alumnoId}`} className="underline">
+                      {a.alumnoNombre}
+                    </Link>
+                  ) : (
+                    (a.evaluacionNombre ?? "—")
+                  )}
                 </td>
                 <td>{a.cursoNombre ?? "—"}</td>
-                <td className="tnum">{a.nivel}</td>
+                {conNivel && <td className="tnum">{a.nivel}</td>}
                 <td className="tnum">{formatFechaHora(a.abiertaEn)}</td>
                 <td className="tnum">{a.resueltaEn ? formatFechaHora(a.resueltaEn) : "Abierta"}</td>
                 <td>{a.motivoCierre ? MOTIVO_LABELS[a.motivoCierre] : "—"}</td>

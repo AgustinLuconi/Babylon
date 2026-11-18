@@ -2,7 +2,8 @@ import type { AlertaAutomatica, ConfigDeRegla, MotivoCierre, ReglaId } from "./a
 
 // Una fila del historial con los nombres ya resueltos (para el panel).
 export interface AlertaConNombres extends AlertaAutomatica {
-  alumnoNombre: string;
+  alumnoNombre: string | null;
+  evaluacionNombre: string | null;
   cursoNombre: string | null;
 }
 
