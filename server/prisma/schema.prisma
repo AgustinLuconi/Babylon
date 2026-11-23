@@ -125,9 +125,33 @@ model Ciclo {
   activo    Boolean
   // Un ciclo bloqueado no admite escrituras de lo que le pertenece (cursos, inscripciones, asistencia, notas…).
   bloqueado Boolean @default(false)
+  // Inicio y fin de las clases del ciclo (días calendario, medianoche UTC). Los dos null = el calendario por defecto (1 de
+  // marzo al 30 de noviembre del año del ciclo). Una restricción de la base impide cargar solo uno de los dos.
+  inicio    DateTime?
+  fin       DateTime?
 
   cursos        Curso[]
   inscripciones Inscripcion[]
+  pausas        PausaDelCiclo[]
+}
+
+enum TipoPausa {
+  receso
+  feriado
+  otro
+}
+
+// Días sin clases dentro de un ciclo (receso de invierno, feriados…). Un feriado es una pausa de un solo día.
+model PausaDelCiclo {
+  id      String    @id
+  cicloId String
+  ciclo   Ciclo     @relation(fields: [cicloId], references: [id], onDelete: Restrict)
+  desde   DateTime
+  hasta   DateTime
+  nombre  String
+  tipo    TipoPausa
+
+  @@index([cicloId])
 }
 
 model Usuario {
@@ -420,6 +444,8 @@ model Configuracion {
   // Valor de la cuota mensual, igual para todos los cursos. Sin valor cargado
   // no se generan cuotas.
   valorCuota Float?
+  // Día del mes en que vencen las cuotas que se generen de acá en adelante (1 a 28).
+  diaVencimiento Int @default(10)
 }
 
 // Una sesión por inicio de sesión (por dispositivo). El token lleva su id (`sid`) y solo vale mientras la

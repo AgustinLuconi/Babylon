@@ -1,5 +1,5 @@
 import type { Repository } from "../../core/ports";
-import type { Ciclo } from "./ciclo.entity";
+import type { Ciclo, PausaDelCiclo } from "./ciclo.entity";
 import type { Inscripcion } from "./inscripcion.entity";
 
 export interface CicloRepository extends Repository<Ciclo> {
@@ -12,6 +12,13 @@ export interface CicloRepository extends Repository<Ciclo> {
   // Lee el ciclo con SELECT … FOR SHARE: quien escribe algo de un ciclo lo toma dentro de su transacción, así un
   // bloqueo simultáneo espera a que esa escritura termine en vez de colarse en el medio.
   bloquearParaLectura(id: string, tx?: unknown): Promise<Ciclo | null>;
+
+  // Pausas (días sin clases) del ciclo, ordenadas por fecha de inicio. Se gestionan desde el repositorio del ciclo.
+  findPausasByCicloId(cicloId: string, tx?: unknown): Promise<PausaDelCiclo[]>;
+  findPausaById(id: string, tx?: unknown): Promise<PausaDelCiclo | null>;
+  crearPausa(pausa: PausaDelCiclo, tx?: unknown): Promise<PausaDelCiclo>;
+  actualizarPausa(id: string, datos: Partial<Pick<PausaDelCiclo, "desde" | "hasta" | "nombre" | "tipo">>, tx?: unknown): Promise<PausaDelCiclo>;
+  eliminarPausa(id: string, tx?: unknown): Promise<void>;
 
   crearInscripcion(inscripcion: Inscripcion, tx?: unknown): Promise<Inscripcion>;
   actualizarInscripcion(

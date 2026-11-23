@@ -149,7 +149,7 @@ export class PaseDeAnioService {
 
       let destinoCiclo = destino;
       if (!destinoCiclo) {
-        destinoCiclo = await this.cicloRepo.create({ id: randomUUID(), anio: destinoAnio, activo: false, bloqueado: false }, tx);
+        destinoCiclo = await this.cicloRepo.create({ id: randomUUID(), anio: destinoAnio, activo: false, bloqueado: false, inicio: null, fin: null }, tx);
         await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "alta", ids: { cicloIds: [destinoCiclo.id] } }, tx);
       }
       await this.verificador.verificarCicloAbierto(destinoCiclo.id, tx);

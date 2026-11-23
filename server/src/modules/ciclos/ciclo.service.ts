@@ -33,7 +33,7 @@ export class CicloService {
       throw new ConflictError(`Ya existe un ciclo para el año ${datos.anio}`);
     }
 
-    const ciclo: Ciclo = { id: randomUUID(), anio: datos.anio, activo: false, bloqueado: false };
+    const ciclo: Ciclo = { id: randomUUID(), anio: datos.anio, activo: false, bloqueado: false, inicio: null, fin: null };
     const creado = await this.cicloRepo.create(ciclo);
     await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "alta", ids: { cicloIds: [creado.id] } });
     return creado;

@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { EntityNotFoundError } from "../../core/errors";
 import type { CicloRepository } from "./ciclo.repository";
-import type { Ciclo } from "./ciclo.entity";
+import type { Ciclo, PausaDelCiclo } from "./ciclo.entity";
 import type { Inscripcion } from "./inscripcion.entity";
 
 export class PrismaCicloRepository implements CicloRepository {
@@ -32,7 +32,7 @@ export class PrismaCicloRepository implements CicloRepository {
   }
 
   async bloquearParaLectura(id: string, tx?: unknown): Promise<Ciclo | null> {
-    const filas = await this.client(tx).$queryRaw<Ciclo[]>`SELECT id, anio, activo, bloqueado FROM "Ciclo" WHERE id = ${id} FOR SHARE`;
+    const filas = await this.client(tx).$queryRaw<Ciclo[]>`SELECT id, anio, activo, bloqueado, inicio, fin FROM "Ciclo" WHERE id = ${id} FOR SHARE`;
     return filas[0] ?? null;
   }
 
@@ -57,6 +57,34 @@ export class PrismaCicloRepository implements CicloRepository {
       await this.client(tx).ciclo.delete({ where: { id } });
     } catch {
       throw new EntityNotFoundError("Ciclo", id);
+    }
+  }
+
+  async findPausasByCicloId(cicloId: string, tx?: unknown): Promise<PausaDelCiclo[]> {
+    return this.client(tx).pausaDelCiclo.findMany({ where: { cicloId }, orderBy: [{ desde: "asc" }, { id: "asc" }] });
+  }
+
+  async findPausaById(id: string, tx?: unknown): Promise<PausaDelCiclo | null> {
+    return this.client(tx).pausaDelCiclo.findUnique({ where: { id } });
+  }
+
+  async crearPausa(pausa: PausaDelCiclo, tx?: unknown): Promise<PausaDelCiclo> {
+    return this.client(tx).pausaDelCiclo.create({ data: pausa });
+  }
+
+  async actualizarPausa(id: string, datos: Partial<Pick<PausaDelCiclo, "desde" | "hasta" | "nombre" | "tipo">>, tx?: unknown): Promise<PausaDelCiclo> {
+    try {
+      return await this.client(tx).pausaDelCiclo.update({ where: { id }, data: datos });
+    } catch {
+      throw new EntityNotFoundError("Pausa", id);
+    }
+  }
+
+  async eliminarPausa(id: string, tx?: unknown): Promise<void> {
+    try {
+      await this.client(tx).pausaDelCiclo.delete({ where: { id } });
+    } catch {
+      throw new EntityNotFoundError("Pausa", id);
     }
   }
 
