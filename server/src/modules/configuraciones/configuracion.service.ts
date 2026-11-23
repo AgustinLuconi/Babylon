@@ -1,3 +1,4 @@
+import { soloPresentes } from "../../core/cambios";
 import { sinAnuncios } from "../../core/eventos";
 import type { Publicador } from "../../core/ports";
 import type { EventosCambios } from "../cambios/cambio.eventos";
@@ -15,11 +16,11 @@ export class ConfiguracionService {
     return this.configuracionRepo.obtener();
   }
 
-  // El nuevo valor rige para las cuotas que se generen de acá en adelante; las
-  // ya generadas (pendientes incluidas) conservan el monto con el que nacieron.
+  // El nuevo valor y el nuevo día de vencimiento rigen para las cuotas que se generen de acá en adelante; las ya
+  // generadas (pendientes incluidas) conservan el monto y el vencimiento con los que nacieron.
   async actualizar(datos: ActualizarConfiguracionInput): Promise<Configuracion> {
     const actual = await this.configuracionRepo.obtener();
-    const guardada = await this.configuracionRepo.update(actual.id, { ...actual, valorCuota: datos.valorCuota });
+    const guardada = await this.configuracionRepo.actualizarParcial(actual.id, soloPresentes(datos));
     await this.anuncios.publicar("datos.cambiaron", { dato: "configuracion", accion: "edicion", ids: {} });
     return guardada;
   }

@@ -11,7 +11,8 @@ import type { Cuota } from "./cuota.entity";
 import type { Pago } from "./pago.entity";
 import type { RegistrarPagoInput } from "./cuota.schema";
 import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
-import { esMesLectivo, PORCENTAJE_DESCUENTO_HERMANOS, vencimientoDelMes } from "./cuota.calendario";
+import { calendarioDelCiclo, esMesLectivo } from "../ciclos/ciclo.calendario";
+import { PORCENTAJE_DESCUENTO_HERMANOS, vencimientoDelMes } from "./cuota.calendario";
 import type { EventosCambios } from "../cambios/cambio.eventos";
 import type { EventosCuotas } from "./cuota.eventos";
 
@@ -100,9 +101,10 @@ export class CuotaService {
   }
 
   // ── Generación automática de cuotas ──────────────────────────────────────
-  // Una cuota por alumno activo del ciclo activo y por mes lectivo (marzo a
-  // noviembre), con el valor global de Configuración, ya con el descuento por
-  // hermanos si corresponde. Nace "pendiente" y vence el día 10. Es idempotente
+  // Una cuota por alumno activo del ciclo activo y por mes lectivo (un mes con al
+  // menos un día de clases en el calendario del ciclo), con el valor global de
+  // Configuración, ya con el descuento por hermanos si corresponde. Nace "pendiente"
+  // y vence el día de vencimiento configurado (por defecto el 10). Es idempotente
   // (una sola cuota por alumno y mes), así que se puede correr las veces que haga
   // falta.
 
@@ -111,13 +113,14 @@ export class CuotaService {
   // sin valor de cuota cargado.
   private async contextoDeGeneracion(hoy: Date, tx?: unknown) {
     const { mes, anio } = fechaHoraEnArgentina(hoy);
-    if (!esMesLectivo(mes)) return null;
     const ciclo = await this.cicloRepo.findActivo(tx);
     // Un ciclo bloqueado no recibe cuotas nuevas (el activo no se puede bloquear: esto es una red de seguridad).
     if (!ciclo || ciclo.anio !== anio || ciclo.bloqueado) return null;
-    const { valorCuota } = await this.configuracionRepo.obtener(tx);
+    const pausas = await this.cicloRepo.findPausasByCicloId(ciclo.id, tx);
+    if (!esMesLectivo(mes, calendarioDelCiclo(ciclo, pausas))) return null;
+    const { valorCuota, diaVencimiento } = await this.configuracionRepo.obtener(tx);
     if (valorCuota === null) return null;
-    return { mes, anio, ciclo, valorCuota, vencimiento: vencimientoDelMes(mes, anio, hoy, 10) };
+    return { mes, anio, ciclo, valorCuota, vencimiento: vencimientoDelMes(mes, anio, hoy, diaVencimiento) };
   }
 
   private nuevaCuota(alumno: Alumno, ctx: { mes: number; anio: number; valorCuota: number; vencimiento: Date }): Cuota {
