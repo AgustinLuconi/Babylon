@@ -60,6 +60,7 @@ reales / restos de prueba / valor de cuota). Debe decir `3/148/0/null`.
 - `e2e-3c-version` y algunos más reinician la API con otra `APP_VERSION` (`pruebas/bin/reiniciar-api.sh`).
 - Al editar por pantalla, apuntar el selector con precisión (el buscador de la barra superior no es el de la pantalla) y
   afirmar el id del recurso en la URL del `PATCH`: una prueba que editó un registro equivocado ya pasó 14 de 14.
+- **Las pruebas que toman asistencia "de hoy" necesitan que hoy esté dentro del calendario del ciclo activo** (por defecto, del 1 de marzo al 30 de noviembre): fuera de esas fechas el servidor responde 400 "Ese día no hay clases" y fallan (`e2e-ciclos`, `e2e-3c-padre`, `_3d-validacion-http`). Las que usan ciclos de años inventados les ponen un calendario ancho al crearlos.
 - Cada recorrido empieza de cero: la batería borra y vuelve a crear el mundo antes de cada uno.
 
 ## Qué cubre cada recorrido

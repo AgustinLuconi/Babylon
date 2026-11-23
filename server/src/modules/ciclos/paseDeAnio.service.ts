@@ -1,3 +1,4 @@
+import { calendarioDelCiclo } from "./ciclo.calendario";
 import { randomUUID } from "node:crypto";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import { sinAnuncios } from "../../core/eventos";
@@ -129,7 +130,7 @@ export class PaseDeAnioService {
         noContinuan: plan.movimientos.filter((m) => m.destino.tipo === "no-continuan").length,
         cursosCopiados: plan.copias.length,
       },
-      advertenciaAnioEnCurso: hoyISOEnArgentina() < `${origen.anio}-12-01`,
+      advertenciaAnioEnCurso: hoyISOEnArgentina() <= calendarioDelCiclo(origen).fin,
     };
   }
 

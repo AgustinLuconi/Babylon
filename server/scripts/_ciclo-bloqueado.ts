@@ -46,7 +46,6 @@ interface Escritura {
 }
 const hoy = new Date().toISOString().slice(0, 10);
 const RECHAZADAS: Escritura[] = [
-  { plantilla: "PATCH /api/ciclos/:id/fechas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/fechas`, cuerpo: () => ({ inicio: "2099-03-01", fin: "2099-11-30" }), bloqueado: [409], desbloqueado: [200] },
   { plantilla: "POST /api/ciclos/:id/pausas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas`, cuerpo: () => ({ desde: "2099-07-20", hasta: "2099-07-31", nombre: "Pruebaav receso", tipo: "receso" }), bloqueado: [409], desbloqueado: [201] },
   { plantilla: "PATCH /api/ciclos/:id/pausas/:pausaId", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas/${c.pausaId}`, cuerpo: () => ({ nombre: "Pruebaav otra" }), bloqueado: [409], desbloqueado: [200] },
   { plantilla: "DELETE /api/ciclos/:id/pausas/:pausaId", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas/${c.pausaId}`, cuerpo: () => undefined, bloqueado: [409], desbloqueado: [204] },
@@ -62,6 +61,8 @@ const RECHAZADAS: Escritura[] = [
   // El curso de 2099 no es del ciclo activo: se rechaza por eso (400) o por el bloqueo (409), nunca se acepta.
   { plantilla: "POST /api/alumnos", rol: "secre", ruta: () => "/api/alumnos", cuerpo: (c) => ({ nombre: "Pruebaavnuevo", apellido: "Pruebaav", cursoId: c.curso, responsable: { tipo: "existente", padreId: c.m.padreId, vinculo: "padre" } }), bloqueado: [400, 409], desbloqueado: [400] },
   { plantilla: "PATCH /api/alumnos/:id", rol: "secre", ruta: (c) => `/api/alumnos/${c.m.hijo1}`, cuerpo: (c) => ({ cursoId: c.curso }), bloqueado: [400, 409], desbloqueado: [400] },
+  // Va al final: cambia las fechas del ciclo y la asistencia de "hoy" de más arriba dejaría de caer dentro del calendario.
+  { plantilla: "PATCH /api/ciclos/:id/fechas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/fechas`, cuerpo: () => ({ inicio: "2099-03-01", fin: "2099-11-30" }), bloqueado: [409], desbloqueado: [200] },
 ];
 // Rutas de módulos con datos de ciclo que se pueden usar con el ciclo bloqueado (son datos de la persona o cobros).
 const EXENTAS = [
@@ -115,7 +116,7 @@ function rutasDeEscritura(): string[] {
   try {
     for (const rol of ["admin", "secre", "profe"] as Rol[]) tokens[rol] = await login(rol);
     const ciclo = `${P}-ciclo-2099`;
-    await prisma.ciclo.create({ data: { id: ciclo, anio: 2099, activo: false } });
+    await prisma.ciclo.create({ data: { id: ciclo, anio: 2099, activo: false, inicio: new Date("2000-01-01T00:00:00Z"), fin: new Date("2099-12-31T00:00:00Z") } }); // calendario ancho: "hoy" cae dentro
     const curso = `${P}-curso-2099`;
     await prisma.curso.create({ data: { id: curso, nombre: "Pruebaav 2099", nivel: "kids", profesorId: m.profesorId, cicloId: ciclo, cupo: 10, estado: "activo" } });
     const alumno = `${P}-alu-2099`;

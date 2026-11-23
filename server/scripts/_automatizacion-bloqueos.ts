@@ -39,7 +39,7 @@ const mensaje = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
     // A guarda la tercera ausencia seguida: abre la alerta y sincroniza los avisos (queda esperando a H).
     const a = container.asistenciaService
-      .registrarAsistenciaMasiva(registrarAsistenciaMasivaSchema.parse({ cursoId: m.cursoId, fecha: "2026-01-10", registros: [{ alumnoId: m.hijo1, estado: "ausente" }] }), m.profesorId)
+      .registrarAsistenciaMasiva(registrarAsistenciaMasivaSchema.parse({ cursoId: m.cursoId, fecha: "2026-03-10", registros: [{ alumnoId: m.hijo1, estado: "ausente" }] }), m.profesorId)
       .then(() => "ok", (e) => mensaje(e));
     await espera(700);
     soltar();

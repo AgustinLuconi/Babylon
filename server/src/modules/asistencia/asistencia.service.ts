@@ -45,6 +45,8 @@ export class AsistenciaService {
 
     return this.unitOfWork.runInTransaction(async (tx) => {
       await this.verificador.verificarCicloDelCurso(datos.cursoId, tx);
+      // Solo se toma asistencia un día con clases del calendario del ciclo del curso (no en feriados, pausas ni fuera del ciclo).
+      await this.verificador.verificarDiaDeClases(datos.cursoId, datos.fecha.toISOString().slice(0, 10), tx);
       const asistencias: Asistencia[] = [];
 
       for (const registro of datos.registros) {

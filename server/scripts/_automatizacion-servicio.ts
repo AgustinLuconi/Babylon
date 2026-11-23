@@ -93,14 +93,14 @@ const abiertas = async (regla: ReglaId, alumnoId: string) => (await alertas(regl
 
     // Anuncios reales: la asistencia y el pago revisan la regla solos
     await container.asistenciaService.registrarAsistenciaMasiva(
-      registrarAsistenciaMasivaSchema.parse({ cursoId: m.cursoId, fecha: "2026-01-20", registros: [{ alumnoId: m.hijo1, estado: "presente" }] }),
+      registrarAsistenciaMasivaSchema.parse({ cursoId: m.cursoId, fecha: "2026-03-20", registros: [{ alumnoId: m.hijo1, estado: "presente" }] }),
       m.profesorId,
     );
     ok("guardar asistencia dispara la revisión (presente corta la racha: se cierra o no se abre)", (await abiertas("inasistencias_seguidas", m.hijo1)).length, 0);
     await falta(m.hijo2, 21);
     for (const d of [22, 23]) await falta(m.hijo2, d);
     await container.asistenciaService.registrarAsistenciaMasiva(
-      registrarAsistenciaMasivaSchema.parse({ cursoId: m.cursoId, fecha: "2026-01-24", registros: [{ alumnoId: m.hijo2, estado: "ausente" }] }),
+      registrarAsistenciaMasivaSchema.parse({ cursoId: m.cursoId, fecha: "2026-03-24", registros: [{ alumnoId: m.hijo2, estado: "ausente" }] }),
       m.profesorId,
     );
     ok("guardar una ausencia que completa la racha abre la alerta sin llamar al servicio", (await abiertas("inasistencias_seguidas", m.hijo2)).length, 1);
