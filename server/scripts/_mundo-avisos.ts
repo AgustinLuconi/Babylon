@@ -74,6 +74,7 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.profesor.deleteMany({ where: { id: { in: profesorIds } } });
   await prisma.usuario.deleteMany({ where: { OR: [{ id: { startsWith: P } }, { email: { startsWith: P } }] } });
   // Ciclos de prueba (año 2098/2099): sus cursos e inscripciones ya se borraron arriba.
+  await prisma.pausaDelCiclo.deleteMany({ where: { cicloId: { startsWith: P } } });
   await prisma.ciclo.deleteMany({ where: { id: { startsWith: P } } });
 }
 

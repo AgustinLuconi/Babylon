@@ -19,3 +19,10 @@ export interface PausaDelCiclo {
   nombre: string;
   tipo: TipoDePausa;
 }
+
+// Lo que devuelve el listado de ciclos: las fechas ya resueltas (nunca null) y sus pausas.
+export interface CicloConCalendario extends Omit<Ciclo, "inicio" | "fin"> {
+  inicio: Date;
+  fin: Date;
+  pausas: PausaDelCiclo[];
+}

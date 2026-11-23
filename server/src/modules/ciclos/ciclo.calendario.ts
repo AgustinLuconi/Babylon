@@ -52,3 +52,18 @@ export function validarPausa(calendario: CalendarioDelCiclo, nueva: PausaDeCalen
   const choca = otras.find((o) => nueva.desde <= o.hasta && o.desde <= nueva.hasta);
   return choca ? `La pausa se superpone con "${choca.nombre}"` : null;
 }
+
+// Arma el calendario de un ciclo a partir de lo guardado (fechas Date, con null = por defecto).
+export function calendarioDelCiclo(
+  ciclo: { anio: number; inicio: Date | null; fin: Date | null },
+  pausas: { desde: Date; hasta: Date; nombre: string }[] = [],
+): CalendarioDelCiclo {
+  const dia = (fecha: Date) => fecha.toISOString().slice(0, 10);
+  const porDefecto = calendarioPorDefecto(ciclo.anio);
+  return {
+    anio: ciclo.anio,
+    inicio: ciclo.inicio ? dia(ciclo.inicio) : porDefecto.inicio,
+    fin: ciclo.fin ? dia(ciclo.fin) : porDefecto.fin,
+    pausas: pausas.map((p) => ({ desde: dia(p.desde), hasta: dia(p.hasta), nombre: p.nombre })),
+  };
+}

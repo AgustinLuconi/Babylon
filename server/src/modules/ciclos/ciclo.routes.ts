@@ -13,6 +13,10 @@ export function cicloRoutes(controller: CicloController, paseDeAnio: PaseDeAnioC
   router.patch("/:id/activar", authMiddleware, requireRole("admin"), controller.marcarActivo);
   router.patch("/:id/bloquear", authMiddleware, requireRole("admin"), controller.bloquear);
   router.patch("/:id/desbloquear", authMiddleware, requireRole("admin"), controller.desbloquear);
+  router.patch("/:id/fechas", authMiddleware, requireRole("admin"), controller.editarFechas);
+  router.post("/:id/pausas", authMiddleware, requireRole("admin"), controller.agregarPausa);
+  router.patch("/:id/pausas/:pausaId", authMiddleware, requireRole("admin"), controller.editarPausa);
+  router.delete("/:id/pausas/:pausaId", authMiddleware, requireRole("admin"), controller.eliminarPausa);
 
   return router;
 }

@@ -34,6 +34,7 @@ interface Contexto {
   alumno: string;
   evaluacionId: string;
   notaCierreId: string;
+  pausaId: string;
 }
 interface Escritura {
   plantilla: string; // "METODO /api/ruta/:id", igual que en los archivos *.routes.ts
@@ -45,6 +46,10 @@ interface Escritura {
 }
 const hoy = new Date().toISOString().slice(0, 10);
 const RECHAZADAS: Escritura[] = [
+  { plantilla: "PATCH /api/ciclos/:id/fechas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/fechas`, cuerpo: () => ({ inicio: "2099-03-01", fin: "2099-11-30" }), bloqueado: [409], desbloqueado: [200] },
+  { plantilla: "POST /api/ciclos/:id/pausas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas`, cuerpo: () => ({ desde: "2099-07-20", hasta: "2099-07-31", nombre: "Pruebaav receso", tipo: "receso" }), bloqueado: [409], desbloqueado: [201] },
+  { plantilla: "PATCH /api/ciclos/:id/pausas/:pausaId", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas/${c.pausaId}`, cuerpo: () => ({ nombre: "Pruebaav otra" }), bloqueado: [409], desbloqueado: [200] },
+  { plantilla: "DELETE /api/ciclos/:id/pausas/:pausaId", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas/${c.pausaId}`, cuerpo: () => undefined, bloqueado: [409], desbloqueado: [204] },
   { plantilla: "POST /api/cursos", rol: "admin", ruta: () => "/api/cursos", cuerpo: (c) => ({ nombre: "Pruebaav Nuevo", nivel: "kids", profesorId: c.m.profesorId, cicloId: c.ciclo, cupo: 10 }), bloqueado: [409], desbloqueado: [201] },
   { plantilla: "PATCH /api/cursos/:id", rol: "admin", ruta: (c) => `/api/cursos/${c.curso}`, cuerpo: () => ({ cupo: 11 }), bloqueado: [409], desbloqueado: [200] },
   { plantilla: "POST /api/asistencia/masiva", rol: "profe", ruta: () => "/api/asistencia/masiva", cuerpo: (c) => ({ cursoId: c.curso, fecha: hoy, registros: [{ alumnoId: c.alumno, estado: "presente" }] }), bloqueado: [409], desbloqueado: [201, 200] },
@@ -118,7 +123,9 @@ function rutasDeEscritura(): string[] {
       data: { id: alumno, nombre: "Pruebaav2099", apellido: "Pruebaav", fechaInscripcion: new Date(), estado: "activo", padreId: m.padreId, cursoId: curso, aplicaDescuentoHermanos: false },
     });
     await prisma.inscripcion.create({ data: { id: `${alumno}-insc`, alumnoId: alumno, cursoId: curso, cicloId: ciclo, fecha: new Date(), aplicaDescuentoHermanos: false } });
-    const base = { m, ciclo, curso, alumno, evaluacionId: "", notaCierreId: "" };
+    const pausaId = `${P}-pausa-2099`;
+    await prisma.pausaDelCiclo.create({ data: { id: pausaId, cicloId: ciclo, desde: new Date("2099-09-01T00:00:00Z"), hasta: new Date("2099-09-02T00:00:00Z"), nombre: "Pruebaav pausa", tipo: "otro" } });
+    const base = { m, ciclo, curso, alumno, evaluacionId: "", notaCierreId: "", pausaId };
     // Con el ciclo abierto: una evaluación y una nota de cierre para poder publicarlas después
     const ev = await pedir("POST", "/api/calificaciones/evaluaciones", "profe", { cursoId: curso, nombre: "Pruebaav eval", tipo: "examen", fecha: hoy, periodo: "julio" });
     const nc = await pedir("POST", "/api/calificaciones/notas-cierre", "profe", { notas: [{ alumnoId: alumno, cursoId: curso, periodo: "julio", nota: "6" }] });
