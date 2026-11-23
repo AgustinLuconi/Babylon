@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/core/components/ui/button";
 import { formatFechaHora } from "@/core/lib/utils";
 import { useAlertasDeRegla } from "../hooks/useAlertasDeRegla";
-import { MOTIVO_LABELS, type ReglaId } from "../types";
+import { MOTIVO_AYUDA, MOTIVO_LABELS, NIVEL_LABELS, type MotivoCierre, type ReglaId } from "../types";
 
 // Las alertas de una regla, las más nuevas primero (el registro es permanente, la campana guarda solo 30 días).
 export function HistorialDeAlertas({ regla, conNivel }: { regla: ReglaId; conNivel: boolean }) {
@@ -23,7 +23,9 @@ export function HistorialDeAlertas({ regla, conNivel }: { regla: ReglaId; conNiv
             <tr>
               <th>Alumno o evaluación</th>
               <th>Curso</th>
-              {conNivel && <th>Nivel</th>}
+              {conNivel && (
+                <th>{NIVEL_LABELS[regla]?.titulo ?? "Nivel"}</th>
+              )}
               <th>Abierta</th>
               <th>Resuelta</th>
               <th>Motivo</th>
@@ -51,6 +53,24 @@ export function HistorialDeAlertas({ regla, conNivel }: { regla: ReglaId; conNiv
           </tbody>
         </table>
       </div>
+      <details className="border-t px-4 py-3 text-[12px] text-muted-foreground" style={{ borderColor: "var(--border-hex)" }}>
+        <summary className="cursor-pointer select-none font-medium text-foreground">¿Cómo leer este historial?</summary>
+        <div className="mt-2 space-y-2">
+          <p>Cada fila es un episodio. Si la situación se repite, se abre otra fila: el historial no se mezcla ni se modifica.</p>
+          {conNivel && NIVEL_LABELS[regla] && (
+            <p>
+              <strong className="text-foreground">{NIVEL_LABELS[regla].titulo}:</strong> {NIVEL_LABELS[regla].ayuda}
+            </p>
+          )}
+          <ul className="space-y-1">
+            {(Object.keys(MOTIVO_LABELS) as MotivoCierre[]).map((m) => (
+              <li key={m}>
+                <strong className="text-foreground">{MOTIVO_LABELS[m]}:</strong> {MOTIVO_AYUDA[m]}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
       {totalPaginas > 1 && (
         <div className="flex items-center justify-between gap-2 border-t px-4 py-3 text-[12px] text-muted-foreground" style={{ borderColor: "var(--border-hex)" }}>
           <span>
