@@ -21,11 +21,11 @@ export function esMesLectivo(mes: number): boolean {
 // fechas calendario). Una cuota que se genera después del día 10 de su propio
 // mes (alta a mitad de mes, o valor de cuota cargado tarde) vence el último día
 // de ese mes, para no nacer ya vencida.
-export function vencimientoDelMes(mes: number, anio: number, hoy: Date): Date {
+export function vencimientoDelMes(mes: number, anio: number, hoy: Date, diaVencimiento: number): Date {
   const hoyAr = fechaHoraEnArgentina(hoy);
   const esMesActual = hoyAr.anio === anio && hoyAr.mes === mes;
-  if (esMesActual && hoyAr.dia > DIA_VENCIMIENTO) {
+  if (esMesActual && hoyAr.dia > diaVencimiento) {
     return new Date(Date.UTC(anio, mes, 0));
   }
-  return new Date(Date.UTC(anio, mes - 1, DIA_VENCIMIENTO));
+  return new Date(Date.UTC(anio, mes - 1, diaVencimiento));
 }

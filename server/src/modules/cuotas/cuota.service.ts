@@ -117,7 +117,7 @@ export class CuotaService {
     if (!ciclo || ciclo.anio !== anio || ciclo.bloqueado) return null;
     const { valorCuota } = await this.configuracionRepo.obtener(tx);
     if (valorCuota === null) return null;
-    return { mes, anio, ciclo, valorCuota, vencimiento: vencimientoDelMes(mes, anio, hoy) };
+    return { mes, anio, ciclo, valorCuota, vencimiento: vencimientoDelMes(mes, anio, hoy, 10) };
   }
 
   private nuevaCuota(alumno: Alumno, ctx: { mes: number; anio: number; valorCuota: number; vencimiento: Date }): Cuota {
