@@ -232,7 +232,7 @@ export function SelectorDeResponsable({ ref, padres, alumnos, esAdulto, alumno, 
             <Label>Buscar responsable</Label>
             <div className="relative mt-1.5">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }} />
-              <Input placeholder="Nombre, email o DNI…" className="pl-7" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+              <Input placeholder="Nombre, email o DNI…" data-sin-enter className="pl-7" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             </div>
           </div>
           <div className="max-h-[200px] overflow-y-auto rounded border" style={{ borderColor: "var(--border-hex)" }}>

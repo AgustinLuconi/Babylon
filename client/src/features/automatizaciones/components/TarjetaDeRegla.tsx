@@ -45,17 +45,23 @@ export function TarjetaDeRegla({ regla }: { regla: ReglaConEstado }) {
           />
         </div>
         {regla.conNumero && (
-          <div className="flex flex-wrap items-end gap-3">
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (cambio && valido && !actualizar.isPending) actualizar.mutate({ regla: regla.id, cambios: { umbral: numero } });
+            }}
+          >
             <div className="space-y-1.5">
               <label className="label" htmlFor={`umbral-${regla.id}`}>
                 Número ({regla.unidad}, de {regla.umbralMinimo} a {regla.umbralMaximo})
               </label>
               <Input id={`umbral-${regla.id}`} type="number" min={regla.umbralMinimo} max={regla.umbralMaximo} value={umbral} onChange={(e) => setUmbral(e.target.value)} className="tnum w-28" />
             </div>
-            <Button disabled={!cambio || !valido || actualizar.isPending} onClick={() => actualizar.mutate({ regla: regla.id, cambios: { umbral: numero } })}>
+            <Button type="submit" disabled={!cambio || !valido || actualizar.isPending}>
               Guardar
             </Button>
-          </div>
+          </form>
         )}
         {cambio && !valido && <p className="text-[12px] text-destructive">El número tiene que ser entero y estar entre {regla.umbralMinimo} y {regla.umbralMaximo}.</p>}
         {error && <p className="text-sm text-destructive">{error}</p>}

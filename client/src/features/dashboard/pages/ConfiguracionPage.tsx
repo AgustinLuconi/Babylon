@@ -137,7 +137,13 @@ export default function ConfiguracionPage() {
             </p>
           )}
           <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
-          <div className="flex flex-wrap items-end gap-2">
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onGuardarCuota();
+            }}
+          >
             <div className="space-y-1">
               <label className="label" htmlFor="valor-cuota">
                 Valor de la cuota
@@ -178,7 +184,7 @@ export default function ConfiguracionPage() {
                 className={`tnum w-28 ${alDia.resaltados.has("diaVencimiento") ? "cambio-resaltado" : ""}`}
               />
             </div>
-            <Button onClick={onGuardarCuota} disabled={!puedeGuardarCuota || actualizarConfiguracion.isPending}>
+            <Button type="submit" disabled={!puedeGuardarCuota || actualizarConfiguracion.isPending}>
               {actualizarConfiguracion.isPending ? "Guardando…" : "Guardar"}
             </Button>
             {cuotaGuardada && configuracion && (
@@ -186,7 +192,7 @@ export default function ConfiguracionPage() {
                 Guardado{configuracion.valorCuota != null ? `: ${formatMonto(configuracion.valorCuota)} por mes` : ""}, vence el día {configuracion.diaVencimiento}
               </span>
             )}
-          </div>
+          </form>
           {actualizarConfiguracion.isError && (
             <p className="text-sm text-destructive">
               {actualizarConfiguracion.error instanceof ApiError ? actualizarConfiguracion.error.message : "No se pudo guardar el valor"}
@@ -250,20 +256,30 @@ export default function ConfiguracionPage() {
             </div>
           ))}
 
-          <div className="flex items-end gap-2 border-t pt-4" style={{ borderColor: "var(--border-hex)" }}>
+          <form
+            className="flex items-end gap-2 border-t pt-4"
+            style={{ borderColor: "var(--border-hex)" }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              onCrear();
+            }}
+          >
             <div className="flex-1 space-y-1.5">
-              <label className="label">Nuevo ciclo (año)</label>
+              <label className="label" htmlFor="nuevo-ciclo-anio">
+                Nuevo ciclo (año)
+              </label>
               <Input
+                id="nuevo-ciclo-anio"
                 type="number"
                 value={nuevoAnio}
                 onChange={(e) => setNuevoAnio(e.target.value)}
                 placeholder="Ej: 2027"
               />
             </div>
-            <Button onClick={onCrear} disabled={crearCiclo.isPending || !nuevoAnio}>
+            <Button type="submit" disabled={crearCiclo.isPending || !nuevoAnio}>
               <Plus className="mr-1.5" size={14} /> Crear
             </Button>
-          </div>
+          </form>
           {crearCiclo.isError && (
             <p className="text-sm text-destructive">
               {crearCiclo.error instanceof ApiError ? crearCiclo.error.message : "No se pudo crear el ciclo"}
