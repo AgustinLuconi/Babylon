@@ -5,6 +5,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { hoyISOEnArgentina } from "../src/core/fechas";
 import { ok } from "./_check";
 import { CLAVE, crearMundo, email, limpiarMundo, P, type Mundo } from "./_mundo-avisos";
 
@@ -44,7 +45,8 @@ interface Escritura {
   bloqueado: number[]; // estados esperados con el ciclo bloqueado
   desbloqueado: number[]; // y con el ciclo abierto
 }
-const hoy = new Date().toISOString().slice(0, 10);
+// "Hoy" en hora de Argentina (con toISOString pasadas las 21:00 sería mañana, y la asistencia no puede ser futura).
+const hoy = hoyISOEnArgentina();
 const RECHAZADAS: Escritura[] = [
   { plantilla: "POST /api/ciclos/:id/pausas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas`, cuerpo: () => ({ desde: "2099-07-20", hasta: "2099-07-31", nombre: "Pruebaav receso", tipo: "receso" }), bloqueado: [409], desbloqueado: [201] },
   { plantilla: "PATCH /api/ciclos/:id/pausas/:pausaId", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas/${c.pausaId}`, cuerpo: () => ({ nombre: "Pruebaav otra" }), bloqueado: [409], desbloqueado: [200] },

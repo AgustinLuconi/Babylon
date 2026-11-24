@@ -39,7 +39,8 @@ const api = async (metodo, ruta, tk, cuerpo) => {
 
     // Bloquear desde Configuración
     await p.goto(`${BASE}/configuracion`);
-    const fila = () => p.locator("div.rounded-md.border", { hasText: "2098" });
+    // La fila del panel "Ciclos lectivos" (la tarjeta del calendario también menciona 2098, pero no tiene estos botones).
+    const fila = () => p.locator("div.rounded-md.border", { hasText: "2098" }).filter({ has: p.getByRole("button", { name: /Bloquear|Desbloquear|Marcar como activo/ }) });
     await fila().getByRole("button", { name: "Bloquear" }).click();
     await p.getByRole("button", { name: "Bloquear", exact: true }).last().click();
     await fila().getByText("Bloqueado").waitFor({ timeout: 8000 });
@@ -48,7 +49,7 @@ const api = async (metodo, ruta, tk, cuerpo) => {
 
     // Un profesor no puede guardar asistencia en un curso del ciclo bloqueado
     const profe = await token("profe");
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date()); // día de Argentina (en UTC, de noche sería mañana)
     const r = await api("POST", "/api/asistencia/masiva", profe, { cursoId: `${P}-c1`, fecha: hoy, registros: [{ alumnoId: `${P}-e1`, estado: "presente" }] });
     ok("el profesor recibe 409 con el motivo", `${r.status} ${r.texto.includes("bloqueado")}`, "409 true");
 
