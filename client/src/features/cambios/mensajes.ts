@@ -55,6 +55,10 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
       return alumnos.length === 1 && alumno ? `${quien} publicó la nota de cierre de ${alumno}` : `${quien} publicó las notas de cierre de ${alumnos.length} alumnos`;
     case "asistencia/registro":
       return `${quien} tomó asistencia`;
+    case "asistencia/sin-clases":
+      return `${quien} marcó una clase como sin clases`;
+    case "asistencia/quitar-sin-clases":
+      return `${quien} quitó la marca de sin clases de una clase`;
     case "observaciones/alta":
       return sobre("escribió una observación sobre", "escribió una observación");
     case "categorias/alta":

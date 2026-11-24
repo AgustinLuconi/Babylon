@@ -13,11 +13,32 @@ const COLOR_JUSTIFICADA = { bg: "var(--muted)", fg: "var(--text-muted)" };
 
 const DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"];
 
-export function AttendanceCalendar({ registros, anio, mes }: { registros: Asistencia[]; anio: number; mes: number }) {
+// Un día sin clases (una clase que no se dio): no es presente ni ausente, se ve atenuado con "SC".
+const COLOR_SIN_CLASES = { bg: "var(--muted)", fg: "var(--text-faint)" };
+
+// `sinClases` (opcional) son las clases que no se dieron; el `motivo` solo viene para el equipo del instituto (a la familia el
+// servidor no se lo manda), y si viene se ve en el detalle del día.
+export function AttendanceCalendar({
+  registros,
+  anio,
+  mes,
+  sinClases,
+}: {
+  registros: Asistencia[];
+  anio: number;
+  mes: number;
+  sinClases?: { fecha: string; motivo?: string }[];
+}) {
   const porDia = new Map<number, Pick<Asistencia, "estado" | "justificada">>();
   for (const r of registros) {
     const [rAnio, rMes, rDia] = r.fecha.slice(0, 10).split("-").map(Number);
     if (rAnio === anio && rMes === mes) porDia.set(rDia, { estado: r.estado, justificada: r.justificada });
+  }
+
+  const sinClasesPorDia = new Map<number, { motivo?: string }>();
+  for (const c of sinClases ?? []) {
+    const [cAnio, cMes, cDia] = c.fecha.slice(0, 10).split("-").map(Number);
+    if (cAnio === anio && cMes === mes) sinClasesPorDia.set(cDia, { motivo: c.motivo });
   }
 
   const diasEnMes = new Date(anio, mes, 0).getDate();
@@ -39,6 +60,12 @@ export function AttendanceCalendar({ registros, anio, mes }: { registros: Asiste
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: COLOR_JUSTIFICADA.fg }} />
           Ausente (justificada)
         </span>
+        {sinClases !== undefined && (
+          <span className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: COLOR_SIN_CLASES.fg }} />
+            Sin clases
+          </span>
+        )}
       </div>
       <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(7, 1fr)" }}>
         {DIAS_SEMANA.map((d) => (
@@ -51,14 +78,15 @@ export function AttendanceCalendar({ registros, anio, mes }: { registros: Asiste
         ))}
         {Array.from({ length: diasEnMes }, (_, i) => i + 1).map((dia) => {
           const registro = porDia.get(dia);
+          const sinClase = registro ? undefined : sinClasesPorDia.get(dia);
           const estado = registro?.estado;
           const justificada = !!registro && registro.estado === "ausente" && registro.justificada;
-          const color = estado ? (justificada ? COLOR_JUSTIFICADA : COLORES[estado]) : null;
+          const color = estado ? (justificada ? COLOR_JUSTIFICADA : COLORES[estado]) : sinClase ? COLOR_SIN_CLASES : null;
           const esFuturo = esMesActual && dia > hoy.getDate();
           return (
             <div
               key={dia}
-              title={registro ? etiquetaDeAsistencia(registro) : undefined}
+              title={registro ? etiquetaDeAsistencia(registro) : sinClase ? `Sin clases${sinClase.motivo ? `: ${sinClase.motivo}` : ""}` : undefined}
               className="tnum flex aspect-square items-center justify-center text-[12px] font-medium"
               style={{
                 background: color?.bg ?? "transparent",
@@ -66,7 +94,7 @@ export function AttendanceCalendar({ registros, anio, mes }: { registros: Asiste
                 borderRadius: 3,
               }}
             >
-              {estado ? (justificada ? "J" : INICIALES[estado]) : dia}
+              {estado ? (justificada ? "J" : INICIALES[estado]) : sinClase ? "SC" : dia}
             </div>
           );
         })}

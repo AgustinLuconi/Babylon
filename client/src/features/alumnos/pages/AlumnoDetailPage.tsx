@@ -18,6 +18,8 @@ import { calcularEdad, formatCelular, formatDni, formatFecha, formatMonto } from
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
+import { useSinClasesDelAlumno } from "@/features/asistencia/hooks/useSinClasesDelAlumno";
+import { mesesDeFechas } from "@/features/asistencia/meses";
 import { useCalificacionesDeAlumno } from "@/features/calificaciones/hooks/useCalificacionesDeAlumno";
 import { useNotasCierreDeAlumno } from "@/features/calificaciones/hooks/useNotasCierreDeAlumno";
 import { PERIODO_LABELS, TIPO_EVALUACION_LABELS, type PeriodoAcademico } from "@/features/calificaciones/types";
@@ -150,14 +152,13 @@ export default function AlumnoDetailPage() {
   // Asistencia
   const { data: asistenciasTodas, isLoading: cargandoAsistencia } = useAsistenciaDeAlumno(alumnoId);
   const asistencias = useMemo(() => vista.filtrar(asistenciasTodas), [vista, asistenciasTodas]);
-  const mesesConRegistros = useMemo(() => {
-    const mapa = new Map<string, { anio: number; mes: number }>();
-    for (const a of asistencias ?? []) {
-      const [anio, mes] = a.fecha.slice(0, 10).split("-").map(Number);
-      mapa.set(`${anio}-${mes}`, { anio, mes });
-    }
-    return Array.from(mapa.values()).sort((a, b) => b.anio - a.anio || b.mes - a.mes);
-  }, [asistencias]);
+  // Las clases que no se dieron (con el motivo: el legajo es del equipo del instituto), del curso que se está mirando.
+  const { data: sinClasesTodas } = useSinClasesDelAlumno(alumnoId);
+  const sinClases = useMemo(() => vista.filtrar(sinClasesTodas), [vista, sinClasesTodas]);
+  const mesesConRegistros = useMemo(
+    () => mesesDeFechas([...(asistencias ?? []).map((a) => a.fecha), ...(sinClases ?? []).map((c) => c.fecha)]),
+    [asistencias, sinClases],
+  );
   const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
   // Al cambiar de curso se pasa directo al mes más reciente de ese curso (sin pasar por "ningún mes", que haría desaparecer el
   // calendario por un instante).
@@ -657,7 +658,7 @@ export default function AlumnoDetailPage() {
             ) : (
               mesAsistencia && (
                 <div>
-                  <AttendanceCalendar registros={asistencias ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
+                  <AttendanceCalendar registros={asistencias ?? []} sinClases={sinClases ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
                 </div>
               )
             )}

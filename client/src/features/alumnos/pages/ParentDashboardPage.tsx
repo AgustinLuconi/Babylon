@@ -19,6 +19,8 @@ import { HistorialDeCursos } from "../components/HistorialDeCursos";
 import { SelectorDeAnio } from "../components/SelectorDeAnio";
 import { useVistaDeCurso } from "../hooks/useVistaDeCurso";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
+import { useSinClasesDelAlumno } from "@/features/asistencia/hooks/useSinClasesDelAlumno";
+import { mesesDeFechas } from "@/features/asistencia/meses";
 import { etiquetaDeAsistencia } from "@/features/asistencia/types";
 import { useCuotasPorAlumno } from "@/features/cuotas/hooks/useCuotasPorAlumno";
 import type { EstadoCuota } from "@/features/cuotas/types";
@@ -126,14 +128,13 @@ export default function ParentDashboardPage() {
   const asistenciaPct = totalMarcado > 0 ? Math.round(((presentes + tardanzas) / totalMarcado) * 100) : null;
 
   // Calendario de asistencia navegable por mes — mismo patrón que el legajo de Admin.
-  const mesesConRegistros = useMemo(() => {
-    const mapa = new Map<string, { anio: number; mes: number }>();
-    for (const a of asistencia ?? []) {
-      const [anio, mes] = a.fecha.slice(0, 10).split("-").map(Number);
-      mapa.set(`${anio}-${mes}`, { anio, mes });
-    }
-    return Array.from(mapa.values()).sort((a, b) => b.anio - a.anio || b.mes - a.mes);
-  }, [asistencia]);
+  // Las clases que no se dieron, del curso que se está mirando (sin el motivo: el servidor no se lo manda a la familia).
+  const { data: sinClasesTodas } = useSinClasesDelAlumno(kid?.id);
+  const sinClases = useMemo(() => vista.filtrar(sinClasesTodas), [vista, sinClasesTodas]);
+  const mesesConRegistros = useMemo(
+    () => mesesDeFechas([...(asistencia ?? []).map((a) => a.fecha), ...(sinClases ?? []).map((c) => c.fecha)]),
+    [asistencia, sinClases],
+  );
   const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
   // Al cambiar de hijo o de curso se pasa directo al mes más reciente de ese curso (sin pasar por "ningún mes", que haría
   // desaparecer el calendario por un instante).
@@ -157,6 +158,13 @@ export default function ParentDashboardPage() {
       return anio === mesAsistencia.anio && mes === mesAsistencia.mes;
     });
   }, [asistencia, mesAsistencia]);
+  const sinClasesDelMes = useMemo(() => {
+    if (!mesAsistencia) return [];
+    return (sinClases ?? []).filter((c) => {
+      const [anio, mes] = c.fecha.slice(0, 10).split("-").map(Number);
+      return anio === mesAsistencia.anio && mes === mesAsistencia.mes;
+    });
+  }, [sinClases, mesAsistencia]);
   const cambiarMesAsistencia = (delta: number) => {
     setMesAsistencia((actual) => {
       if (!actual) return actual;
@@ -518,7 +526,7 @@ export default function ParentDashboardPage() {
             </div>
             {mesAsistencia && (
               <div className="mx-auto max-w-[300px]">
-                <AttendanceCalendar registros={asistencia ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
+                <AttendanceCalendar registros={asistencia ?? []} sinClases={sinClases ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
               </div>
             )}
           </div>
@@ -545,13 +553,34 @@ export default function ParentDashboardPage() {
               </div>
             </div>
             <Panel title="Detalle del mes">
-              {registrosDelMes.length === 0 && (
+              {registrosDelMes.length === 0 && sinClasesDelMes.length === 0 && (
                 <p className="px-5 py-6 text-center text-sm text-muted-foreground">
                   Todavía no hay registros de asistencia para este mes.
                 </p>
               )}
-              {filasAsistencia.map(({ item: a, estado }, i, arr) => {
-                  const [anio, mes, dia] = a.fecha.slice(0, 10).split("-");
+              {[
+                ...filasAsistencia.map((f) => ({ fecha: f.item.fecha, fila: f })),
+                ...sinClasesDelMes.map((c) => ({ fecha: c.fecha, sinClases: c })),
+              ]
+                .sort((x, y) => y.fecha.localeCompare(x.fecha))
+                .map((dia, i, arr) => {
+                  if ("sinClases" in dia) {
+                    const [anioSC, mesSC, diaSC] = dia.fecha.slice(0, 10).split("-");
+                    return (
+                      <div
+                        key={`sin-clases-${dia.fecha}`}
+                        className="flex items-center justify-between px-5 py-3"
+                        style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}
+                      >
+                        <span className="text-[13px]">
+                          {Number(diaSC)} de {MESES[Number(mesSC) - 1]} de {anioSC}
+                        </span>
+                        <Badge variant="neutral">Sin clases</Badge>
+                      </div>
+                    );
+                  }
+                  const { item: a, estado } = dia.fila;
+                  const [anio, mes, diaDelMes] = a.fecha.slice(0, 10).split("-");
                   return (
                     <div
                       key={a.id}
@@ -559,7 +588,7 @@ export default function ParentDashboardPage() {
                       style={{ borderBottom: i < arr.length - 1 ? "1px solid var(--border-hex)" : "none" }}
                     >
                       <span className="text-[13px]">
-                        {Number(dia)} de {MESES[Number(mes) - 1]} de {anio}
+                        {Number(diaDelMes)} de {MESES[Number(mes) - 1]} de {anio}
                       </span>
                       <div className="flex items-center gap-2">
                         {a.estado === "tarde" && a.minutosRetraso !== undefined && (
