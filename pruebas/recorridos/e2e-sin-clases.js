@@ -80,6 +80,9 @@ async function entrar(p, quien) {
     await secre.click("button:has-text('Asistencia')");
     await secre.locator(`[title="Sin clases: ${MOTIVO}"]`).first().waitFor({ timeout: 10000 });
     ok("secretaría: el legajo muestra el día sin clases con su motivo", await secre.locator(`[title="Sin clases: ${MOTIVO}"]`).count(), 1);
+    // El motivo también a la vista debajo del calendario (en un celular no hay cursor encima).
+    const dm = FECHA.split("-").map(Number);
+    ok("secretaría: debajo del calendario se lee 'Sin clases el D/M: motivo'", await secre.getByText(`Sin clases el ${dm[2]}/${dm[1]}:`).locator("xpath=..").innerText().then((t) => t.includes(MOTIVO)), true);
 
     // 4. El profesor quita la marca: la grilla vuelve y la familia deja de verla
     await profe.getByRole("button", { name: "Quitar marca" }).click();
