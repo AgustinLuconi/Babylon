@@ -1,5 +1,6 @@
 // Enter en los modales: en un campo de texto aprieta el botón principal del pie (si está habilitado); en un área de texto es un
-// salto de línea; en el buscador del cobro no cobra; con el botón deshabilitado no hace nada.
+// salto de línea; en el buscador del cobro no cobra; con el botón deshabilitado no hace nada. Sobre una cuota o un método de
+// pago elegidos, Enter confirma (como una casilla: Espacio marca, Enter confirma). Las flechas mueven el foco entre los campos.
 const { chromium } = require("playwright");
 const { execSync } = require("child_process");
 const ok = (e, r, x) => console.log(`${e}: ${r} (esperado ${x})`);
@@ -18,10 +19,12 @@ async function entrar(p, quien) {
 (async () => {
   const CICLO = `${P}-ciclo-enter`;
   const CUOTA = `${P}-cuota-enter`;
+  const CUOTA2 = `${P}-cuota-enter2`;
   q(`delete from "PausaDelCiclo" where "cicloId" = '${CICLO}'`);
   q(`delete from "Ciclo" where id = '${CICLO}'`);
   q(`insert into "Ciclo" (id, anio, activo, bloqueado) values ('${CICLO}', 2092, false, false)`);
   q(`insert into "Cuota" (id, "alumnoId", mes, anio, "montoBase", descuento, "montoFinal", vencimiento, estado) values ('${CUOTA}', '${P}-hijo1', 3, 2091, 1000, 0, 1000, '2091-03-10', 'pendiente')`);
+  q(`insert into "Cuota" (id, "alumnoId", mes, anio, "montoBase", descuento, "montoFinal", vencimiento, estado) values ('${CUOTA2}', '${P}-hijo1', 4, 2091, 1000, 0, 1000, '2091-04-10', 'pendiente')`);
   const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
   const admin = await b.newPage({ viewport: { width: 1280, height: 1400 } });
   const secre = await b.newPage({ viewport: { width: 1280, height: 1000 } });
@@ -39,6 +42,12 @@ async function entrar(p, quien) {
     await nombre.press("Enter");
     await admin.waitForTimeout(800);
     ok("pausa: con el botón deshabilitado (falta la fecha), Enter no guarda ni cierra", `${await modal(admin).count()} ${q(`select count(*) from "PausaDelCiclo" where "cicloId"='${CICLO}'`)}`, "1 0");
+    // Flechas: abajo/arriba mueven el foco entre los campos
+    await nombre.press("ArrowDown");
+    ok("pausa: la flecha hacia abajo pasa al campo siguiente (la fecha)", await admin.evaluate(() => document.activeElement?.getAttribute("type")), "date");
+    await nombre.focus();
+    await nombre.press("ArrowUp");
+    ok("pausa: la flecha hacia arriba vuelve al campo anterior (el tipo)", await admin.evaluate(() => document.activeElement?.tagName), "SELECT");
     await modal(admin).locator('input[type="date"]').first().fill("2092-07-09");
     await nombre.press("Enter");
     await modal(admin).waitFor({ state: "detached", timeout: 8000 });
@@ -58,6 +67,20 @@ async function entrar(p, quien) {
     await modal(admin).waitFor({ state: "detached", timeout: 8000 });
     ok("cobro: Enter en la fecha, con la cuota elegida, registra el pago", q(`select count(*) from "Pago" where "cuotaId"='${CUOTA}'`), "1");
 
+    // 2b. Con la cuota elegida y el foco en el botón de la cuota o del método, Enter confirma; las flechas mueven el foco
+    await admin.goto(`${BASE}/cuotas`);
+    await admin.getByRole("button", { name: "Registrar pago" }).first().click();
+    await modal(admin).getByPlaceholder("Nombre o DNI del alumno…").fill("Tomasav");
+    await modal(admin).getByRole("button", { name: /Tomasav/ }).first().click();
+    await modal(admin).getByRole("button", { name: /Abril 2091/ }).click();
+    await admin.keyboard.press("ArrowDown");
+    ok("cobro: la flecha hacia abajo desde la cuota pasa al primer método de pago", (await admin.evaluate(() => document.activeElement?.textContent ?? "")).trim(), "Efectivo");
+    await admin.keyboard.press("ArrowUp");
+    ok("cobro: la flecha hacia arriba vuelve a la cuota", (await admin.evaluate(() => document.activeElement?.textContent ?? "")).includes("Abril 2091"), true);
+    await admin.keyboard.press("Enter");
+    await modal(admin).waitFor({ state: "detached", timeout: 8000 });
+    ok("cobro: Enter sobre la cuota elegida registra el pago", q(`select count(*) from "Pago" where "cuotaId"='${CUOTA2}'`), "1");
+
     // 3. Área de texto: Enter es un salto de línea y no envía
     await entrar(secre, "secre");
     await secre.goto(`${BASE}/alumnos/${P}-hijo1`);
@@ -73,8 +96,8 @@ async function entrar(p, quien) {
     ok("y no envía la observación", `${await modal(secre).count()} ${q(`select count(*) from "Observacion" where "alumnoId"='${P}-hijo1'`) === antes}`, "1 true");
   } finally {
     await b.close();
-    q(`delete from "Pago" where "cuotaId" = '${CUOTA}'`);
-    q(`delete from "Cuota" where id = '${CUOTA}'`);
+    q(`delete from "Pago" where "cuotaId" in ('${CUOTA}', '${CUOTA2}')`);
+    q(`delete from "Cuota" where id in ('${CUOTA}', '${CUOTA2}')`);
     q(`delete from "PausaDelCiclo" where "cicloId" = '${CICLO}'`);
     q(`delete from "Ciclo" where id = '${CICLO}'`);
   }

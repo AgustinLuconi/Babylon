@@ -436,6 +436,7 @@ export default function CuotasPage() {
                     return (
                       <button
                         key={c.id}
+                        data-enter-envia
                         onClick={() => toggleCuota(c.id)}
                         className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-left transition-all"
                         style={{
@@ -496,6 +497,7 @@ export default function CuotasPage() {
               {METODOS.map((m) => (
                 <button
                   key={m}
+                  data-enter-envia
                   onClick={() => setMetodo(m)}
                   className="rounded px-3 py-2 text-[12.5px] font-medium transition-all"
                   style={{
