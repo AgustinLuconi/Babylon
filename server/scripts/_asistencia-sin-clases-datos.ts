@@ -32,6 +32,7 @@ async function mensaje(f: () => Promise<unknown>): Promise<string> {
     ok("y se borra el motivo", (await repo.actualizarMotivoDeClaseSinDictar(`${P}-sc-a`, null)).motivo, undefined);
 
     ok("las del curso, la más nueva primero", (await repo.findSinDictarByCursoId(m.cursoId)).map((c) => c.fecha.toISOString().slice(0, 10)).join(","), "2026-03-19,2026-03-17");
+    await prisma.inscripcion.updateMany({ where: { id: { startsWith: P } }, data: { fecha: dia("2026-03-01") } });
     ok("las de un alumno salen de los cursos donde está inscripto (no de otro curso)", (await repo.findSinDictarByAlumnoId(m.hijo1)).map((c) => c.cursoId).sort().join(","), [m.cursoId, m.cursoId].sort().join(","));
     ok("las de un alumno de otro curso son las de su curso", (await repo.findSinDictarByAlumnoId(m.alumnoAjeno)).map((c) => c.cursoId).join(","), m.cursoMultiId);
 

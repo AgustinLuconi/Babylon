@@ -99,6 +99,19 @@ export function AttendanceCalendar({
           );
         })}
       </div>
+      {/* El motivo también a la vista (el cursor encima no existe en un celular). Solo llega al equipo: a la familia no se lo manda el servidor. */}
+      {[...sinClasesPorDia.entries()].some(([, c]) => c.motivo) && (
+        <ul className="mt-3 space-y-0.5 text-[11.5px]" style={{ color: "var(--text-muted)" }}>
+          {[...sinClasesPorDia.entries()]
+            .filter(([, c]) => c.motivo)
+            .sort(([a], [b]) => a - b)
+            .map(([dia, c]) => (
+              <li key={dia}>
+                <span className="tnum font-medium">Sin clases el {dia}/{mes}:</span> {c.motivo}
+              </li>
+            ))}
+        </ul>
+      )}
     </div>
   );
 }

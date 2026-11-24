@@ -50,6 +50,8 @@ const MARCADA = "Esa clase está marcada como sin clases: quitá la marca para t
   const m = await crearMundo(prisma);
   const PAUSA = `${P}-pausa-sc`;
   try {
+    // Las inscripciones del mundo son de hoy; las marcas de este script son anteriores, y a la familia solo se le muestran las desde la inscripción.
+    await prisma.inscripcion.updateMany({ where: { id: { startsWith: P } }, data: { fecha: dia("2026-03-01") } });
     const marcas = (fecha: string) => prisma.claseSinDictar.count({ where: { cursoId: m.cursoId, fecha: dia(fecha) } });
     const filas = (fecha: string) => prisma.asistencia.count({ where: { cursoId: m.cursoId, fecha: dia(fecha) } });
     const guardar = (fecha: string, alumnoIds = [m.hijo1, m.hijo2]) =>
@@ -85,6 +87,11 @@ const MARCADA = "Esa clase está marcada como sin clases: quitá la marca para t
     await quitar("2026-03-26");
     await prisma.pausaDelCiclo.create({ data: { id: PAUSA, cicloId: m.cicloId, desde: dia("2026-03-31"), hasta: dia("2026-03-31"), nombre: "Pausa de prueba", tipo: "feriado" } });
     ok("un día sin clases del calendario no se marca", await falla(() => marcar("2026-03-31")), "ValidationError: Ese día no hay clases: Pausa de prueba");
+    // Una marca que ya existía sigue pudiendo corregirse aunque ese día haya pasado a ser pausa.
+    await prisma.claseSinDictar.create({ data: { id: `${P}-sc-pausa`, cursoId: m.cursoId, fecha: dia("2026-03-31"), motivo: "Original", registradaPor: m.profe } });
+    ok("el motivo de una marca existente se corrige aunque el día ahora sea pausa", await falla(() => marcar("2026-03-31", "Corregido")), "no falló");
+    ok("y queda guardado", (await asistenciaRepo.findClaseSinDictar(m.cursoId, dia("2026-03-31")))?.motivo, "Corregido");
+    await prisma.claseSinDictar.deleteMany({ where: { id: `${P}-sc-pausa` } });
     ok("un día futuro no pasa el esquema", marcarSinClasesSchema.safeParse({ cursoId: m.cursoId, fecha: "2099-01-01" }).success, false);
     ok("un motivo de más de 200 caracteres no pasa el esquema", marcarSinClasesSchema.safeParse({ cursoId: m.cursoId, fecha: "2026-03-17", motivo: "x".repeat(201) }).success, false);
 
@@ -120,7 +127,15 @@ const MARCADA = "Esa clase está marcada como sin clases: quitá la marca para t
     ok("la familia no ve a un alumno ajeno", (await falla(() => servicio.listarSinClasesDeAlumno(m.alumnoAjeno, { rol: "padre", padreId: m.padreId }))).split(":")[0], "AuthorizationError");
     const paraEquipo = await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "admin" });
     ok("el equipo sí ve el motivo", paraEquipo.some((c) => c.motivo === "Motivo secreto"), true);
-    ok("un profesor también lee las de un alumno", (await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "profesor" })).length > 0, true);
+    const paraProfesor = await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "profesor" });
+    ok("un profesor lee las de un alumno pero sin el motivo (lo ve en su curso)", `${paraProfesor.length > 0} ${paraProfesor.every((c) => !("motivo" in c))}`, "true true");
+    // Antes de inscribirse, la clase no es del alumno: no aparece (a nadie).
+    await prisma.inscripcion.update({ where: { id: `${m.hijo1}-insc` }, data: { fecha: new Date("2026-05-06T15:00:00Z") } });
+    const despues = await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "padre", padreId: m.padreId });
+    ok("una marca anterior a la inscripción del alumno no aparece", despues.some((c) => c.fecha.toISOString().slice(0, 10) === "2026-05-05"), false);
+    await prisma.inscripcion.update({ where: { id: `${m.hijo1}-insc` }, data: { fecha: new Date("2026-05-05T15:00:00Z") } });
+    ok("la del día de la inscripción sí", (await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "padre", padreId: m.padreId })).some((c) => c.fecha.toISOString().slice(0, 10) === "2026-05-05"), true);
+    await prisma.inscripcion.update({ where: { id: `${m.hijo1}-insc` }, data: { fecha: dia("2026-03-01") } });
     await quitar("2026-05-05");
 
     // El aviso "falta tomar asistencia" saltea las clases marcadas (el curso tiene clases martes y jueves 14:00; jueves 15/10/2026)

@@ -56,7 +56,7 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
     case "asistencia/registro":
       return `${quien} tomó asistencia`;
     case "asistencia/sin-clases":
-      return `${quien} marcó una clase como sin clases`;
+      return `${quien} marcó una clase como sin dar`;
     case "asistencia/quitar-sin-clases":
       return `${quien} quitó la marca de sin clases de una clase`;
     case "observaciones/alta":

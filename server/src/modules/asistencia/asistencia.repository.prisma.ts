@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import { EntityNotFoundError } from "../../core/errors";
+import { hoyISOEnArgentina } from "../../core/fechas";
 import type { AsistenciaRepository } from "./asistencia.repository";
 import type { Asistencia, ClaseSinDictar } from "./asistencia.entity";
 
@@ -75,12 +76,18 @@ export class PrismaAsistenciaRepository implements AsistenciaRepository {
     return filas.map(claseAEntidad);
   }
 
+  // Las clases sin dictar de los cursos donde el alumno está o estuvo inscripto, desde el día de su inscripción en cada uno (una
+  // clase anterior a que llegara no es suya).
   async findSinDictarByAlumnoId(alumnoId: string, tx?: unknown): Promise<ClaseSinDictar[]> {
-    const filas = await this.client(tx).claseSinDictar.findMany({
-      where: { curso: { inscripciones: { some: { alumnoId } } } },
+    const client = this.client(tx);
+    const inscripciones = await client.inscripcion.findMany({ where: { alumnoId }, select: { cursoId: true, fecha: true } });
+    if (inscripciones.length === 0) return [];
+    const desde = new Map(inscripciones.map((i) => [i.cursoId, hoyISOEnArgentina(i.fecha)]));
+    const filas = await client.claseSinDictar.findMany({
+      where: { cursoId: { in: [...desde.keys()] } },
       orderBy: [{ fecha: "desc" }, { id: "asc" }],
     });
-    return filas.map(claseAEntidad);
+    return filas.filter((f) => f.fecha.toISOString().slice(0, 10) >= (desde.get(f.cursoId) ?? "")).map(claseAEntidad);
   }
 
   async contarRegistrosDelDia(cursoId: string, fecha: Date, tx?: unknown): Promise<number> {

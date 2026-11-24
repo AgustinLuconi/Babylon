@@ -114,11 +114,14 @@ export class AsistenciaService {
     return this.unitOfWork.runInTransaction(async (tx) => {
       await this.verificador.verificarCicloDelCurso(datos.cursoId, tx);
       await this.asistenciaRepo.bloquearClase(datos.cursoId, datos.fecha, tx);
-      await this.verificador.verificarDiaDeClases(datos.cursoId, datos.fecha.toISOString().slice(0, 10), tx);
-      if ((await this.asistenciaRepo.contarRegistrosDelDia(datos.cursoId, datos.fecha, tx)) > 0) {
-        throw new ConflictError("Ese día ya tiene asistencia guardada: no se puede marcar como sin clases");
-      }
       const existente = await this.asistenciaRepo.findClaseSinDictar(datos.cursoId, datos.fecha, tx);
+      // Una marca que ya existe solo cambia de motivo: eso se puede aunque el calendario cambiara después (el día pasó a ser pausa).
+      if (!existente) {
+        await this.verificador.verificarDiaDeClases(datos.cursoId, datos.fecha.toISOString().slice(0, 10), tx);
+        if ((await this.asistenciaRepo.contarRegistrosDelDia(datos.cursoId, datos.fecha, tx)) > 0) {
+          throw new ConflictError("Ese día ya tiene asistencia guardada: no se puede marcar como sin clases");
+        }
+      }
       const clase = existente
         ? await this.asistenciaRepo.actualizarMotivoDeClaseSinDictar(existente.id, datos.motivo ?? null, tx)
         : await this.asistenciaRepo.crearClaseSinDictar(
@@ -157,8 +160,8 @@ export class AsistenciaService {
     return clases.map((c) => ({ fecha: c.fecha, motivo: c.motivo }));
   }
 
-  // Las clases sin dictar de los cursos de un alumno. **La familia nunca recibe el motivo** (se quita acá, no en la pantalla) y
-  // solo ve a su propio hijo.
+  // Las clases sin dictar de los cursos de un alumno (desde que se inscribió en cada curso). **El motivo es solo de administración y
+  // secretaría** (se quita acá, no en la pantalla; el profesor lo lee en su curso) y la familia solo ve a su propio hijo.
   async listarSinClasesDeAlumno(alumnoId: string, solicitante: Solicitante): Promise<{ cursoId: string; fecha: Date; motivo?: string }[]> {
     if (solicitante.rol === "padre") {
       const alumno = await this.alumnoRepo.findById(alumnoId);
@@ -167,7 +170,8 @@ export class AsistenciaService {
       }
     }
     const clases = await this.asistenciaRepo.findSinDictarByAlumnoId(alumnoId);
-    return clases.map((c) => (solicitante.rol === "padre" ? { cursoId: c.cursoId, fecha: c.fecha } : { cursoId: c.cursoId, fecha: c.fecha, motivo: c.motivo }));
+    const conMotivo = solicitante.rol === "admin" || solicitante.rol === "secretario";
+    return clases.map((c) => (conMotivo ? { cursoId: c.cursoId, fecha: c.fecha, motivo: c.motivo } : { cursoId: c.cursoId, fecha: c.fecha }));
   }
 
   async listarPorAlumno(alumnoId: string, solicitante: Solicitante): Promise<Asistencia[]> {

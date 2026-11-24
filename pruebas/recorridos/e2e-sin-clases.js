@@ -9,8 +9,13 @@ const P = "prueba-tmp-av";
 const MOTIVO = "Corte de luz de la prueba";
 const q = (sql) => execSync(`docker exec babylon-postgres psql -U babylon -d babylon -tAc "${sql.replace(/"/g, '\\"')}"`).toString().trim();
 const email = (x) => `${P}-${x}@prueba.babylon.test`;
+// Hace `atras` días, pero dentro del calendario del ciclo (1/3 al 30/11): fuera de esos meses (diciembre a febrero) no hay clases
+// y el recorrido fallaría por eso, no por un error del sistema. En ese caso se parte del 28 de noviembre.
 const dia = (atras) => {
   const d = new Date();
+  if (d.getMonth() === 11 || d.getMonth() < 2) {
+    d.setFullYear(d.getMonth() === 11 ? d.getFullYear() : d.getFullYear() - 1, 10, 28);
+  }
   d.setDate(d.getDate() - atras);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
@@ -24,6 +29,8 @@ async function entrar(p, quien) {
 
 (async () => {
   const FECHA = dia(2);
+  // Las inscripciones del mundo son de hoy; la clase marcada es de hace días y a la familia solo se le muestran las desde la inscripción.
+  q(`update "Inscripcion" set fecha = '${dia(30)}T15:00:00Z' where id like '${P}%'`);
   const marcas = () => q(`select count(*) from "ClaseSinDictar" where "cursoId"='${P}-curso' and fecha='${FECHA}'`);
   const filas = () => q(`select count(*) from "Asistencia" where "cursoId"='${P}-curso' and fecha='${FECHA}'`);
   const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });

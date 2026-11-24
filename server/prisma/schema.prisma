@@ -293,7 +293,6 @@ model ClaseSinDictar {
   creadaEn      DateTime @default(now())
 
   @@unique([cursoId, fecha])
-  @@index([cursoId])
 }
 
 model Cuota {

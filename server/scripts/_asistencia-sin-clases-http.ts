@@ -19,6 +19,8 @@ async function pedir(ruta: string, token: string): Promise<{ status: number; tex
 
 (async () => {
   const m = await crearMundo(prisma);
+  // Las inscripciones del mundo son de hoy y la marca de este script es anterior: a la familia solo se le muestran las desde la inscripción.
+  await prisma.inscripcion.updateMany({ where: { id: { startsWith: P } }, data: { fecha: new Date("2026-03-01T15:00:00Z") } });
   try {
     await prisma.claseSinDictar.create({ data: { id: `${P}-sc-http`, cursoId: m.cursoId, fecha: new Date("2026-05-05T00:00:00Z"), motivo: MOTIVO, registradaPor: m.profe } });
     const [padre, secre, profe] = [await login("padre"), await login("secre"), await login("profe")];
