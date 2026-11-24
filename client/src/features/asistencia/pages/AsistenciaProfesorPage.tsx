@@ -16,6 +16,9 @@ import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import type { DiaSemana, Horario } from "@/features/cursos/types";
 import { asistenciaService } from "../asistenciaService";
+import { ModalSinClases } from "../components/ModalSinClases";
+import { useQuitarSinClases } from "../hooks/useQuitarSinClases";
+import { useSinClasesDelCurso } from "../hooks/useSinClasesDelCurso";
 import { sesionPorDefecto } from "../sesionPorDefecto";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
@@ -114,6 +117,12 @@ export default function AsistenciaProfesorPage() {
   const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
   const { avisos, cerrar } = useAvisosDeNomina(cursoId, alumnos);
   const tomarAsistencia = useTomarAsistencia();
+  // Clases que no se dieron (un imprevisto) de este curso: no cuentan como falta ni como asistencia y ese día no admite asistencia.
+  const { data: sinDictar } = useSinClasesDelCurso(cursoId);
+  const quitarMarca = useQuitarSinClases();
+  const [marcandoSinClases, setMarcandoSinClases] = useState(false);
+  const clasesSinDictar = new Set((sinDictar ?? []).map((c) => c.fecha.slice(0, 10)));
+  const claseSinDictar = (sinDictar ?? []).find((c) => c.fecha.slice(0, 10) === fecha);
 
   const [estados, setEstados] = useState<Record<string, EstadoAsistencia>>({});
   const [minutos, setMinutos] = useState<Record<string, number>>({});
@@ -200,6 +209,8 @@ export default function AsistenciaProfesorPage() {
   // servidor lo permite): solo se bloquea el guardado cuando no hay nada cargado.
   const hayAsistenciaGuardada = (alumnos ?? []).some((a) => registroExistente(a.id) !== undefined);
   const bloqueadoPorSinClases = !!sinClases && !hayAsistenciaGuardada;
+  // Se puede marcar "sin clases" una clase con clases en el calendario, que todavía no tiene asistencia guardada ni marca.
+  const puedeMarcarSinClases = !!cursoId && !claseSinDictar && !hayAsistenciaGuardada && !sinClases && !cursoPerdido;
 
   const setEstado = (alumnoId: string, estado: EstadoAsistencia) => {
     setEstados((actual) => ({ ...actual, [alumnoId]: estado }));
@@ -295,7 +306,14 @@ export default function AsistenciaProfesorPage() {
       <div>
         <div className="flex items-center justify-between gap-3">
           <p className="eyebrow">Clase</p>
-          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="h-7 w-36 text-[12px]" />
+          <div className="flex items-center gap-2">
+            {puedeMarcarSinClases && (
+              <Button variant="outline" size="sm" onClick={() => setMarcandoSinClases(true)}>
+                Marcar sin clases
+              </Button>
+            )}
+            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="h-7 w-36 text-[12px]" />
+          </div>
         </div>
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {sesiones.map((d, i) => {
@@ -303,10 +321,12 @@ export default function AsistenciaProfesorPage() {
             const active = iso === fecha;
             const hoy = iso === hoyLocalISO();
             const completa = sesionCompleta(d);
+            const sinDar = clasesSinDictar.has(iso);
             return (
               <button
                 key={i}
                 onClick={() => setFecha(iso)}
+                title={sinDar ? "Sin clases" : undefined}
                 className="flex shrink-0 flex-col items-center gap-1.5 rounded px-3 py-2 transition-all"
                 style={{
                   minWidth: 58,
@@ -319,7 +339,7 @@ export default function AsistenciaProfesorPage() {
                 </span>
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: hoy ? "var(--text-faint)" : completa ? "var(--brand-dot)" : "var(--warning-dot)" }}
+                  style={{ background: hoy || sinDar ? "var(--text-faint)" : completa ? "var(--brand-dot)" : "var(--warning-dot)" }}
                 />
               </button>
             );
@@ -333,6 +353,23 @@ export default function AsistenciaProfesorPage() {
         )}
       </div>
 
+      {claseSinDictar && (
+        <div className="card-hl p-5" data-clase-sin-dictar>
+          <p className="eyebrow mb-1.5">Clase sin dar</p>
+          <p className="text-[13px]">
+            {claseSinDictar.motivo ? `${claseSinDictar.motivo}. ` : ""}No cuenta como falta ni como asistencia para ningún alumno.
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" disabled={quitarMarca.isPending} onClick={() => cursoId && quitarMarca.mutate({ cursoId, fecha })}>
+            Quitar marca
+          </Button>
+          {quitarMarca.isError && (
+            <p className="mt-2 text-sm text-destructive">{quitarMarca.error instanceof ApiError ? quitarMarca.error.message : "No se pudo quitar la marca"}</p>
+          )}
+        </div>
+      )}
+
+      {!claseSinDictar && (
+      <>
       <Button variant="outline" className="w-full justify-center" onClick={marcarTodosPresentes}>
         <CheckCheck className="mr-1.5" size={15} /> Marcar todos como presentes
       </Button>
@@ -429,7 +466,10 @@ export default function AsistenciaProfesorPage() {
           <p className="py-6 text-center text-sm text-muted-foreground lg:col-span-2">Este curso todavía no tiene alumnos.</p>
         )}
       </div>
+      </>
+      )}
 
+      {!claseSinDictar && (
       <div
         className="fixed bottom-0 left-0 right-0 z-20 md:left-[244px]"
         style={{ background: "var(--bg)", borderTop: "1px solid var(--border-hex)", paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -467,6 +507,8 @@ export default function AsistenciaProfesorPage() {
           )}
         </div>
       </div>
+      )}
+      {marcandoSinClases && cursoId && <ModalSinClases cursoId={cursoId} fecha={fecha} onClose={() => setMarcandoSinClases(false)} />}
     </div>
   );
 }
