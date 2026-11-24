@@ -21,6 +21,7 @@ import { useCrearCiclo } from "@/features/ciclos/hooks/useCrearCiclo";
 import { useDesbloquearCiclo } from "@/features/ciclos/hooks/useDesbloquearCiclo";
 import type { Ciclo } from "@/features/ciclos/types";
 import { useMarcarCicloActivo } from "@/features/ciclos/hooks/useMarcarCicloActivo";
+import { PanelCalendarioDeCiclos } from "@/features/ciclos/components/PanelCalendarioDeCiclos";
 
 export default function ConfiguracionPage() {
   const { data: ciclos, isLoading } = useCiclos();
@@ -34,38 +35,53 @@ export default function ConfiguracionPage() {
   const { data: configuracion } = useConfiguracion();
   const actualizarConfiguracion = useActualizarConfiguracion();
   const [valorCuota, setValorCuota] = useState("");
+  const [diaVencimiento, setDiaVencimiento] = useState("");
   const [cuotaGuardada, setCuotaGuardada] = useState(false);
 
   const valorGuardado = configuracion?.valorCuota != null ? String(configuracion.valorCuota) : "";
+  const diaGuardado = configuracion ? String(configuracion.diaVencimiento) : "";
   // El campo muestra el valor guardado apenas se carga; después, si otra persona lo cambia, se pone al día solo mientras no
   // se lo haya tocado (lo que se está escribiendo nunca se pisa) y un aviso dice quién lo cambió.
   const [cargado, setCargado] = useState(false);
   useEffect(() => {
     if (configuracion && !cargado) {
       setValorCuota(valorGuardado);
+      setDiaVencimiento(diaGuardado);
       setCargado(true);
     }
-  }, [configuracion, cargado, valorGuardado]);
-  const servidor = useMemo(() => (configuracion ? { valorCuota: valorGuardado } : undefined), [configuracion, valorGuardado]);
-  const alDia = useFormularioAlDia<{ valorCuota: string }>({
+  }, [configuracion, cargado, valorGuardado, diaGuardado]);
+  const servidor = useMemo(() => (configuracion ? { valorCuota: valorGuardado, diaVencimiento: diaGuardado } : undefined), [configuracion, valorGuardado, diaGuardado]);
+  const alDia = useFormularioAlDia<{ valorCuota: string; diaVencimiento: string }>({
     activo: cargado,
     dato: "configuracion",
     claveDeId: "",
     id: "",
     servidor,
-    etiquetas: { valorCuota: "el valor de la cuota" },
-    valores: { valorCuota },
-    aplicar: (parcial) => setValorCuota(parcial.valorCuota ?? ""),
+    etiquetas: { valorCuota: "el valor de la cuota", diaVencimiento: "el día de vencimiento" },
+    valores: { valorCuota, diaVencimiento },
+    aplicar: (parcial) => {
+      if (parcial.valorCuota !== undefined) setValorCuota(parcial.valorCuota);
+      if (parcial.diaVencimiento !== undefined) setDiaVencimiento(parcial.diaVencimiento);
+    },
   });
 
-  useSinGuardar(valorCuota !== valorGuardado || nuevoAnio.trim() !== "");
+  useSinGuardar(valorCuota !== valorGuardado || diaVencimiento !== diaGuardado || nuevoAnio.trim() !== "");
 
   const valorNumerico = Number(valorCuota);
   const valorValido = valorCuota.trim() !== "" && Number.isFinite(valorNumerico) && valorNumerico > 0;
+  const diaNumerico = Number(diaVencimiento);
+  const diaValido = diaVencimiento.trim() !== "" && Number.isInteger(diaNumerico) && diaNumerico >= 1 && diaNumerico <= 28;
+  // Se manda solo lo que cambió: editar el valor y el día a la vez, desde dos pantallas, no se pisa.
+  const cambioValor = valorCuota !== valorGuardado;
+  const cambioDia = diaVencimiento !== diaGuardado;
+  const puedeGuardarCuota = (cambioValor || cambioDia) && (!cambioValor || valorValido) && (!cambioDia || diaValido);
   const onGuardarCuota = () => {
-    if (!valorValido) return;
+    if (!puedeGuardarCuota) return;
     setCuotaGuardada(false);
-    actualizarConfiguracion.mutate(valorNumerico, { onSuccess: () => setCuotaGuardada(true) });
+    actualizarConfiguracion.mutate(
+      { ...(cambioValor && { valorCuota: valorNumerico }), ...(cambioDia && { diaVencimiento: diaNumerico }) },
+      { onSuccess: () => setCuotaGuardada(true) },
+    );
   };
 
   const onCrear = () => {
@@ -110,10 +126,10 @@ export default function ConfiguracionPage() {
       <Panel title="Cuota mensual">
         <div className="space-y-3 p-5">
           <p className="text-[12.5px] text-muted-foreground">
-            Es el mismo valor para todos los cursos. El sistema genera solo la cuota de cada mes (de marzo a noviembre)
-            para los alumnos activos del ciclo activo; vence el día 10 y lleva el 10% de descuento a partir del segundo
-            hermano. Un cambio de valor rige para las cuotas que se generen desde ahora: las ya generadas conservan su
-            monto.
+            Es el mismo valor para todos los cursos. El sistema genera solo la cuota de cada mes con clases (según el
+            calendario del ciclo activo) para los alumnos activos; vence el día {configuracion?.diaVencimiento ?? 10} de su mes y lleva
+            el 10% de descuento a partir del segundo hermano. Un cambio de valor o de día de vencimiento rige para las cuotas que
+            se generen desde ahora: las ya generadas conservan su monto y su vencimiento.
           </p>
           {configuracion && configuracion.valorCuota === null && (
             <p className="rounded-md border p-3 text-[12.5px]" style={{ borderColor: "var(--warning)", background: "var(--warning-soft)", color: "var(--warning)" }}>
@@ -121,10 +137,15 @@ export default function ConfiguracionPage() {
             </p>
           )}
           <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <label className="label" htmlFor="valor-cuota">
+                Valor de la cuota
+              </label>
+              <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-muted-foreground">$</span>
               <Input
+                id="valor-cuota"
                 type="number"
                 min={1}
                 step={100}
@@ -136,13 +157,33 @@ export default function ConfiguracionPage() {
                 placeholder="35000"
                 className={`tnum w-44 pl-7 ${alDia.resaltados.has("valorCuota") ? "cambio-resaltado" : ""}`}
               />
+              </div>
             </div>
-            <Button onClick={onGuardarCuota} disabled={!valorValido || actualizarConfiguracion.isPending}>
+            <div className="space-y-1">
+              <label className="label" htmlFor="dia-vencimiento">
+                Día de vencimiento
+              </label>
+              <Input
+                id="dia-vencimiento"
+                type="number"
+                min={1}
+                max={28}
+                step={1}
+                value={diaVencimiento}
+                onChange={(e) => {
+                  setDiaVencimiento(e.target.value);
+                  setCuotaGuardada(false);
+                }}
+                placeholder="10"
+                className={`tnum w-28 ${alDia.resaltados.has("diaVencimiento") ? "cambio-resaltado" : ""}`}
+              />
+            </div>
+            <Button onClick={onGuardarCuota} disabled={!puedeGuardarCuota || actualizarConfiguracion.isPending}>
               {actualizarConfiguracion.isPending ? "Guardando…" : "Guardar"}
             </Button>
-            {cuotaGuardada && configuracion?.valorCuota != null && (
+            {cuotaGuardada && configuracion && (
               <span className="text-[12.5px]" style={{ color: "var(--brand)" }}>
-                Guardado: {formatMonto(configuracion.valorCuota)} por mes
+                Guardado{configuracion.valorCuota != null ? `: ${formatMonto(configuracion.valorCuota)} por mes` : ""}, vence el día {configuracion.diaVencimiento}
               </span>
             )}
           </div>
@@ -235,6 +276,8 @@ export default function ConfiguracionPage() {
           )}
         </div>
       </Panel>
+
+      <PanelCalendarioDeCiclos />
 
       <PanelAutomatizaciones />
 

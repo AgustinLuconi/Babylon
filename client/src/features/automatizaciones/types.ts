@@ -51,3 +51,19 @@ export const MOTIVO_LABELS: Record<MotivoCierre, string> = {
   "cambio-de-numero": "Cambio de número",
   "ya-no-corresponde": "Ya no corresponde",
 };
+
+// Qué significa cada motivo de cierre (se muestran en el desplegable "¿Cómo leer este historial?" debajo de la tabla).
+export const MOTIVO_AYUDA: Record<MotivoCierre, string> = {
+  resuelta: "La situación se solucionó: el alumno pagó, volvió a asistir o se cargó una nota.",
+  "regla-apagada": "Se apagó la regla desde este panel, así que se cerraron sus alertas abiertas.",
+  "cambio-de-numero":
+    "Se cambió el número de la regla y esta alerta dejó de alcanzarlo (por ejemplo, de 2 a 4 cuotas). Era válida con el número anterior; el historial no se modifica.",
+  "ya-no-corresponde":
+    "Ya no tiene sentido seguir vigilando el caso: el alumno se dio de baja, cambió de curso, el curso se desactivó o se activó otro ciclo. La alerta se cierra sola; no quiere decir que el problema se haya solucionado.",
+};
+
+// Qué mide la columna "Nivel" en cada regla que lo usa (en las otras la columna no se muestra).
+export const NIVEL_LABELS: Partial<Record<ReglaId, { titulo: string; ayuda: string }>> = {
+  deuda_cuotas: { titulo: "Cuotas vencidas", ayuda: "Cantidad de cuotas vencidas que tenía el alumno (sube si debe una más con la alerta abierta)." },
+  inasistencias_seguidas: { titulo: "Faltas seguidas", ayuda: "Largo de la racha de faltas sin justificar (sube si falta una vez más con la alerta abierta)." },
+};

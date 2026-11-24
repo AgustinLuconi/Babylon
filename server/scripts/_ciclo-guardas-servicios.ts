@@ -27,7 +27,7 @@ const resultado = async (f: () => Promise<unknown>): Promise<string> => {
   const valorOriginal = (await prisma.configuracion.findUnique({ where: { id: ID_CONFIGURACION } }))?.valorCuota ?? null;
   try {
     const ciclo = `${P}-ciclo-2099`;
-    await prisma.ciclo.create({ data: { id: ciclo, anio: 2099, activo: false } });
+    await prisma.ciclo.create({ data: { id: ciclo, anio: 2099, activo: false, inicio: new Date("2000-01-01T00:00:00Z"), fin: new Date("2099-12-31T00:00:00Z") } }); // calendario ancho: "hoy" cae dentro
     const curso = `${P}-curso-2099`;
     await prisma.curso.create({ data: { id: curso, nombre: "Pruebaav 2099", nivel: "kids", profesorId: m.profesorId, cicloId: ciclo, cupo: 10, estado: "activo" } });
     const alumno = `${P}-alu-2099`;

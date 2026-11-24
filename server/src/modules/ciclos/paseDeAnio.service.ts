@@ -1,3 +1,4 @@
+import { calendarioDelCiclo } from "./ciclo.calendario";
 import { randomUUID } from "node:crypto";
 import { ConflictError, EntityNotFoundError, ValidationError } from "../../core/errors";
 import { sinAnuncios } from "../../core/eventos";
@@ -129,7 +130,7 @@ export class PaseDeAnioService {
         noContinuan: plan.movimientos.filter((m) => m.destino.tipo === "no-continuan").length,
         cursosCopiados: plan.copias.length,
       },
-      advertenciaAnioEnCurso: hoyISOEnArgentina() < `${origen.anio}-12-01`,
+      advertenciaAnioEnCurso: hoyISOEnArgentina() <= calendarioDelCiclo(origen).fin,
     };
   }
 
@@ -149,7 +150,7 @@ export class PaseDeAnioService {
 
       let destinoCiclo = destino;
       if (!destinoCiclo) {
-        destinoCiclo = await this.cicloRepo.create({ id: randomUUID(), anio: destinoAnio, activo: false, bloqueado: false }, tx);
+        destinoCiclo = await this.cicloRepo.create({ id: randomUUID(), anio: destinoAnio, activo: false, bloqueado: false, inicio: null, fin: null }, tx);
         await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "alta", ids: { cicloIds: [destinoCiclo.id] } }, tx);
       }
       await this.verificador.verificarCicloAbierto(destinoCiclo.id, tx);

@@ -9,11 +9,14 @@ import { Input } from "@/core/components/ui/input";
 import { Select } from "@/core/components/ui/select";
 import { ApiError } from "@/core/lib/apiClient";
 import { fechaLocalISO, hoyLocalISO } from "@/core/lib/utils";
+import { calendarioDelCiclo, motivoSinClases } from "@/features/ciclos/calendario";
+import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import type { DiaSemana, Horario } from "@/features/cursos/types";
 import { asistenciaService } from "../asistenciaService";
+import { sesionPorDefecto } from "../sesionPorDefecto";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
@@ -77,6 +80,7 @@ function esFechaReal(texto: string): boolean {
 export default function AsistenciaProfesorPage() {
   const queryClient = useQueryClient();
   const { data: cursos } = useCursosDelCicloActivo();
+  const { data: ciclos } = useCiclos();
   const { data: horarios } = useHorarios();
   // Curso y fecha en la dirección (el aviso "Falta tomar asistencia de 3° A del 14/10" abre ese curso en ese día). Un
   // curso que no es del profesor cae en el primero propio; sin fecha, la última clase del curso.
@@ -91,16 +95,20 @@ export default function AsistenciaProfesorPage() {
 
   const horariosDelCurso = useMemo(() => (horarios ?? []).filter((h) => h.cursoId === cursoId), [horarios, cursoId]);
   const sesiones = useMemo(() => sesionesPasadas(horariosDelCurso, 8), [horariosDelCurso]);
-  const primeraSesion = sesiones[0]?.getTime();
+  // El calendario del ciclo del curso: un día sin clases (feriado, receso o fuera del ciclo) no admite asistencia nueva.
+  const cicloDelCurso = ciclos?.find((c) => c.id === cursos?.find((curso) => curso.id === cursoId)?.cicloId);
+  const calendario = useMemo(() => (cicloDelCurso ? calendarioDelCiclo(cicloDelCurso) : null), [cicloDelCurso]);
+  // Sin fecha pedida abre con la última clase que cae en un día con clases (no en un feriado ni en una pausa).
+  const primeraSesion = sesionPorDefecto(
+    sesiones.map((d) => fechaLocalISO(d)),
+    (dia) => !calendario || motivoSinClases(dia, calendario) === null,
+  );
   // La fecha del enlace solo vale para el curso del enlace: si ese curso se descartó, también la fecha.
   const fechaPedida = cursoEsPropio ? leer("fecha") : null;
-  const fecha =
-    fechaPedida && esFechaReal(fechaPedida)
-      ? fechaPedida
-      : primeraSesion
-        ? fechaLocalISO(new Date(primeraSesion))
-        : hoyLocalISO();
+  const fecha = fechaPedida && esFechaReal(fechaPedida) ? fechaPedida : (primeraSesion ?? hoyLocalISO());
   const setFecha = (nueva: string) => escribir({ fecha: nueva });
+  // El servidor rechaza la asistencia nueva en un día sin clases; acá se avisa antes.
+  const sinClases = calendario ? motivoSinClases(fecha, calendario) : null;
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
   const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
@@ -188,6 +196,10 @@ export default function AsistenciaProfesorPage() {
   const total = alumnos?.length ?? 0;
   const marcados = alumnos?.filter((a) => estadoEfectivo(a.id) !== undefined).length ?? 0;
   const isToday = fecha === hoyLocalISO();
+  // Un día sin clases no admite asistencia nueva, pero si ya hay asistencia guardada ese día se puede seguir corrigiendo (el
+  // servidor lo permite): solo se bloquea el guardado cuando no hay nada cargado.
+  const hayAsistenciaGuardada = (alumnos ?? []).some((a) => registroExistente(a.id) !== undefined);
+  const bloqueadoPorSinClases = !!sinClases && !hayAsistenciaGuardada;
 
   const setEstado = (alumnoId: string, estado: EstadoAsistencia) => {
     setEstados((actual) => ({ ...actual, [alumnoId]: estado }));
@@ -226,6 +238,12 @@ export default function AsistenciaProfesorPage() {
   return (
     <div className="space-y-4 pb-24">
       <AvisosDeNomina avisos={avisos} onCerrar={cerrar} cursoPerdido={!!cursoPerdido} />
+      {sinClases && (
+        <div className="flex items-center gap-2 rounded-md border p-3 text-[12.5px]" style={{ borderColor: "var(--warning)", background: "var(--warning-soft)", color: "var(--warning)" }} role="alert">
+          <AlertTriangle size={15} /> Ese día no hay clases: {sinClases}.{" "}
+          {hayAsistenciaGuardada ? "Lo ya guardado se puede corregir, pero no cargar asistencia nueva." : "No se puede guardar asistencia."}
+        </div>
+      )}
       <div className="card-hl p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -427,7 +445,7 @@ export default function AsistenciaProfesorPage() {
           ) : (
             <Button
               className="w-full justify-center"
-              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
+              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || bloqueadoPorSinClases || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
               onClick={onGuardar}
             >
               {tomarAsistencia.isPending

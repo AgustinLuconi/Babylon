@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { crearCicloSchema } from "./ciclo.schema";
+import { crearCicloSchema, crearPausaSchema, editarFechasSchema, editarPausaSchema } from "./ciclo.schema";
 import type { CicloService } from "./ciclo.service";
 
 export class CicloController {
@@ -27,5 +27,25 @@ export class CicloController {
 
   desbloquear = async (req: Request, res: Response) => {
     res.status(200).json(await this.cicloService.desbloquearCiclo(String(req.params.id)));
+  };
+
+  editarFechas = async (req: Request, res: Response) => {
+    const datos = editarFechasSchema.parse(req.body);
+    res.status(200).json(await this.cicloService.editarFechas(String(req.params.id), datos));
+  };
+
+  agregarPausa = async (req: Request, res: Response) => {
+    const datos = crearPausaSchema.parse(req.body);
+    res.status(201).json(await this.cicloService.agregarPausa(String(req.params.id), datos));
+  };
+
+  editarPausa = async (req: Request, res: Response) => {
+    const datos = editarPausaSchema.parse(req.body);
+    res.status(200).json(await this.cicloService.editarPausa(String(req.params.id), String(req.params.pausaId), datos));
+  };
+
+  eliminarPausa = async (req: Request, res: Response) => {
+    await this.cicloService.eliminarPausa(String(req.params.id), String(req.params.pausaId));
+    res.status(204).send();
   };
 }

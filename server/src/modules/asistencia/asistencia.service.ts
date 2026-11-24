@@ -45,6 +45,10 @@ export class AsistenciaService {
 
     return this.unitOfWork.runInTransaction(async (tx) => {
       await this.verificador.verificarCicloDelCurso(datos.cursoId, tx);
+      // Solo se carga asistencia NUEVA un día con clases del calendario del ciclo del curso (no en feriados, pausas ni fuera
+      // del ciclo). Corregir o justificar lo ya guardado siempre se puede: si el día pasó a no tener clases después de tomar
+      // la asistencia, no puede quedar congelada. Se verifica una sola vez, antes de crear el primer registro nuevo.
+      let diaVerificado = false;
       const asistencias: Asistencia[] = [];
 
       for (const registro of datos.registros) {
@@ -68,6 +72,10 @@ export class AsistenciaService {
           continue;
         }
 
+        if (!diaVerificado) {
+          await this.verificador.verificarDiaDeClases(datos.cursoId, datos.fecha.toISOString().slice(0, 10), tx);
+          diaVerificado = true;
+        }
         const asistencia: Asistencia = {
           id: randomUUID(),
           alumnoId: registro.alumnoId,

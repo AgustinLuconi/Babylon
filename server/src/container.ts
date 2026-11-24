@@ -105,7 +105,7 @@ const tablero = new TableroDeAnuncios<EventosDelSistema>();
 // --- Servicios ---
 // Guarda del bloqueo de ciclos: la reciben los services que escriben algo que pertenece a un ciclo.
 const verificadorDeCiclo = crearVerificadorDeCiclo(cicloRepository, cursoRepository);
-const cicloService = new CicloService(cicloRepository, unitOfWork, tablero);
+const cicloService = new CicloService(cicloRepository, unitOfWork, tablero, verificadorDeCiclo);
 const padreService = new PadreService(padreRepository, usuarioRepository, profesorRepository, alumnoRepository, unitOfWork, tablero);
 const profesorService = new ProfesorService(profesorRepository, usuarioRepository, sesionRepository, padreRepository, unitOfWork, tablero);
 const usuarioService = new UsuarioService(usuarioRepository, sesionRepository, profesorRepository, padreRepository, padreService, profesorService, unitOfWork, tablero);

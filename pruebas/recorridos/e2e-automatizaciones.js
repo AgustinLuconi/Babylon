@@ -134,8 +134,8 @@ const abiertas = (regla, alumno) => Number(q(`select count(*) from "AlertaAutoma
     await sinNotas.getByRole("button", { name: "Ver historial" }).click();
     await sinNotas.getByText("Pruebaav examen").first().waitFor({ timeout: 8000 });
     await tarjeta.getByRole("button", { name: "Ver historial" }).click();
-    await tarjeta.getByRole("columnheader", { name: "Nivel" }).waitFor({ timeout: 8000 });
-    ok("el historial de evaluación sin notas no tiene columna Nivel (siempre sería 1); el de deuda sí", `${await sinNotas.getByRole("columnheader", { name: "Nivel" }).count()} ${await tarjeta.getByRole("columnheader", { name: "Nivel" }).count()}`, "0 1");
+    await tarjeta.getByRole("columnheader", { name: "Cuotas vencidas" }).waitFor({ timeout: 8000 });
+    ok("el historial de evaluación sin notas no tiene columna de nivel (siempre sería 1); el de deuda sí, como \"Cuotas vencidas\"", `${await sinNotas.getByRole("columnheader", { name: /Nivel|Cuotas vencidas|Faltas seguidas/ }).count()} ${await tarjeta.getByRole("columnheader", { name: "Cuotas vencidas" }).count()}`, "0 1");
     ok("el historial muestra la evaluación y el curso, sin enlace a un alumno", `${await sinNotas.getByText("Pruebaav examen").count() > 0} ${await sinNotas.getByText("Pruebaav Kids").count() > 0} ${await sinNotas.locator('a[href^="/alumnos/"]').count()}`, "true true 0");
   } finally {
     await b.close();

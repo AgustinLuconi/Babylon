@@ -23,7 +23,8 @@ const CLAVES: Record<Exclude<TipoDato, "ciclos">, QueryKey[]> = {
   automatizaciones: [["automatizaciones"]],
 };
 
-// Activar otro ciclo lectivo cambia todo lo que muestran las pantallas.
+// Activar otro ciclo lectivo cambia todo lo que muestran las pantallas; editar sus fechas o pausas, solo el calendario.
 export function clavesAfectadas(cambio: SenalCambio): QueryKey[] | "todo" {
-  return cambio.dato === "ciclos" ? "todo" : CLAVES[cambio.dato];
+  if (cambio.dato !== "ciclos") return CLAVES[cambio.dato];
+  return cambio.accion === "edicion" ? [["ciclos"]] : "todo";
 }

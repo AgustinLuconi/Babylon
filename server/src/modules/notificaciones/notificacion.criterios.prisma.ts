@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { fechaHoraEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
-import { esMesLectivo } from "../cuotas/cuota.calendario";
+import { fechaHoraEnArgentina, hoyISOEnArgentina, inicioDeHoyUtc } from "../../core/fechas";
+import { calendarioDelCiclo, motivoSinClases } from "../ciclos/ciclo.calendario";
 import type { CambioDeDescuento } from "../alumnos/alumno.eventos";
 import type { AlumnoRepository } from "../alumnos/alumno.repository";
 import type { DocumentoRepository } from "../documentos/documento.repository";
@@ -291,12 +291,11 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     });
   }
 
-  // El año lectivo (marzo a noviembre) terminó y el ciclo activo sigue sin cerrarse: lo ve solo el administrador.
+  // El ciclo activo terminó (pasó su fecha de fin) y sigue sin cerrarse: lo ve solo el administrador.
   private async cicloPorCerrar(ahora: Date, tx?: unknown): Promise<AvisoEsperado[]> {
     const ciclo = await this.db(tx).ciclo.findFirst({ where: { activo: true, bloqueado: false } });
     if (!ciclo) return [];
-    const hoy = fechaHoraEnArgentina(ahora);
-    if (hoy.anio < ciclo.anio || (hoy.anio === ciclo.anio && hoy.mes < 12)) return [];
+    if (hoyISOEnArgentina(ahora) <= calendarioDelCiclo(ciclo).fin) return [];
     const texto = `El ciclo ${ciclo.anio} terminó. Falta pasar de año: pasá a los alumnos y activá el ciclo nuevo.`;
     return (await this.staff(tx))
       .filter((d) => d.rol === "admin")
@@ -331,7 +330,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
   }
 
   // ── Profesor ─────────────────────────────────────────────────────────────
-  // Clases de los últimos 7 días (hoy incluido, solo si ya empezó) sin ninguna asistencia ese día, en meses lectivos.
+  // Clases de los últimos 7 días (hoy incluido, solo si ya empezó) sin ninguna asistencia ese día, en días con clases del calendario.
   private async asistenciaPendiente(ahora: Date, tx?: unknown): Promise<AvisoEsperado[]> {
     const cuentas = await this.cuentasDeProfesores(tx);
     if (cuentas.size === 0) return [];
@@ -339,6 +338,9 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
       where: { profesorId: { in: [...cuentas.keys()] }, estado: "activo", ciclo: { activo: true } },
       include: { horarios: true },
     });
+    const cicloActivo = await this.db(tx).ciclo.findFirst({ where: { activo: true }, include: { pausas: true } });
+    if (!cicloActivo) return [];
+    const calendario = calendarioDelCiclo(cicloActivo, cicloActivo.pausas);
     const hoy = inicioDeHoyUtc(ahora);
     const desde = new Date(hoy.getTime() - (DIAS_ASISTENCIA - 1) * DIA_MS);
     const tomadas = await this.db(tx).asistencia.groupBy({
@@ -352,8 +354,8 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
     const lista: AvisoEsperado[] = [];
     for (let atras = 0; atras < DIAS_ASISTENCIA; atras++) {
       const dia = new Date(hoy.getTime() - atras * DIA_MS);
-      if (!esMesLectivo(dia.getUTCMonth() + 1)) continue;
       const fecha = dia.toISOString().slice(0, 10);
+      if (motivoSinClases(fecha, calendario) !== null) continue;
       const nombreDia = DIAS_SEMANA[dia.getUTCDay()];
       for (const curso of cursos) {
         const clases = curso.horarios
