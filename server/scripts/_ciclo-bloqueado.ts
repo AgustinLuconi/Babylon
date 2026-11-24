@@ -47,6 +47,8 @@ interface Escritura {
 }
 // "Hoy" en hora de Argentina (con toISOString pasadas las 21:00 sería mañana, y la asistencia no puede ser futura).
 const hoy = hoyISOEnArgentina();
+// Ayer (para marcar una clase sin dictar sin chocar con la asistencia de "hoy" de otra entrada).
+const ayer = new Date(Date.parse(`${hoy}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 const RECHAZADAS: Escritura[] = [
   { plantilla: "POST /api/ciclos/:id/pausas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas`, cuerpo: () => ({ desde: "2099-07-20", hasta: "2099-07-31", nombre: "Pruebaav receso", tipo: "receso" }), bloqueado: [409], desbloqueado: [201] },
   { plantilla: "PATCH /api/ciclos/:id/pausas/:pausaId", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/pausas/${c.pausaId}`, cuerpo: () => ({ nombre: "Pruebaav otra" }), bloqueado: [409], desbloqueado: [200] },
@@ -63,6 +65,8 @@ const RECHAZADAS: Escritura[] = [
   // El curso de 2099 no es del ciclo activo: se rechaza por eso (400) o por el bloqueo (409), nunca se acepta.
   { plantilla: "POST /api/alumnos", rol: "secre", ruta: () => "/api/alumnos", cuerpo: (c) => ({ nombre: "Pruebaavnuevo", apellido: "Pruebaav", cursoId: c.curso, responsable: { tipo: "existente", padreId: c.m.padreId, vinculo: "padre" } }), bloqueado: [400, 409], desbloqueado: [400] },
   { plantilla: "PATCH /api/alumnos/:id", rol: "secre", ruta: (c) => `/api/alumnos/${c.m.hijo1}`, cuerpo: (c) => ({ cursoId: c.curso }), bloqueado: [400, 409], desbloqueado: [400] },
+  { plantilla: "POST /api/asistencia/sin-clases", rol: "profe", ruta: () => "/api/asistencia/sin-clases", cuerpo: (c) => ({ cursoId: c.curso, fecha: ayer }), bloqueado: [409], desbloqueado: [201] },
+  { plantilla: "DELETE /api/asistencia/sin-clases/:cursoId/:fecha", rol: "profe", ruta: (c) => `/api/asistencia/sin-clases/${c.curso}/${ayer}`, cuerpo: () => undefined, bloqueado: [409], desbloqueado: [204] },
   // Va al final: cambia las fechas del ciclo y la asistencia de "hoy" de más arriba dejaría de caer dentro del calendario.
   { plantilla: "PATCH /api/ciclos/:id/fechas", rol: "admin", ruta: (c) => `/api/ciclos/${c.ciclo}/fechas`, cuerpo: () => ({ inicio: "2099-03-01", fin: "2099-11-30" }), bloqueado: [409], desbloqueado: [200] },
 ];
