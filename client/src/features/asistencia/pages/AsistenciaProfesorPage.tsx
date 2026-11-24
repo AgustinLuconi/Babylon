@@ -194,6 +194,10 @@ export default function AsistenciaProfesorPage() {
   const total = alumnos?.length ?? 0;
   const marcados = alumnos?.filter((a) => estadoEfectivo(a.id) !== undefined).length ?? 0;
   const isToday = fecha === hoyLocalISO();
+  // Un día sin clases no admite asistencia nueva, pero si ya hay asistencia guardada ese día se puede seguir corrigiendo (el
+  // servidor lo permite): solo se bloquea el guardado cuando no hay nada cargado.
+  const hayAsistenciaGuardada = (alumnos ?? []).some((a) => registroExistente(a.id) !== undefined);
+  const bloqueadoPorSinClases = !!sinClases && !hayAsistenciaGuardada;
 
   const setEstado = (alumnoId: string, estado: EstadoAsistencia) => {
     setEstados((actual) => ({ ...actual, [alumnoId]: estado }));
@@ -234,7 +238,8 @@ export default function AsistenciaProfesorPage() {
       <AvisosDeNomina avisos={avisos} onCerrar={cerrar} cursoPerdido={!!cursoPerdido} />
       {sinClases && (
         <div className="flex items-center gap-2 rounded-md border p-3 text-[12.5px]" style={{ borderColor: "var(--warning)", background: "var(--warning-soft)", color: "var(--warning)" }} role="alert">
-          <AlertTriangle size={15} /> Ese día no hay clases: {sinClases}. No se puede guardar asistencia.
+          <AlertTriangle size={15} /> Ese día no hay clases: {sinClases}.{" "}
+          {hayAsistenciaGuardada ? "Lo ya guardado se puede corregir, pero no cargar asistencia nueva." : "No se puede guardar asistencia."}
         </div>
       )}
       <div className="card-hl p-5">
@@ -438,7 +443,7 @@ export default function AsistenciaProfesorPage() {
           ) : (
             <Button
               className="w-full justify-center"
-              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || !!sinClases || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
+              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || bloqueadoPorSinClases || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
               onClick={onGuardar}
             >
               {tomarAsistencia.isPending

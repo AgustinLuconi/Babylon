@@ -27,6 +27,9 @@ const prueba = async <K extends keyof EventosDelSistema & string>(nombre: K, dat
   // Editar un responsable cambia lo que les falta a sus alumnos; otros cambios de datos no revisan nada.
   await prueba("datos.cambiaron", { dato: "padres", accion: "edicion", ids: { padreIds: ["p1"] } }, "sync datos_incompletos");
   await prueba("datos.cambiaron", { dato: "cursos", accion: "edicion", ids: { cursoIds: ["c1"] } }, "");
+  // Editar fechas o pausas de un ciclo cambia qué días tienen clases y cuándo termina el ciclo; las otras acciones sobre ciclos no.
+  await prueba("datos.cambiaron", { dato: "ciclos", accion: "edicion", ids: { cicloIds: ["x"] } }, "sync asistencia_pendiente,ciclo_por_cerrar");
+  await prueba("datos.cambiaron", { dato: "ciclos", accion: "bloqueo", ids: { cicloIds: ["x"] } }, "");
   await prueba("documentos.cambiaron", { alumnoId: "a1" }, "sync documentacion_hijo,documentacion_pendiente");
   await prueba("asistencia.registrada", { cursoId: "c1" }, "sync asistencia_pendiente");
   await prueba("cursos.cambiaron", { cursoId: "c1" }, "sync alumno_con_faltas_profesor,asistencia_pendiente,cierre_sin_publicar,evaluacion_proxima,evaluacion_sin_notas_profesor,notas_sin_publicar");

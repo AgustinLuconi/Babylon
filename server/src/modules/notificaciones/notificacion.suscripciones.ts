@@ -23,9 +23,11 @@ export function suscribirAvisos(tablero: TableroDeAnuncios<EventosDelSistema>, a
     "alumnos.cambiaron",
     sincronizar(["cuota", "cuotas_vencidas", "documentacion_hijo", "documentacion_pendiente", "datos_incompletos"]),
   );
-  // Completar o borrar un dato de un responsable cambia lo que les falta a sus alumnos.
-  tablero.alPublicarse("datos.cambiaron", async ({ dato }, tx) => {
+  // Completar o borrar un dato de un responsable cambia lo que les falta a sus alumnos. Editar las fechas o las pausas de un
+  // ciclo cambia qué días tienen clases (asistencia pendiente) y cuándo termina el ciclo (ciclo por cerrar).
+  tablero.alPublicarse("datos.cambiaron", async ({ dato, accion }, tx) => {
     if (dato === "padres") await avisos.sincronizar(["datos_incompletos"], tx);
+    if (dato === "ciclos" && accion === "edicion") await avisos.sincronizar(["asistencia_pendiente", "ciclo_por_cerrar"], tx);
   });
   tablero.alPublicarse("documentos.cambiaron", sincronizar(["documentacion_hijo", "documentacion_pendiente"]));
   tablero.alPublicarse("asistencia.registrada", sincronizar(["asistencia_pendiente"]));
