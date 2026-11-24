@@ -183,17 +183,19 @@ export default function AsistenciaProfesorPage() {
   // Una ausencia justificada sin motivo no se puede guardar.
   const faltaMotivo = (alumnoId: string): boolean =>
     estadoEfectivo(alumnoId) === "ausente" && justificadaEfectiva(alumnoId) && motivoEfectivo(alumnoId).trim() === "";
-  // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo).
+  // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo). En una clase
+  // marcada como "sin clases" no hay nada que guardar (la grilla ni se muestra), aunque quede algo tildado de antes.
   useSinGuardar(
-    (alumnos ?? []).some((a) => {
-      const guardado = registroExistente(a.id);
-      return (
-        (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
-        (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
-        (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? "")) ||
-        (justificadas[a.id] !== undefined && justificadas[a.id] !== (guardado?.justificada ?? false))
-      );
-    }),
+    !claseSinDictar &&
+      (alumnos ?? []).some((a) => {
+        const guardado = registroExistente(a.id);
+        return (
+          (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
+          (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
+          (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? "")) ||
+          (justificadas[a.id] !== undefined && justificadas[a.id] !== (guardado?.justificada ?? false))
+        );
+      }),
   );
 
   const sesionCompleta = (d: Date) => {

@@ -7,6 +7,8 @@ import { PrismaAlumnoRepository } from "../src/modules/alumnos/alumno.repository
 import { marcarSinClasesSchema, registrarAsistenciaMasivaSchema } from "../src/modules/asistencia/asistencia.schema";
 import { AsistenciaService } from "../src/modules/asistencia/asistencia.service";
 import { PrismaAsistenciaRepository } from "../src/modules/asistencia/asistencia.repository.prisma";
+import { PrismaEvaluadoresDeReglas } from "../src/modules/automatizaciones/automatizacion.evaluadores.prisma";
+import { ReporteService } from "../src/modules/reportes/reporte.service";
 import { PrismaDocumentoRepository } from "../src/modules/documentos/documento.repository.prisma";
 import { PrismaCriteriosDeAvisos } from "../src/modules/notificaciones/notificacion.criterios.prisma";
 import { crearVerificadorDeCiclo } from "../src/modules/ciclos/ciclo.guarda";
@@ -133,6 +135,24 @@ const MARCADA = "Esa clase está marcada como sin clases: quitá la marca para t
     ok("con el jueves marcado, ese día ya no figura y el martes sí", `${conMarca.includes(claveJueves)} ${conMarca.includes(claveMartes)}`, "false true");
     await quitar("2026-10-15");
     ok("al quitar la marca, el jueves vuelve a figurar", (await pendientes()).includes(claveJueves), true);
+
+    // Una clase sin dictar no es presente ni ausente: no corta ni alarga la racha de faltas y no cambia el porcentaje de asistencia
+    const evaluadores = new PrismaEvaluadoresDeReglas(prisma);
+    const reportes = new ReporteService(prisma, new PrismaDocumentoRepository(prisma));
+    for (const f of ["2026-06-02", "2026-06-09", "2026-06-11"]) {
+      await prisma.asistencia.create({ data: { id: `${P}-as-racha-${f}`, alumnoId: m.hijo2, cursoId: m.cursoId, fecha: dia(f), estado: "ausente" } });
+    }
+    const racha = async () => (await evaluadores.inasistencias_seguidas.evaluar(2)).esperadas.find((e) => e.alumnoId === m.hijo2 && e.cursoId === m.cursoId)?.nivel;
+    const porcentaje = async () => (await reportes.listarReporteAlumnos()).find((r) => r.alumnoId === m.hijo2)?.asistenciaPct;
+    const rachaSinMarcas = await racha();
+    const porcentajeSinMarcas = await porcentaje();
+    await marcar("2026-06-04", "En el medio de la racha");
+    await marcar("2026-06-16", "Después de la racha");
+    ok("tres faltas con una clase sin dictar en el medio y otra después siguen siendo una racha de tres", `${rachaSinMarcas} ${await racha()}`, "3 3");
+    const porcentajeConMarcas = await porcentaje();
+    ok("el porcentaje de asistencia del alumno no cambia con las clases sin dictar", `${porcentajeSinMarcas !== undefined && porcentajeSinMarcas !== null} ${porcentajeConMarcas === porcentajeSinMarcas}`, "true true");
+    await quitar("2026-06-04");
+    await quitar("2026-06-16");
 
     // Carrera: marcar y guardar asistencia de la misma clase a la vez nunca dejan las dos cosas
     let todasCoherentes = true;

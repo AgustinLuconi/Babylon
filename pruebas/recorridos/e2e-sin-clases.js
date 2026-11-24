@@ -33,6 +33,20 @@ async function entrar(p, quien) {
   try {
     await entrar(profe, "profe");
 
+    // 0. Lo que se había tildado antes de marcar la clase no queda como "sin guardar": no hay nada que guardar en una clase sin dar
+    await profe.goto(`${BASE}/asistencia?curso=${P}-curso&fecha=${FECHA}`);
+    await profe.locator("[data-alumno]").first().getByRole("button", { name: "Presente" }).click();
+    await profe.getByRole("button", { name: "Marcar sin clases" }).click();
+    await profe.locator("#motivo-sin-clases").fill(MOTIVO);
+    await profe.locator("#motivo-sin-clases").press("Enter");
+    await profe.locator("[data-clase-sin-dictar]").waitFor({ timeout: 8000 });
+    await profe.locator('input[type="date"]').first().fill(dia(3));
+    await profe.waitForTimeout(800);
+    ok("profesor: tras marcar la clase, cambiar de día no pregunta por cambios sin guardar", `${await profe.getByText("Tenés cambios sin guardar").count()} ${new URL(profe.url()).searchParams.get("fecha")}`, `0 ${dia(3)}`);
+    await profe.goto(`${BASE}/asistencia?curso=${P}-curso&fecha=${FECHA}`);
+    await profe.getByRole("button", { name: "Quitar marca" }).click();
+    await profe.locator("[data-alumno]").first().waitFor({ timeout: 8000 });
+
     // 1. El profesor marca la clase (Enter en el motivo confirma)
     await profe.goto(`${BASE}/asistencia?curso=${P}-curso&fecha=${FECHA}`);
     await profe.getByRole("button", { name: "Marcar sin clases" }).click();
