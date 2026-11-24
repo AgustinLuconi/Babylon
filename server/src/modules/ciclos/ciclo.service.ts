@@ -30,16 +30,20 @@ export class CicloService {
   }
 
   // Las operaciones del calendario toman el ciclo con FOR UPDATE (esperan a una asistencia que ya verificó el ciclo), y un
-  // ciclo bloqueado las rechaza. Después validan con las reglas puras y anuncian el cambio dentro de la transacción.
-  private async enElCalendario<T>(cicloId: string, trabajo: (ciclo: Ciclo, pausas: PausaDelCiclo[], tx: unknown) => Promise<T>): Promise<T> {
+  // ciclo bloqueado las rechaza. Después validan con las reglas puras y anuncian el cambio dentro de la transacción. Una edición
+  // que no cambia nada (`cambio: false`) no escribe ni anuncia: no hace recargar las pantallas de todo el personal.
+  private async enElCalendario<T>(
+    cicloId: string,
+    trabajo: (ciclo: Ciclo, pausas: PausaDelCiclo[], tx: unknown) => Promise<{ valor: T; cambio: boolean }>,
+  ): Promise<T> {
     return this.unitOfWork.runInTransaction(async (tx) => {
       await this.cicloRepo.bloquear(cicloId, tx);
       await this.verificador.verificarCicloAbierto(cicloId, tx);
       const ciclo = await this.cicloRepo.findById(cicloId, tx);
       if (!ciclo) throw new EntityNotFoundError("Ciclo", cicloId);
-      const resultado = await trabajo(ciclo, await this.cicloRepo.findPausasByCicloId(cicloId, tx), tx);
-      await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "edicion", ids: { cicloIds: [cicloId] } }, tx);
-      return resultado;
+      const { valor, cambio } = await trabajo(ciclo, await this.cicloRepo.findPausasByCicloId(cicloId, tx), tx);
+      if (cambio) await this.anuncios.publicar("datos.cambiaron", { dato: "ciclos", accion: "edicion", ids: { cicloIds: [cicloId] } }, tx);
+      return valor;
     });
   }
 
@@ -51,19 +55,22 @@ export class CicloService {
 
   async editarFechas(id: string, datos: EditarFechasInput): Promise<CicloConCalendario> {
     return this.enElCalendario(id, async (ciclo, pausas, tx) => {
+      const actual = calendarioDelCiclo(ciclo);
       const error = validarFechasDelCiclo({ ...calendarioDelCiclo({ anio: ciclo.anio, inicio: null, fin: null }, pausas), inicio: datos.inicio, fin: datos.fin });
       if (error) throw new ValidationError(error);
+      if (datos.inicio === actual.inicio && datos.fin === actual.fin) return { valor: this.conCalendario(ciclo, pausas), cambio: false };
       const guardado = await this.cicloRepo.update(id, { ...ciclo, inicio: new Date(`${datos.inicio}T00:00:00.000Z`), fin: new Date(`${datos.fin}T00:00:00.000Z`) }, tx);
-      return this.conCalendario(guardado, pausas);
+      return { valor: this.conCalendario(guardado, pausas), cambio: true };
     });
   }
 
   async agregarPausa(cicloId: string, datos: CrearPausaInput): Promise<PausaDelCiclo> {
     return this.enElCalendario(cicloId, async (ciclo, pausas, tx) => {
+      if (datos.tipo === "feriado" && datos.desde !== datos.hasta) throw new ValidationError("Un feriado dura un solo día");
       const error = validarPausa(calendarioDelCiclo(ciclo), datos, calendarioDelCiclo(ciclo, pausas).pausas);
       if (error) throw new ValidationError(error);
       const pausa: PausaDelCiclo = { id: randomUUID(), cicloId, desde: new Date(`${datos.desde}T00:00:00.000Z`), hasta: new Date(`${datos.hasta}T00:00:00.000Z`), nombre: datos.nombre, tipo: datos.tipo };
-      return this.cicloRepo.crearPausa(pausa, tx);
+      return { valor: await this.cicloRepo.crearPausa(pausa, tx), cambio: true };
     });
   }
 
@@ -71,11 +78,13 @@ export class CicloService {
     return this.enElCalendario(cicloId, async (ciclo, pausas, tx) => {
       const actual = this.pausaDelCiclo(pausas, cicloId, pausaId);
       const [mia] = calendarioDelCiclo(ciclo, [actual]).pausas;
-      const nueva = { desde: datos.desde ?? mia.desde, hasta: datos.hasta ?? mia.hasta, nombre: datos.nombre ?? actual.nombre };
+      const nueva = { desde: datos.desde ?? mia.desde, hasta: datos.hasta ?? mia.hasta, nombre: datos.nombre ?? actual.nombre, tipo: datos.tipo ?? actual.tipo };
+      if (nueva.tipo === "feriado" && nueva.desde !== nueva.hasta) throw new ValidationError("Un feriado dura un solo día");
       const otras = calendarioDelCiclo(ciclo, pausas.filter((p) => p.id !== pausaId)).pausas;
       const error = validarPausa(calendarioDelCiclo(ciclo), nueva, otras);
       if (error) throw new ValidationError(error);
-      return this.cicloRepo.actualizarPausa(
+      if (nueva.desde === mia.desde && nueva.hasta === mia.hasta && nueva.nombre === actual.nombre && nueva.tipo === actual.tipo) return { valor: actual, cambio: false };
+      const guardada = await this.cicloRepo.actualizarPausa(
         pausaId,
         {
           ...(datos.desde !== undefined && { desde: new Date(`${datos.desde}T00:00:00.000Z`) }),
@@ -85,6 +94,7 @@ export class CicloService {
         },
         tx,
       );
+      return { valor: guardada, cambio: true };
     });
   }
 
@@ -92,6 +102,7 @@ export class CicloService {
     await this.enElCalendario(cicloId, async (_ciclo, pausas, tx) => {
       this.pausaDelCiclo(pausas, cicloId, pausaId);
       await this.cicloRepo.eliminarPausa(pausaId, tx);
+      return { valor: undefined, cambio: true };
     });
   }
 

@@ -1,6 +1,7 @@
 // Datos del calendario del ciclo: fechas opcionales en Ciclo, pausas (PausaDelCiclo) y el día de vencimiento de Configuracion.
 import { PrismaClient } from "@prisma/client";
 import { PrismaCicloRepository } from "../src/modules/ciclos/ciclo.repository.prisma";
+import { PrismaConfiguracionRepository } from "../src/modules/configuraciones/configuracion.repository.prisma";
 import { ok } from "./_check";
 
 const prisma = new PrismaClient();
@@ -38,6 +39,23 @@ const dia = (iso: string) => new Date(`${iso}T00:00:00Z`);
     let invertida = "aceptó";
     await repo.crearPausa({ id: `${CICLO}-p3`, cicloId: CICLO, desde: dia("2095-08-10"), hasta: dia("2095-08-09"), nombre: "Mal", tipo: "otro" }).catch(() => (invertida = "rechazó"));
     ok("una pausa con hasta antes que desde la rechaza la base (CHECK)", invertida, "rechazó");
+
+    // Solo una fila inexistente es un 404: cualquier otro error de la base se propaga tal cual
+    const mensaje = async (f: () => Promise<unknown>) => {
+      try {
+        await f();
+        return "no falló";
+      } catch (e) {
+        return (e as Error).message;
+      }
+    };
+    ok("actualizarPausa de una pausa inexistente es 404", await mensaje(() => repo.actualizarPausa("no-existe", { nombre: "X" })), "Pausa con id no-existe no encontrado/a");
+    ok("eliminarPausa de una pausa inexistente es 404", await mensaje(() => repo.eliminarPausa("no-existe")), "Pausa con id no-existe no encontrado/a");
+    const roto = await mensaje(() => repo.actualizarPausa(`${CICLO}-p2`, { hasta: dia("2095-07-19") }));
+    ok("un error de la base que no es 'no existe' no se disfraza de 404", roto.includes("no encontrado"), false);
+    ok("y la restricción de la base lo rechazó", roto !== "no falló", true);
+    const repoConfig = new PrismaConfiguracionRepository(prisma);
+    ok("actualizarParcial de una configuración inexistente es 404", await mensaje(() => repoConfig.actualizarParcial("no-existe", { diaVencimiento: 5 })), "Configuracion con id no-existe no encontrado/a");
 
     await repo.eliminarPausa(`${CICLO}-p1`);
     ok("eliminarPausa la quita", (await repo.findPausasByCicloId(CICLO)).length, 1);

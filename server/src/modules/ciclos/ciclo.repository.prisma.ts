@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { traducirErrorDeEscritura } from "../../core/adapters/prismaErrores";
 import { EntityNotFoundError } from "../../core/errors";
 import type { CicloRepository } from "./ciclo.repository";
 import type { Ciclo, PausaDelCiclo } from "./ciclo.entity";
@@ -75,16 +76,16 @@ export class PrismaCicloRepository implements CicloRepository {
   async actualizarPausa(id: string, datos: Partial<Pick<PausaDelCiclo, "desde" | "hasta" | "nombre" | "tipo">>, tx?: unknown): Promise<PausaDelCiclo> {
     try {
       return await this.client(tx).pausaDelCiclo.update({ where: { id }, data: datos });
-    } catch {
-      throw new EntityNotFoundError("Pausa", id);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Pausa", id);
     }
   }
 
   async eliminarPausa(id: string, tx?: unknown): Promise<void> {
     try {
       await this.client(tx).pausaDelCiclo.delete({ where: { id } });
-    } catch {
-      throw new EntityNotFoundError("Pausa", id);
+    } catch (error) {
+      throw traducirErrorDeEscritura(error, "Pausa", id);
     }
   }
 
