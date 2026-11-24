@@ -7,6 +7,8 @@ import { PrismaAlumnoRepository } from "../src/modules/alumnos/alumno.repository
 import { marcarSinClasesSchema, registrarAsistenciaMasivaSchema } from "../src/modules/asistencia/asistencia.schema";
 import { AsistenciaService } from "../src/modules/asistencia/asistencia.service";
 import { PrismaAsistenciaRepository } from "../src/modules/asistencia/asistencia.repository.prisma";
+import { PrismaDocumentoRepository } from "../src/modules/documentos/documento.repository.prisma";
+import { PrismaCriteriosDeAvisos } from "../src/modules/notificaciones/notificacion.criterios.prisma";
 import { crearVerificadorDeCiclo } from "../src/modules/ciclos/ciclo.guarda";
 import { PrismaCicloRepository } from "../src/modules/ciclos/ciclo.repository.prisma";
 import { PrismaCursoRepository } from "../src/modules/cursos/curso.repository.prisma";
@@ -28,6 +30,7 @@ const servicio = new AsistenciaService(
   tablero,
   crearVerificadorDeCiclo(new PrismaCicloRepository(prisma), cursoRepo),
 );
+const criterios = new PrismaCriteriosDeAvisos(prisma, new PrismaDocumentoRepository(prisma), new PrismaAlumnoRepository(prisma));
 const dia = (iso: string) => new Date(`${iso}T00:00:00Z`);
 // "ClaseDelError: mensaje" de lo que lanza, o "no falló".
 async function falla(f: () => Promise<unknown>): Promise<string> {
@@ -117,6 +120,19 @@ const MARCADA = "Esa clase está marcada como sin clases: quitá la marca para t
     ok("el equipo sí ve el motivo", paraEquipo.some((c) => c.motivo === "Motivo secreto"), true);
     ok("un profesor también lee las de un alumno", (await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "profesor" })).length > 0, true);
     await quitar("2026-05-05");
+
+    // El aviso "falta tomar asistencia" saltea las clases marcadas (el curso tiene clases martes y jueves 14:00; jueves 15/10/2026)
+    const JUEVES_15 = new Date("2026-10-15T18:00:00Z");
+    const pendientes = async () => (await criterios.esperados("asistencia_pendiente", JUEVES_15)).filter((a) => a.usuarioId === m.profe).map((a) => a.clave);
+    const claveJueves = `asistencia:${m.cursoId}:2026-10-15`;
+    const claveMartes = `asistencia:${m.cursoId}:2026-10-13`;
+    const sinMarca = await pendientes();
+    ok("sin marca, faltan tomar la del martes y la del jueves", `${sinMarca.includes(claveMartes)} ${sinMarca.includes(claveJueves)}`, "true true");
+    await marcar("2026-10-15", "Imprevisto del jueves");
+    const conMarca = await pendientes();
+    ok("con el jueves marcado, ese día ya no figura y el martes sí", `${conMarca.includes(claveJueves)} ${conMarca.includes(claveMartes)}`, "false true");
+    await quitar("2026-10-15");
+    ok("al quitar la marca, el jueves vuelve a figurar", (await pendientes()).includes(claveJueves), true);
 
     // Carrera: marcar y guardar asistencia de la misma clase a la vez nunca dejan las dos cosas
     let todasCoherentes = true;
