@@ -43,4 +43,23 @@ export class AsistenciaController {
     const asistencias = await this.asistenciaService.listarPorAlumno(String(req.params.alumnoId), solicitante);
     res.status(200).json(asistencias);
   };
+
+  listarSinClasesDeCurso = async (req: Request, res: Response) => {
+    const solicitante =
+      req.auth!.rol === "profesor"
+        ? { rol: req.auth!.rol, profesorId: (await this.profesorService.buscarPorUsuarioId(req.auth!.sub)).id }
+        : { rol: req.auth!.rol };
+    res.status(200).json(await this.asistenciaService.listarSinClasesDeCurso(String(req.params.cursoId), solicitante));
+  };
+
+  listarSinClasesDeAlumno = async (req: Request, res: Response) => {
+    let solicitante: Solicitante;
+    if (req.auth!.rol === "padre") {
+      const padre = await this.padreService.buscarPorUsuarioId(req.auth!.sub);
+      solicitante = { rol: "padre", padreId: padre.id };
+    } else {
+      solicitante = { rol: req.auth!.rol };
+    }
+    res.status(200).json(await this.asistenciaService.listarSinClasesDeAlumno(String(req.params.alumnoId), solicitante));
+  };
 }

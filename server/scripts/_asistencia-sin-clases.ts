@@ -101,6 +101,23 @@ const MARCADA = "Esa clase está marcada como sin clases: quitá la marca para t
     await quitar("2026-04-07");
     ok("quitar una marca que no existe no anuncia nada", anuncios.length, 0);
 
+    // Lecturas: el motivo es solo para el equipo
+    await marcar("2026-05-05", "Motivo secreto");
+    await servicio.marcarSinClases({ cursoId: m.cursoMultiId, fecha: dia("2026-05-05"), motivo: "Otro curso" }, m.profesorMultiId, m.multi);
+    const delCurso = await servicio.listarSinClasesDeCurso(m.cursoId, { rol: "profesor", profesorId: m.profesorId });
+    ok("el profesor del curso lee las marcas con su motivo", delCurso.some((c) => c.fecha.toISOString().slice(0, 10) === "2026-05-05" && c.motivo === "Motivo secreto"), true);
+    ok("otro profesor no lee las marcas de un curso ajeno", (await falla(() => servicio.listarSinClasesDeCurso(m.cursoId, { rol: "profesor", profesorId: m.profesorMultiId }))).split(":")[0], "AuthorizationError");
+    ok("administración y secretaría leen las marcas de cualquier curso", `${(await servicio.listarSinClasesDeCurso(m.cursoId, { rol: "admin" })).length > 0} ${(await servicio.listarSinClasesDeCurso(m.cursoId, { rol: "secretario" })).length > 0}`, "true true");
+    const paraFamilia = await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "padre", padreId: m.padreId });
+    ok("la familia ve las marcas del curso de su hijo", paraFamilia.some((c) => c.cursoId === m.cursoId && c.fecha.toISOString().slice(0, 10) === "2026-05-05"), true);
+    ok("la familia no recibe la clave del motivo (ni vacía)", paraFamilia.every((c) => !("motivo" in c)), true);
+    ok("la familia no ve las marcas de un curso donde su hijo no está", paraFamilia.every((c) => c.cursoId === m.cursoId), true);
+    ok("la familia no ve a un alumno ajeno", (await falla(() => servicio.listarSinClasesDeAlumno(m.alumnoAjeno, { rol: "padre", padreId: m.padreId }))).split(":")[0], "AuthorizationError");
+    const paraEquipo = await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "admin" });
+    ok("el equipo sí ve el motivo", paraEquipo.some((c) => c.motivo === "Motivo secreto"), true);
+    ok("un profesor también lee las de un alumno", (await servicio.listarSinClasesDeAlumno(m.hijo1, { rol: "profesor" })).length > 0, true);
+    await quitar("2026-05-05");
+
     // Carrera: marcar y guardar asistencia de la misma clase a la vez nunca dejan las dos cosas
     let todasCoherentes = true;
     const detalle: string[] = [];

@@ -150,6 +150,26 @@ export class AsistenciaService {
     await this.anuncios.publicar("datos.cambiaron", { dato: "asistencia", accion, ids: { cursoIds: [cursoId], alumnoIds } }, tx);
   }
 
+  // Las clases sin dictar de un curso, con el motivo (solo para el equipo): administración, secretaría y el profesor del curso.
+  async listarSinClasesDeCurso(cursoId: string, solicitante: { rol: Rol; profesorId?: string }): Promise<{ fecha: Date; motivo?: string }[]> {
+    if (solicitante.rol === "profesor") await this.verificarDuenoDelCurso(cursoId, solicitante.profesorId ?? "");
+    const clases = await this.asistenciaRepo.findSinDictarByCursoId(cursoId);
+    return clases.map((c) => ({ fecha: c.fecha, motivo: c.motivo }));
+  }
+
+  // Las clases sin dictar de los cursos de un alumno. **La familia nunca recibe el motivo** (se quita acá, no en la pantalla) y
+  // solo ve a su propio hijo.
+  async listarSinClasesDeAlumno(alumnoId: string, solicitante: Solicitante): Promise<{ cursoId: string; fecha: Date; motivo?: string }[]> {
+    if (solicitante.rol === "padre") {
+      const alumno = await this.alumnoRepo.findById(alumnoId);
+      if (!alumno || alumno.padreId !== solicitante.padreId) {
+        throw new AuthorizationError("Un padre solo puede ver los datos de sus propios hijos");
+      }
+    }
+    const clases = await this.asistenciaRepo.findSinDictarByAlumnoId(alumnoId);
+    return clases.map((c) => (solicitante.rol === "padre" ? { cursoId: c.cursoId, fecha: c.fecha } : { cursoId: c.cursoId, fecha: c.fecha, motivo: c.motivo }));
+  }
+
   async listarPorAlumno(alumnoId: string, solicitante: Solicitante): Promise<Asistencia[]> {
     if (solicitante.rol === "padre") {
       const alumno = await this.alumnoRepo.findById(alumnoId);
