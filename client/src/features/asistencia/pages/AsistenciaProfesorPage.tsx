@@ -9,6 +9,8 @@ import { Input } from "@/core/components/ui/input";
 import { Select } from "@/core/components/ui/select";
 import { ApiError } from "@/core/lib/apiClient";
 import { fechaLocalISO, hoyLocalISO } from "@/core/lib/utils";
+import { calendarioDelCiclo, motivoSinClases } from "@/features/ciclos/calendario";
+import { useCiclos } from "@/features/ciclos/hooks/useCiclos";
 import { useCursosDelCicloActivo } from "@/features/cursos/hooks/useCursosDelCicloActivo";
 import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
@@ -77,6 +79,7 @@ function esFechaReal(texto: string): boolean {
 export default function AsistenciaProfesorPage() {
   const queryClient = useQueryClient();
   const { data: cursos } = useCursosDelCicloActivo();
+  const { data: ciclos } = useCiclos();
   const { data: horarios } = useHorarios();
   // Curso y fecha en la dirección (el aviso "Falta tomar asistencia de 3° A del 14/10" abre ese curso en ese día). Un
   // curso que no es del profesor cae en el primero propio; sin fecha, la última clase del curso.
@@ -101,6 +104,9 @@ export default function AsistenciaProfesorPage() {
         ? fechaLocalISO(new Date(primeraSesion))
         : hoyLocalISO();
   const setFecha = (nueva: string) => escribir({ fecha: nueva });
+  // Un día sin clases (feriado, receso o fuera del ciclo) no admite asistencia: el servidor lo rechaza, acá se avisa antes.
+  const cicloDelCurso = ciclos?.find((c) => c.id === cursos?.find((curso) => curso.id === cursoId)?.cicloId);
+  const sinClases = cicloDelCurso ? motivoSinClases(fecha, calendarioDelCiclo(cicloDelCurso)) : null;
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
   const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
@@ -226,6 +232,11 @@ export default function AsistenciaProfesorPage() {
   return (
     <div className="space-y-4 pb-24">
       <AvisosDeNomina avisos={avisos} onCerrar={cerrar} cursoPerdido={!!cursoPerdido} />
+      {sinClases && (
+        <div className="flex items-center gap-2 rounded-md border p-3 text-[12.5px]" style={{ borderColor: "var(--warning)", background: "var(--warning-soft)", color: "var(--warning)" }} role="alert">
+          <AlertTriangle size={15} /> Ese día no hay clases: {sinClases}. No se puede guardar asistencia.
+        </div>
+      )}
       <div className="card-hl p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -427,7 +438,7 @@ export default function AsistenciaProfesorPage() {
           ) : (
             <Button
               className="w-full justify-center"
-              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
+              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || !!sinClases || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
               onClick={onGuardar}
             >
               {tomarAsistencia.isPending
