@@ -22,6 +22,10 @@ export interface Ciclo {
   pausas: PausaDelCiclo[];
 }
 
+// Lo que devuelven crear, activar, bloquear y desbloquear: el ciclo "crudo" (sin pausas y con las fechas en null si nunca se
+// cargaron). Solo el listado (`GET /api/ciclos`) trae el `Ciclo` completo, con el calendario ya resuelto.
+export type CicloBasico = Omit<Ciclo, "inicio" | "fin" | "pausas"> & { inicio: string | null; fin: string | null };
+
 export interface EditarFechasInput {
   inicio: string;
   fin: string;

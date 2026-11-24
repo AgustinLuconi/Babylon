@@ -16,6 +16,7 @@ import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import type { DiaSemana, Horario } from "@/features/cursos/types";
 import { asistenciaService } from "../asistenciaService";
+import { sesionPorDefecto } from "../sesionPorDefecto";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
 import { useFiltrosDeUrl } from "@/core/hooks/useFiltrosDeUrl";
@@ -94,19 +95,20 @@ export default function AsistenciaProfesorPage() {
 
   const horariosDelCurso = useMemo(() => (horarios ?? []).filter((h) => h.cursoId === cursoId), [horarios, cursoId]);
   const sesiones = useMemo(() => sesionesPasadas(horariosDelCurso, 8), [horariosDelCurso]);
-  const primeraSesion = sesiones[0]?.getTime();
+  // El calendario del ciclo del curso: un día sin clases (feriado, receso o fuera del ciclo) no admite asistencia nueva.
+  const cicloDelCurso = ciclos?.find((c) => c.id === cursos?.find((curso) => curso.id === cursoId)?.cicloId);
+  const calendario = useMemo(() => (cicloDelCurso ? calendarioDelCiclo(cicloDelCurso) : null), [cicloDelCurso]);
+  // Sin fecha pedida abre con la última clase que cae en un día con clases (no en un feriado ni en una pausa).
+  const primeraSesion = sesionPorDefecto(
+    sesiones.map((d) => fechaLocalISO(d)),
+    (dia) => !calendario || motivoSinClases(dia, calendario) === null,
+  );
   // La fecha del enlace solo vale para el curso del enlace: si ese curso se descartó, también la fecha.
   const fechaPedida = cursoEsPropio ? leer("fecha") : null;
-  const fecha =
-    fechaPedida && esFechaReal(fechaPedida)
-      ? fechaPedida
-      : primeraSesion
-        ? fechaLocalISO(new Date(primeraSesion))
-        : hoyLocalISO();
+  const fecha = fechaPedida && esFechaReal(fechaPedida) ? fechaPedida : (primeraSesion ?? hoyLocalISO());
   const setFecha = (nueva: string) => escribir({ fecha: nueva });
-  // Un día sin clases (feriado, receso o fuera del ciclo) no admite asistencia: el servidor lo rechaza, acá se avisa antes.
-  const cicloDelCurso = ciclos?.find((c) => c.id === cursos?.find((curso) => curso.id === cursoId)?.cicloId);
-  const sinClases = cicloDelCurso ? motivoSinClases(fecha, calendarioDelCiclo(cicloDelCurso)) : null;
+  // El servidor rechaza la asistencia nueva en un día sin clases; acá se avisa antes.
+  const sinClases = calendario ? motivoSinClases(fecha, calendario) : null;
 
   const { data: alumnos } = useAlumnosDelCurso(cursoId);
   const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);

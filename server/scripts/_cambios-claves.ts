@@ -21,5 +21,11 @@ ok("padres", k("padres"), '["padres"] ["sin-cuenta"] ["alumnos"]');
 ok("profesores", k("profesores"), '["profesores"] ["sin-cuenta"] ["cursos"]');
 ok("usuarios", k("usuarios"), '["usuarios"] ["sin-cuenta"]');
 ok("configuración", k("configuracion"), '["configuracion"]');
-ok("ciclos: todo", k("ciclos"), "todo");
+ok("ciclos: activar o crear uno cambia todo lo que muestran las pantallas", k("ciclos"), "todo");
+const kAccion = (accion: SenalCambio["accion"]) => {
+  const r = clavesAfectadas({ dato: "ciclos", accion, ids: {}, por: null });
+  return r === "todo" ? "todo" : r.map((x) => JSON.stringify(x)).join(" ");
+};
+ok("ciclos: activación → todo", kAccion("activacion"), "todo");
+ok("ciclos: editar fechas o pausas solo vuelve a pedir los ciclos", kAccion("edicion"), '["ciclos"]');
 ok("sesiones", k("sesiones"), '["sesiones"]');

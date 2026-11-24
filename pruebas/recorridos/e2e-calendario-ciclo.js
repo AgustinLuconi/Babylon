@@ -84,6 +84,14 @@ async function entrar(p, quien) {
     await tarjeta.waitFor({ timeout: 8000 });
     ok("las fechas guardadas sobreviven a recargar", `${await tarjeta.getByLabel("Inicio de clases 2093").inputValue()} ${await tarjeta.getByLabel("Fin de clases 2093").inputValue()}`, "2093-03-16 2093-11-27");
 
+    // Fechas: sin una fecha no se puede guardar; volver al valor guardado deja de contar como cambio
+    await tarjeta.getByLabel("Inicio de clases 2093").fill("");
+    ok("con una fecha borrada, guardar fechas deshabilitado", await tarjeta.getByRole("button", { name: "Guardar fechas" }).isDisabled(), true);
+    await tarjeta.getByLabel("Inicio de clases 2093").fill("2093-04-01");
+    ok("con un cambio válido, guardar fechas habilitado", await tarjeta.getByRole("button", { name: "Guardar fechas" }).isDisabled(), false);
+    await tarjeta.getByLabel("Inicio de clases 2093").fill("2093-03-16");
+    ok("volver al valor guardado: sin cambios, guardar fechas deshabilitado", await tarjeta.getByRole("button", { name: "Guardar fechas" }).isDisabled(), true);
+
     // Día de vencimiento
     await admin.locator("#dia-vencimiento").fill("7");
     await admin.getByRole("button", { name: "Guardar", exact: true }).first().click();

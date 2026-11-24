@@ -61,6 +61,7 @@ reales / restos de prueba / valor de cuota). Debe decir `3/148/0/null`.
 - Al editar por pantalla, apuntar el selector con precisión (el buscador de la barra superior no es el de la pantalla) y
   afirmar el id del recurso en la URL del `PATCH`: una prueba que editó un registro equivocado ya pasó 14 de 14.
 - **Las pruebas que toman asistencia "de hoy" necesitan que hoy esté dentro del calendario del ciclo activo** (por defecto, del 1 de marzo al 30 de noviembre): fuera de esas fechas el servidor responde 400 "Ese día no hay clases" y fallan (`e2e-ciclos`, `e2e-3c-padre`, `_3d-validacion-http`). Las que usan ciclos de años inventados les ponen un calendario ancho al crearlos.
+- `_ciclo-calendario-asistencia` y `_cuota-calendario` tocan de forma temporal el ciclo activo real (fechas, pausas) y la configuración de la cuota, y lo restauran al terminar. Si se matan a mitad (SIGKILL), el ciclo real queda con datos de prueba: `update "Ciclo" set inicio = null, fin = null where activo; delete from "PausaDelCiclo" where id like 'prueba-tmp-av-%';` y, para la configuración, `valorCuota` en `null` y `diaVencimiento` en 10.
 - Cada recorrido empieza de cero: la batería borra y vuelve a crear el mundo antes de cada uno.
 
 ## Qué cubre cada recorrido

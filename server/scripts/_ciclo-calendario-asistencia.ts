@@ -1,5 +1,7 @@
 // El calendario del ciclo manda sobre la asistencia (el servidor rechaza días sin clases), el aviso de asistencia pendiente y el
-// aviso de ciclo por cerrar. Toca el ciclo activo real de forma temporal (pausas y fechas) y lo deja como estaba.
+// aviso de ciclo por cerrar. Toca el ciclo activo real de forma temporal (pausas y fechas) y lo deja como estaba en el `finally`.
+// Si el proceso se mata a mitad (SIGKILL), el ciclo real queda con fechas de prueba. Se recupera con:
+//   update "Ciclo" set inicio = null, fin = null where activo;   delete from "PausaDelCiclo" where id like 'prueba-tmp-av-pausa-cal%';
 import { PrismaClient } from "@prisma/client";
 import { container } from "../src/container";
 import { PrismaAlumnoRepository } from "../src/modules/alumnos/alumno.repository.prisma";

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
+import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/core/components/ui/badge";
 import { Button } from "@/core/components/ui/button";
@@ -41,30 +43,38 @@ export function PanelCalendarioDeCiclos() {
 function TarjetaDeCalendario({ ciclo }: { ciclo: Ciclo }) {
   const editarFechas = useEditarFechasDelCiclo();
   const eliminar = useEliminarPausa();
-  // Lo escrito (null = sin tocar): mientras no se toca un campo, muestra lo último que dijo el servidor.
-  const [inicioEscrito, setInicioEscrito] = useState<string | null>(null);
-  const [finEscrito, setFinEscrito] = useState<string | null>(null);
   const [modal, setModal] = useState<{ pausa?: PausaDelCiclo } | null>(null);
   const [borrando, setBorrando] = useState<PausaDelCiclo | null>(null);
 
-  const inicio = inicioEscrito ?? ciclo.inicio.slice(0, 10);
-  const fin = finEscrito ?? ciclo.fin.slice(0, 10);
-  const cambioFechas = inicio !== ciclo.inicio.slice(0, 10) || fin !== ciclo.fin.slice(0, 10);
+  // Las fechas escritas arrancan en lo que dice el servidor; si otra persona las cambia mientras se editan, las que no se
+  // tocaron se ponen al día solas (con un aviso de quién y qué) y lo escrito se conserva.
+  const servidor = useMemo(() => ({ inicio: ciclo.inicio.slice(0, 10), fin: ciclo.fin.slice(0, 10) }), [ciclo.inicio, ciclo.fin]);
+  const [inicio, setInicio] = useState(servidor.inicio);
+  const [fin, setFin] = useState(servidor.fin);
+  const alDia = useFormularioAlDia<{ inicio: string; fin: string }>({
+    activo: true,
+    dato: "ciclos",
+    claveDeId: "cicloIds",
+    id: ciclo.id,
+    servidor,
+    etiquetas: { inicio: "el inicio de clases", fin: "el fin de clases" },
+    valores: { inicio, fin },
+    aplicar: (parcial) => {
+      if (parcial.inicio !== undefined) setInicio(parcial.inicio);
+      if (parcial.fin !== undefined) setFin(parcial.fin);
+    },
+  });
+
+  const cambioFechas = inicio !== servidor.inicio || fin !== servidor.fin;
   useSinGuardar(cambioFechas);
-  const error = cambioFechas && inicio && fin ? validarFechasDelCiclo({ ...calendarioDelCiclo(ciclo), inicio, fin }) : null;
+  // Con una fecha borrada no se puede guardar (no hay qué mandar).
+  const completas = inicio !== "" && fin !== "";
+  const error = cambioFechas && completas ? validarFechasDelCiclo({ ...calendarioDelCiclo(ciclo), inicio, fin }) : null;
   const sololectura = ciclo.bloqueado;
 
   const onGuardarFechas = () => {
-    if (!cambioFechas || error || !inicio || !fin) return;
-    editarFechas.mutate(
-      { cicloId: ciclo.id, datos: { inicio, fin } },
-      {
-        onSuccess: () => {
-          setInicioEscrito(null);
-          setFinEscrito(null);
-        },
-      },
-    );
+    if (!cambioFechas || !completas || error) return;
+    editarFechas.mutate({ cicloId: ciclo.id, datos: { inicio, fin } });
   };
 
   return (
@@ -75,17 +85,18 @@ function TarjetaDeCalendario({ ciclo }: { ciclo: Ciclo }) {
         {ciclo.bloqueado && <Badge variant="warning">Bloqueado</Badge>}
       </div>
 
+      <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <label className="label">Inicio de clases</label>
-          <Input type="date" value={inicio} disabled={sololectura} onChange={(e) => setInicioEscrito(e.target.value)} className="w-44" aria-label={`Inicio de clases ${ciclo.anio}`} />
+          <Input type="date" value={inicio} disabled={sololectura} onChange={(e) => setInicio(e.target.value)} className={`w-44 ${alDia.resaltados.has("inicio") ? "cambio-resaltado" : ""}`} aria-label={`Inicio de clases ${ciclo.anio}`} />
         </div>
         <div className="space-y-1.5">
           <label className="label">Fin de clases</label>
-          <Input type="date" value={fin} disabled={sololectura} onChange={(e) => setFinEscrito(e.target.value)} className="w-44" aria-label={`Fin de clases ${ciclo.anio}`} />
+          <Input type="date" value={fin} disabled={sololectura} onChange={(e) => setFin(e.target.value)} className={`w-44 ${alDia.resaltados.has("fin") ? "cambio-resaltado" : ""}`} aria-label={`Fin de clases ${ciclo.anio}`} />
         </div>
         {!sololectura && (
-          <Button onClick={onGuardarFechas} disabled={!cambioFechas || !!error || editarFechas.isPending}>
+          <Button onClick={onGuardarFechas} disabled={!cambioFechas || !completas || !!error || editarFechas.isPending}>
             {editarFechas.isPending ? "Guardando…" : "Guardar fechas"}
           </Button>
         )}

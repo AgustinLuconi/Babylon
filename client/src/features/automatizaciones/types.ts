@@ -52,7 +52,7 @@ export const MOTIVO_LABELS: Record<MotivoCierre, string> = {
   "ya-no-corresponde": "Ya no corresponde",
 };
 
-// Qué significa cada motivo de cierre (se muestra al pasar el mouse por el motivo en el historial).
+// Qué significa cada motivo de cierre (se muestran en el desplegable "¿Cómo leer este historial?" debajo de la tabla).
 export const MOTIVO_AYUDA: Record<MotivoCierre, string> = {
   resuelta: "La situación se solucionó: el alumno pagó, volvió a asistir o se cargó una nota.",
   "regla-apagada": "Se apagó la regla desde este panel, así que se cerraron sus alertas abiertas.",

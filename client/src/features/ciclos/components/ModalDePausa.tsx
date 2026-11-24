@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { AvisoDeCambioAjeno } from "@/core/formularios/AvisoDeCambioAjeno";
+import { useFormularioAlDia } from "@/core/formularios/useFormularioAlDia";
 import { Button } from "@/core/components/ui/button";
 import { Input } from "@/core/components/ui/input";
 import { Modal } from "@/core/components/ui/modal";
@@ -12,6 +14,13 @@ import type { Ciclo, PausaDelCiclo, TipoDePausa } from "../types";
 // Alta o edición de una pausa (días sin clases) de un ciclo. Un feriado es de un solo día: no pide "hasta".
 export function ModalDePausa({ ciclo, pausa, onClose }: { ciclo: Ciclo; pausa?: PausaDelCiclo; onClose: () => void }) {
   const guardar = useGuardarPausa();
+  // Al editar: lo que dice el servidor de esta pausa ahora (null si otra persona la borró mientras el modal estaba abierto).
+  const pausaActual = pausa ? ciclo.pausas.find((p) => p.id === pausa.id) : undefined;
+  const eliminada = !!pausa && !pausaActual;
+  const servidor = useMemo(
+    () => (pausaActual ? { nombre: pausaActual.nombre, tipo: pausaActual.tipo as string, desde: pausaActual.desde.slice(0, 10), hasta: pausaActual.hasta.slice(0, 10) } : undefined),
+    [pausaActual],
+  );
   const inicial = {
     nombre: pausa?.nombre ?? "",
     tipo: pausa?.tipo ?? ("feriado" as TipoDePausa),
@@ -22,15 +31,32 @@ export function ModalDePausa({ ciclo, pausa, onClose }: { ciclo: Ciclo; pausa?: 
   const [tipo, setTipo] = useState<TipoDePausa>(inicial.tipo);
   const [desde, setDesde] = useState(inicial.desde);
   const [hasta, setHasta] = useState(inicial.hasta);
+  // Si otra persona edita esta pausa mientras se la edita acá, lo que no se tocó se pone al día solo y un aviso dice quién y qué.
+  const alDia = useFormularioAlDia<{ nombre: string; tipo: string; desde: string; hasta: string }>({
+    activo: !!pausa,
+    dato: "ciclos",
+    claveDeId: "cicloIds",
+    id: ciclo.id,
+    servidor,
+    etiquetas: { nombre: "el nombre", tipo: "el tipo", desde: "la fecha de inicio", hasta: "la fecha de fin" },
+    valores: { nombre, tipo, desde, hasta },
+    aplicar: (parcial) => {
+      if (parcial.nombre !== undefined) setNombre(parcial.nombre);
+      if (parcial.tipo !== undefined) setTipo(parcial.tipo as TipoDePausa);
+      if (parcial.desde !== undefined) setDesde(parcial.desde);
+      if (parcial.hasta !== undefined) setHasta(parcial.hasta);
+    },
+  });
 
   const hastaEfectivo = tipo === "feriado" ? desde : hasta;
-  const sinGuardar = nombre !== inicial.nombre || tipo !== inicial.tipo || desde !== inicial.desde || hasta !== inicial.hasta;
+  const referencia = servidor ?? inicial;
+  const sinGuardar = nombre !== referencia.nombre || tipo !== referencia.tipo || desde !== referencia.desde || hasta !== referencia.hasta;
   const completo = nombre.trim() !== "" && desde !== "" && hastaEfectivo !== "";
   const otras = calendarioDelCiclo(ciclo).pausas.filter((_, i) => ciclo.pausas[i].id !== pausa?.id);
   const error = completo ? validarPausa(calendarioDelCiclo(ciclo), { desde, hasta: hastaEfectivo, nombre }, otras) : null;
 
   const onGuardar = () => {
-    if (!completo || error) return;
+    if (!completo || error || eliminada) return;
     guardar.mutate({ cicloId: ciclo.id, pausaId: pausa?.id, datos: { desde, hasta: hastaEfectivo, nombre: nombre.trim(), tipo } }, { onSuccess: onClose });
   };
 
@@ -44,12 +70,14 @@ export function ModalDePausa({ ciclo, pausa, onClose }: { ciclo: Ciclo; pausa?: 
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={onGuardar} disabled={!completo || !!error || guardar.isPending}>
+          <Button onClick={onGuardar} disabled={!completo || !!error || eliminada || guardar.isPending}>
             {guardar.isPending ? "Guardando…" : "Guardar"}
           </Button>
         </>
       }
     >
+      <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
+      {eliminada && <p className="text-sm text-destructive">Otra persona borró esta pausa mientras la editabas: ya no se puede guardar.</p>}
       <div className="space-y-1.5">
         <label className="label">Tipo</label>
         <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoDePausa)}>
