@@ -52,6 +52,7 @@ async function borrar() {
   });
   await prisma.horario.deleteMany(w);
   await prisma.alumno.deleteMany(w);
+  await prisma.claseSinDictar.deleteMany({ where: { cursoId: { startsWith: "prueba-" } } });
   await prisma.curso.deleteMany(w);
   await prisma.padre.deleteMany(w);
   await prisma.usuario.deleteMany(w);
