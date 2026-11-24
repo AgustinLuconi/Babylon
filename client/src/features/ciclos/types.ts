@@ -1,9 +1,37 @@
+export type TipoDePausa = "receso" | "feriado" | "otro";
+
+// Días sin clases de un ciclo (receso de invierno, feriados). Un feriado es una pausa de un solo día.
+export interface PausaDelCiclo {
+  id: string;
+  cicloId: string;
+  desde: string;
+  hasta: string;
+  nombre: string;
+  tipo: TipoDePausa;
+}
+
 export interface Ciclo {
   id: string;
   anio: number;
   activo: boolean;
   // Un ciclo bloqueado no admite cambios de lo que le pertenece (cursos, asistencia, notas…).
   bloqueado: boolean;
+  // Días de clases del ciclo (sin fechas cargadas, el servidor devuelve el calendario por defecto: 1/3 al 30/11).
+  inicio: string;
+  fin: string;
+  pausas: PausaDelCiclo[];
+}
+
+export interface EditarFechasInput {
+  inicio: string;
+  fin: string;
+}
+
+export interface PausaInput {
+  desde: string;
+  hasta: string;
+  nombre: string;
+  tipo: TipoDePausa;
 }
 
 export interface CrearCicloInput {

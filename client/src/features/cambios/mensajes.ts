@@ -89,6 +89,8 @@ export function textoDelCambio(c: SenalCambio, nombres: Nombres): string | null 
       return `${quien} cambió el ciclo lectivo activo`;
     case "alumnos/pase-de-anio":
       return `${quien} pasó de año a los alumnos`;
+    case "ciclos/edicion":
+      return `${quien} cambió las fechas o pausas de un ciclo lectivo`;
     case "ciclos/bloqueo":
       return `${quien} bloqueó un ciclo lectivo`;
     case "ciclos/desbloqueo":

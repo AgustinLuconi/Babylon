@@ -65,7 +65,7 @@ export default function ConfiguracionPage() {
   const onGuardarCuota = () => {
     if (!valorValido) return;
     setCuotaGuardada(false);
-    actualizarConfiguracion.mutate(valorNumerico, { onSuccess: () => setCuotaGuardada(true) });
+    actualizarConfiguracion.mutate({ valorCuota: valorNumerico }, { onSuccess: () => setCuotaGuardada(true) });
   };
 
   const onCrear = () => {
