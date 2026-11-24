@@ -11,8 +11,10 @@ import { AREA_POR_ROL, navPorRol } from "./nav";
 import { obtenerTituloPagina } from "./pageTitles";
 import { useEtiquetasDelPanel } from "@/features/alumnos/hooks/useModoDelPanel";
 import { GlobalSearch } from "./GlobalSearch";
+import { MenuDeUsuario } from "./MenuDeUsuario";
 import { NotificationBell } from "./NotificationBell";
 import { ContadorChats } from "./ContadorChats";
+import { ContadorNotificaciones } from "./ContadorNotificaciones";
 import { TiempoReal } from "@/core/tiempoReal/TiempoReal";
 import { ProteccionSinGuardar } from "@/core/sinGuardar/ProteccionSinGuardar";
 import { VersionNueva } from "@/core/version/VersionNueva";
@@ -80,6 +82,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 <item.icon size={15} strokeWidth={1.6} />
                 <span className="flex-1">{item.label}</span>
                 {item.contador === "chats" && <ContadorChats />}
+                {item.contador === "notificaciones" && <ContadorNotificaciones />}
               </NavLink>
             ))}
           </div>
@@ -187,9 +190,7 @@ export function AppLayout() {
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <NotificationBell />
-            {usuario && (
-              <Avatar name={usuario.nombre} tone="brand" />
-            )}
+            <MenuDeUsuario />
           </div>
         </header>
 

@@ -1,8 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Bell,
   BarChart3,
   BookOpen,
   CalendarCheck,
+  CircleUser,
   ClipboardCheck,
   FileText,
   FolderCheck,
@@ -24,7 +26,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   // Número a mostrar al lado (mensajes sin leer).
-  contador?: "chats";
+  contador?: "chats" | "notificaciones";
 }
 
 export interface NavGroup {
@@ -100,16 +102,31 @@ function navDelPadre({ grupo, menu }: EtiquetasDelPanel): NavGroup[] {
   ];
 }
 
+// Todos los roles cierran su menú con un grupo propio de la persona: sus avisos (con el número de no leídos) y su cuenta. En el
+// de administración queda debajo de Configuración.
+function conMiEspacio(grupos: NavGroup[]): NavGroup[] {
+  return [
+    ...grupos,
+    {
+      group: "Mi espacio",
+      items: [
+        { to: "/notificaciones", label: "Notificaciones", icon: Bell, contador: "notificaciones" },
+        { to: "/mi-cuenta", label: "Mi cuenta", icon: CircleUser },
+      ],
+    },
+  ];
+}
+
 export function navPorRol(rol: Rol, etiquetasDelPadre: EtiquetasDelPanel): NavGroup[] {
   switch (rol) {
     case "admin":
-      return NAV_ADMIN;
+      return conMiEspacio(NAV_ADMIN);
     case "secretario":
-      return NAV_SECRETARIO;
+      return conMiEspacio(NAV_SECRETARIO);
     case "profesor":
-      return NAV_PROFESOR;
+      return conMiEspacio(NAV_PROFESOR);
     case "padre":
-      return navDelPadre(etiquetasDelPadre);
+      return conMiEspacio(navDelPadre(etiquetasDelPadre));
   }
 }
 
