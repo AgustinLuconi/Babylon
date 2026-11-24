@@ -1,0 +1,81 @@
+// Enter en los modales: en un campo de texto aprieta el botón principal del pie (si está habilitado); en un área de texto es un
+// salto de línea; en el buscador del cobro no cobra; con el botón deshabilitado no hace nada.
+const { chromium } = require("playwright");
+const { execSync } = require("child_process");
+const ok = (e, r, x) => console.log(`${e}: ${r} (esperado ${x})`);
+const BASE = "http://localhost:5173";
+const P = "prueba-tmp-av";
+const q = (sql) => execSync(`docker exec babylon-postgres psql -U babylon -d babylon -tAc "${sql.replace(/"/g, '\\"')}"`).toString().trim();
+const email = (x) => `${P}-${x}@prueba.babylon.test`;
+async function entrar(p, quien) {
+  await p.goto(`${BASE}/login`);
+  await p.fill('input[name="email"]', email(quien));
+  await p.fill('input[name="password"]', "prueba1234");
+  await p.click('button[type="submit"]');
+  await p.waitForURL((u) => !u.pathname.startsWith("/login"));
+}
+
+(async () => {
+  const CICLO = `${P}-ciclo-enter`;
+  const CUOTA = `${P}-cuota-enter`;
+  q(`delete from "PausaDelCiclo" where "cicloId" = '${CICLO}'`);
+  q(`delete from "Ciclo" where id = '${CICLO}'`);
+  q(`insert into "Ciclo" (id, anio, activo, bloqueado) values ('${CICLO}', 2092, false, false)`);
+  q(`insert into "Cuota" (id, "alumnoId", mes, anio, "montoBase", descuento, "montoFinal", vencimiento, estado) values ('${CUOTA}', '${P}-hijo1', 3, 2091, 1000, 0, 1000, '2091-03-10', 'pendiente')`);
+  const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
+  const admin = await b.newPage({ viewport: { width: 1280, height: 1400 } });
+  const secre = await b.newPage({ viewport: { width: 1280, height: 1000 } });
+  const modal = (p) => p.locator("div.fixed.inset-0");
+  try {
+    await entrar(admin, "admin");
+
+    // 1. Modal de pausa: sin los datos completos, Enter no hace nada; completos, guarda y cierra
+    await admin.goto(`${BASE}/configuracion`);
+    const tarjeta = admin.getByTestId("calendario-2092");
+    await tarjeta.waitFor({ timeout: 8000 });
+    await tarjeta.getByRole("button", { name: "Agregar pausa" }).click();
+    const nombre = modal(admin).getByPlaceholder("Ej: Día de la Independencia");
+    await nombre.fill("Pruebaav enter");
+    await nombre.press("Enter");
+    await admin.waitForTimeout(800);
+    ok("pausa: con el botón deshabilitado (falta la fecha), Enter no guarda ni cierra", `${await modal(admin).count()} ${q(`select count(*) from "PausaDelCiclo" where "cicloId"='${CICLO}'`)}`, "1 0");
+    await modal(admin).locator('input[type="date"]').first().fill("2092-07-09");
+    await nombre.press("Enter");
+    await modal(admin).waitFor({ state: "detached", timeout: 8000 });
+    ok("pausa: con todo completo, Enter guarda y cierra el modal", q(`select count(*) from "PausaDelCiclo" where "cicloId"='${CICLO}'`), "1");
+
+    // 2. Cobro: Enter en el buscador de alumnos no cobra; Enter en la fecha, sí
+    await admin.goto(`${BASE}/cuotas`);
+    await admin.getByRole("button", { name: "Registrar pago" }).first().click();
+    const buscador = modal(admin).getByPlaceholder("Nombre o DNI del alumno…");
+    await buscador.fill("Tomasav");
+    await modal(admin).getByRole("button", { name: /Tomasav/ }).first().click();
+    await modal(admin).getByRole("button", { name: /Marzo 2091/ }).click();
+    await buscador.press("Enter");
+    await admin.waitForTimeout(1200);
+    ok("cobro: Enter en el buscador de alumnos no registra el pago", `${await modal(admin).count()} ${q(`select count(*) from "Pago" where "cuotaId"='${CUOTA}'`)}`, "1 0");
+    await modal(admin).locator('input[type="date"]').press("Enter");
+    await modal(admin).waitFor({ state: "detached", timeout: 8000 });
+    ok("cobro: Enter en la fecha, con la cuota elegida, registra el pago", q(`select count(*) from "Pago" where "cuotaId"='${CUOTA}'`), "1");
+
+    // 3. Área de texto: Enter es un salto de línea y no envía
+    await entrar(secre, "secre");
+    await secre.goto(`${BASE}/alumnos/${P}-hijo1`);
+    await secre.click("button:has-text('Observaciones')");
+    await secre.click("button:has-text('Nueva observación')");
+    const area = modal(secre).locator("textarea");
+    await area.fill("Primera línea");
+    const antes = q(`select count(*) from "Observacion" where "alumnoId"='${P}-hijo1'`);
+    await area.press("Enter");
+    await area.pressSequentially("segunda línea");
+    await secre.waitForTimeout(800);
+    ok("observación: Enter en el área de texto hace un salto de línea", (await area.inputValue()).includes("\n"), true);
+    ok("y no envía la observación", `${await modal(secre).count()} ${q(`select count(*) from "Observacion" where "alumnoId"='${P}-hijo1'`) === antes}`, "1 true");
+  } finally {
+    await b.close();
+    q(`delete from "Pago" where "cuotaId" = '${CUOTA}'`);
+    q(`delete from "Cuota" where id = '${CUOTA}'`);
+    q(`delete from "PausaDelCiclo" where "cicloId" = '${CICLO}'`);
+    q(`delete from "Ciclo" where id = '${CICLO}'`);
+  }
+})().catch((e) => { console.log(`sin excepciones: ${e.message.split("\n").slice(0, 4).join(" | ")} (esperado ninguna)`); process.exit(1); });

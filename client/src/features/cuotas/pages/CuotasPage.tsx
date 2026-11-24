@@ -370,6 +370,7 @@ export default function CuotasPage() {
                   setCuotaIdsSeleccionadas([]);
                 }}
                 placeholder="Nombre o DNI del alumno…"
+                data-sin-enter
                 className="pl-7"
               />
             </div>
