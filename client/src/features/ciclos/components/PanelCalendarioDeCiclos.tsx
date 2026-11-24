@@ -86,7 +86,13 @@ function TarjetaDeCalendario({ ciclo }: { ciclo: Ciclo }) {
       </div>
 
       <AvisoDeCambioAjeno aviso={alDia.aviso} onCerrar={alDia.descartarAviso} />
-      <div className="flex flex-wrap items-end gap-3">
+      <form
+        className="flex flex-wrap items-end gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onGuardarFechas();
+        }}
+      >
         <div className="space-y-1.5">
           <label className="label">Inicio de clases</label>
           <Input type="date" value={inicio} disabled={sololectura} onChange={(e) => setInicio(e.target.value)} className={`w-44 ${alDia.resaltados.has("inicio") ? "cambio-resaltado" : ""}`} aria-label={`Inicio de clases ${ciclo.anio}`} />
@@ -96,11 +102,11 @@ function TarjetaDeCalendario({ ciclo }: { ciclo: Ciclo }) {
           <Input type="date" value={fin} disabled={sololectura} onChange={(e) => setFin(e.target.value)} className={`w-44 ${alDia.resaltados.has("fin") ? "cambio-resaltado" : ""}`} aria-label={`Fin de clases ${ciclo.anio}`} />
         </div>
         {!sololectura && (
-          <Button onClick={onGuardarFechas} disabled={!cambioFechas || !completas || !!error || editarFechas.isPending}>
+          <Button type="submit" disabled={!cambioFechas || !completas || !!error || editarFechas.isPending}>
             {editarFechas.isPending ? "Guardando…" : "Guardar fechas"}
           </Button>
         )}
-      </div>
+      </form>
       {(error || editarFechas.isError) && (
         <p className="text-sm text-destructive">{error ?? (editarFechas.error instanceof ApiError ? editarFechas.error.message : "No se pudieron guardar las fechas")}</p>
       )}

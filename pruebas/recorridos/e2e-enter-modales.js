@@ -1,6 +1,8 @@
 // Enter en los modales: en un campo de texto aprieta el botón principal del pie (si está habilitado); en un área de texto es un
 // salto de línea; en el buscador del cobro no cobra; con el botón deshabilitado no hace nada. Sobre una cuota o un método de
 // pago elegidos, Enter confirma (como una casilla: Espacio marca, Enter confirma). Las flechas mueven el foco entre los campos.
+// Fuera de los modales, Enter guarda en los campos sueltos de Configuración: día de vencimiento, fechas del ciclo, número de una
+// regla de automatizaciones y año de un ciclo nuevo.
 const { chromium } = require("playwright");
 const { execSync } = require("child_process");
 const ok = (e, r, x) => console.log(`${e}: ${r} (esperado ${x})`);
@@ -20,6 +22,9 @@ async function entrar(p, quien) {
   const CICLO = `${P}-ciclo-enter`;
   const CUOTA = `${P}-cuota-enter`;
   const CUOTA2 = `${P}-cuota-enter2`;
+  const inicioDePrueba = q("select now()");
+  const diaOriginal = q(`select "diaVencimiento" from "Configuracion" limit 1`);
+  const umbralOriginal = q(`select umbral from "Automatizacion" where regla = 'inasistencias_seguidas'`);
   q(`delete from "PausaDelCiclo" where "cicloId" = '${CICLO}'`);
   q(`delete from "Ciclo" where id = '${CICLO}'`);
   q(`insert into "Ciclo" (id, anio, activo, bloqueado) values ('${CICLO}', 2092, false, false)`);
@@ -81,6 +86,36 @@ async function entrar(p, quien) {
     await modal(admin).waitFor({ state: "detached", timeout: 8000 });
     ok("cobro: Enter sobre la cuota elegida registra el pago", q(`select count(*) from "Pago" where "cuotaId"='${CUOTA2}'`), "1");
 
+    // 4. Campos sueltos de Configuración: Enter guarda
+    await admin.goto(`${BASE}/configuracion`);
+    await admin.locator("#dia-vencimiento").waitFor({ timeout: 8000 });
+    await admin.locator("#dia-vencimiento").fill("29");
+    await admin.locator("#dia-vencimiento").press("Enter");
+    await admin.waitForTimeout(800);
+    ok("vencimiento: un día inválido (29) con el botón deshabilitado, Enter no guarda", q(`select "diaVencimiento" from "Configuracion" limit 1`), diaOriginal);
+    await admin.locator("#dia-vencimiento").fill("7");
+    await admin.locator("#dia-vencimiento").press("Enter");
+    await admin.waitForFunction(() => document.body.innerText.includes("vence el día 7"), null, { timeout: 8000 });
+    ok("vencimiento: Enter guarda el día", q(`select "diaVencimiento" from "Configuracion" limit 1`), "7");
+
+    const tarjetaCiclo = admin.getByTestId("calendario-2092");
+    await tarjetaCiclo.getByLabel("Inicio de clases 2092").fill("2092-03-16");
+    await tarjetaCiclo.getByLabel("Fin de clases 2092").fill("2092-11-27");
+    await tarjetaCiclo.getByLabel("Fin de clases 2092").press("Enter");
+    await admin.waitForFunction(() => document.querySelector('[data-testid="calendario-2092"] button[type="submit"]')?.hasAttribute("disabled"), null, { timeout: 8000 });
+    ok("fechas del ciclo: Enter guarda inicio y fin", q(`select to_char(inicio,'YYYY-MM-DD') || ' ' || to_char(fin,'YYYY-MM-DD') from "Ciclo" where id='${CICLO}'`), "2092-03-16 2092-11-27");
+
+    const umbral = admin.locator("#umbral-inasistencias_seguidas");
+    await umbral.fill("4");
+    await umbral.press("Enter");
+    await admin.waitForTimeout(1500);
+    ok("automatización: Enter guarda el número de la regla", q(`select umbral from "Automatizacion" where regla='inasistencias_seguidas'`), "4");
+
+    await admin.getByLabel("Nuevo ciclo (año)").fill("2091");
+    await admin.getByLabel("Nuevo ciclo (año)").press("Enter");
+    await admin.waitForTimeout(1500);
+    ok("ciclo nuevo: Enter crea el ciclo", q(`select count(*) from "Ciclo" where anio = 2091`), "1");
+
     // 3. Área de texto: Enter es un salto de línea y no envía
     await entrar(secre, "secre");
     await secre.goto(`${BASE}/alumnos/${P}-hijo1`);
@@ -100,5 +135,11 @@ async function entrar(p, quien) {
     q(`delete from "Cuota" where id in ('${CUOTA}', '${CUOTA2}')`);
     q(`delete from "PausaDelCiclo" where "cicloId" = '${CICLO}'`);
     q(`delete from "Ciclo" where id = '${CICLO}'`);
+    q(`delete from "Ciclo" where anio = 2091 and id not like 'prueba-%' and activo = false`);
+    q(`update "Configuracion" set "diaVencimiento" = ${diaOriginal}`);
+    // Cambiar el número de una regla cierra y reabre alertas de verdad: se deshace lo que abrió o cerró sobre alumnos reales.
+    q(`update "Automatizacion" set umbral = ${umbralOriginal} where regla = 'inasistencias_seguidas'`);
+    q(`delete from "AlertaAutomatica" where "abiertaEn" >= '${inicioDePrueba}'`);
+    q(`update "AlertaAutomatica" set "resueltaEn" = null, "motivoCierre" = null where "resueltaEn" >= '${inicioDePrueba}'`);
   }
 })().catch((e) => { console.log(`sin excepciones: ${e.message.split("\n").slice(0, 4).join(" | ")} (esperado ninguna)`); process.exit(1); });
