@@ -18,6 +18,8 @@ import { calcularEdad, formatCelular, formatDni, formatFecha, formatMonto } from
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { AttendanceCalendar } from "@/features/asistencia/components/AttendanceCalendar";
 import { useAsistenciaDeAlumno } from "@/features/asistencia/hooks/useAsistenciaDeAlumno";
+import { useSinClasesDelAlumno } from "@/features/asistencia/hooks/useSinClasesDelAlumno";
+import { mesesDeFechas } from "@/features/asistencia/meses";
 import { useCalificacionesDeAlumno } from "@/features/calificaciones/hooks/useCalificacionesDeAlumno";
 import { useNotasCierreDeAlumno } from "@/features/calificaciones/hooks/useNotasCierreDeAlumno";
 import { PERIODO_LABELS, TIPO_EVALUACION_LABELS, type PeriodoAcademico } from "@/features/calificaciones/types";
@@ -150,51 +152,40 @@ export default function AlumnoDetailPage() {
   // Asistencia
   const { data: asistenciasTodas, isLoading: cargandoAsistencia } = useAsistenciaDeAlumno(alumnoId);
   const asistencias = useMemo(() => vista.filtrar(asistenciasTodas), [vista, asistenciasTodas]);
-  const mesesConRegistros = useMemo(() => {
-    const mapa = new Map<string, { anio: number; mes: number }>();
-    for (const a of asistencias ?? []) {
-      const [anio, mes] = a.fecha.slice(0, 10).split("-").map(Number);
-      mapa.set(`${anio}-${mes}`, { anio, mes });
-    }
-    return Array.from(mapa.values()).sort((a, b) => b.anio - a.anio || b.mes - a.mes);
-  }, [asistencias]);
-  const [mesAsistencia, setMesAsistencia] = useState<{ anio: number; mes: number } | null>(null);
-  // Al cambiar de curso se pasa directo al mes más reciente de ese curso (sin pasar por "ningún mes", que haría desaparecer el
-  // calendario por un instante).
+  // Las clases que no se dieron (con el motivo: el legajo es del equipo del instituto), del curso que se está mirando.
+  const { data: sinClasesTodas } = useSinClasesDelAlumno(alumnoId);
+  const sinClases = useMemo(() => vista.filtrar(sinClasesTodas), [vista, sinClasesTodas]);
+  const mesesConRegistros = useMemo(
+    () => mesesDeFechas([...(asistencias ?? []).map((a) => a.fecha), ...(sinClases ?? []).map((c) => c.fecha)]),
+    [asistencias, sinClases],
+  );
+  // El mes que eligió quien mira (con las flechas); mientras no elige, el más reciente con algo que mostrar. Se deriva en vez de
+  // copiarlo a un estado: si las clases sin dictar llegan después que la asistencia, el mes inicial las tiene en cuenta igual.
+  const [mesElegido, setMesElegido] = useState<{ anio: number; mes: number } | null>(null);
   useEffect(() => {
+    setMesElegido(null);
+  }, [vista.cursoId]);
+  const mesAsistencia = useMemo(() => {
     const ahora = new Date();
-    setMesAsistencia(mesesConRegistros[0] ?? { anio: ahora.getFullYear(), mes: ahora.getMonth() + 1 });
-  }, [vista.cursoId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (mesAsistencia) return;
-    if (mesesConRegistros.length > 0) {
-      setMesAsistencia(mesesConRegistros[0]);
-      return;
-    }
-    const ahora = new Date();
-    setMesAsistencia({ anio: ahora.getFullYear(), mes: ahora.getMonth() + 1 });
-  }, [mesesConRegistros, mesAsistencia]);
+    return mesElegido ?? mesesConRegistros[0] ?? { anio: ahora.getFullYear(), mes: ahora.getMonth() + 1 };
+  }, [mesElegido, mesesConRegistros]);
   const registrosDelMes = useMemo(() => {
-    if (!mesAsistencia) return [];
     return (asistencias ?? []).filter((a) => {
       const [anio, mes] = a.fecha.slice(0, 10).split("-").map(Number);
       return anio === mesAsistencia.anio && mes === mesAsistencia.mes;
     });
   }, [asistencias, mesAsistencia]);
   const cambiarMesAsistencia = (delta: number) => {
-    setMesAsistencia((actual) => {
-      if (!actual) return actual;
-      let mes = actual.mes + delta;
-      let anio = actual.anio;
-      if (mes < 1) {
-        mes = 12;
-        anio -= 1;
-      } else if (mes > 12) {
-        mes = 1;
-        anio += 1;
-      }
-      return { anio, mes };
-    });
+    let mes = mesAsistencia.mes + delta;
+    let anio = mesAsistencia.anio;
+    if (mes < 1) {
+      mes = 12;
+      anio -= 1;
+    } else if (mes > 12) {
+      mes = 1;
+      anio += 1;
+    }
+    setMesElegido({ anio, mes });
   };
 
   const presentes = registrosDelMes.filter((a) => a.estado === "presente").length;
@@ -636,7 +627,7 @@ export default function AlumnoDetailPage() {
                     <ChevronLeft size={16} />
                   </button>
                   <h3 className="w-[130px] text-center text-[15px] font-semibold">
-                    {mesAsistencia ? `${MESES[mesAsistencia.mes - 1]} ${mesAsistencia.anio}` : "—"}
+                    {`${MESES[mesAsistencia.mes - 1]} ${mesAsistencia.anio}`}
                   </h3>
                   <button
                     onClick={() => cambiarMesAsistencia(1)}
@@ -657,7 +648,7 @@ export default function AlumnoDetailPage() {
             ) : (
               mesAsistencia && (
                 <div>
-                  <AttendanceCalendar registros={asistencias ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
+                  <AttendanceCalendar registros={asistencias ?? []} sinClases={sinClases ?? []} anio={mesAsistencia.anio} mes={mesAsistencia.mes} />
                 </div>
               )
             )}

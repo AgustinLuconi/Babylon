@@ -16,6 +16,9 @@ import { useAlumnosDelCurso } from "@/features/cursos/hooks/useAlumnosDelCurso";
 import { useHorarios } from "@/features/cursos/hooks/useHorarios";
 import type { DiaSemana, Horario } from "@/features/cursos/types";
 import { asistenciaService } from "../asistenciaService";
+import { ModalSinClases } from "../components/ModalSinClases";
+import { useQuitarSinClases } from "../hooks/useQuitarSinClases";
+import { useSinClasesDelCurso } from "../hooks/useSinClasesDelCurso";
 import { sesionPorDefecto } from "../sesionPorDefecto";
 import { useTomarAsistencia } from "../hooks/useTomarAsistencia";
 import { type Asistencia, type EstadoAsistencia } from "../types";
@@ -114,6 +117,12 @@ export default function AsistenciaProfesorPage() {
   const filasNomina = useListaConSalidas(alumnos ?? [], (a) => a.id, ["alumnos"]);
   const { avisos, cerrar } = useAvisosDeNomina(cursoId, alumnos);
   const tomarAsistencia = useTomarAsistencia();
+  // Clases que no se dieron (un imprevisto) de este curso: no cuentan como falta ni como asistencia y ese día no admite asistencia.
+  const { data: sinDictar } = useSinClasesDelCurso(cursoId);
+  const quitarMarca = useQuitarSinClases();
+  const [marcandoSinClases, setMarcandoSinClases] = useState(false);
+  const clasesSinDictar = new Set((sinDictar ?? []).map((c) => c.fecha.slice(0, 10)));
+  const claseSinDictar = (sinDictar ?? []).find((c) => c.fecha.slice(0, 10) === fecha);
 
   const [estados, setEstados] = useState<Record<string, EstadoAsistencia>>({});
   const [minutos, setMinutos] = useState<Record<string, number>>({});
@@ -174,17 +183,19 @@ export default function AsistenciaProfesorPage() {
   // Una ausencia justificada sin motivo no se puede guardar.
   const faltaMotivo = (alumnoId: string): boolean =>
     estadoEfectivo(alumnoId) === "ausente" && justificadaEfectiva(alumnoId) && motivoEfectivo(alumnoId).trim() === "";
-  // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo).
+  // Sin guardar: algo marcado distinto de lo que ya está guardado para esa fecha (después de guardar, deja de serlo). En una clase
+  // marcada como "sin clases" no hay nada que guardar (la grilla ni se muestra), aunque quede algo tildado de antes.
   useSinGuardar(
-    (alumnos ?? []).some((a) => {
-      const guardado = registroExistente(a.id);
-      return (
-        (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
-        (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
-        (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? "")) ||
-        (justificadas[a.id] !== undefined && justificadas[a.id] !== (guardado?.justificada ?? false))
-      );
-    }),
+    !claseSinDictar &&
+      (alumnos ?? []).some((a) => {
+        const guardado = registroExistente(a.id);
+        return (
+          (estados[a.id] !== undefined && estados[a.id] !== guardado?.estado) ||
+          (minutos[a.id] !== undefined && minutos[a.id] !== guardado?.minutosRetraso) ||
+          (motivos[a.id] !== undefined && motivos[a.id] !== (guardado?.motivo ?? "")) ||
+          (justificadas[a.id] !== undefined && justificadas[a.id] !== (guardado?.justificada ?? false))
+        );
+      }),
   );
 
   const sesionCompleta = (d: Date) => {
@@ -200,6 +211,9 @@ export default function AsistenciaProfesorPage() {
   // servidor lo permite): solo se bloquea el guardado cuando no hay nada cargado.
   const hayAsistenciaGuardada = (alumnos ?? []).some((a) => registroExistente(a.id) !== undefined);
   const bloqueadoPorSinClases = !!sinClases && !hayAsistenciaGuardada;
+  // Se puede marcar "sin clases" una clase con clases en el calendario, que todavía no tiene asistencia guardada ni marca.
+  // (Un día futuro tampoco: todavía no se sabe si la clase se da.)
+  const puedeMarcarSinClases = !!cursoId && !claseSinDictar && !hayAsistenciaGuardada && !sinClases && !cursoPerdido && fecha <= hoyLocalISO();
 
   const setEstado = (alumnoId: string, estado: EstadoAsistencia) => {
     setEstados((actual) => ({ ...actual, [alumnoId]: estado }));
@@ -295,7 +309,14 @@ export default function AsistenciaProfesorPage() {
       <div>
         <div className="flex items-center justify-between gap-3">
           <p className="eyebrow">Clase</p>
-          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="h-7 w-36 text-[12px]" />
+          <div className="flex items-center gap-2">
+            {puedeMarcarSinClases && (
+              <Button variant="outline" size="sm" onClick={() => setMarcandoSinClases(true)}>
+                Marcar sin clases
+              </Button>
+            )}
+            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="h-7 w-36 text-[12px]" />
+          </div>
         </div>
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
           {sesiones.map((d, i) => {
@@ -303,24 +324,32 @@ export default function AsistenciaProfesorPage() {
             const active = iso === fecha;
             const hoy = iso === hoyLocalISO();
             const completa = sesionCompleta(d);
+            const sinDar = clasesSinDictar.has(iso);
             return (
               <button
                 key={i}
                 onClick={() => setFecha(iso)}
+                title={sinDar ? "Sin clases" : undefined}
                 className="flex shrink-0 flex-col items-center gap-1.5 rounded px-3 py-2 transition-all"
                 style={{
                   minWidth: 58,
-                  border: `1px solid ${active ? "var(--brand)" : "var(--border-hex)"}`,
+                  border: `1px ${sinDar ? "dashed" : "solid"} ${active ? "var(--brand)" : "var(--border-hex)"}`,
                   background: active ? "var(--brand-soft)" : "var(--bg)",
                 }}
               >
                 <span className="text-[12px] font-medium" style={{ color: active ? "var(--brand)" : "var(--text)" }}>
                   {hoy ? "Hoy" : fmtSesionCorta(d)}
                 </span>
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: hoy ? "var(--text-faint)" : completa ? "var(--brand-dot)" : "var(--warning-dot)" }}
-                />
+                {sinDar ? (
+                  <span className="text-[10px] font-medium leading-none" style={{ color: "var(--text-faint)" }}>
+                    Sin clases
+                  </span>
+                ) : (
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ background: hoy ? "var(--text-faint)" : completa ? "var(--brand-dot)" : "var(--warning-dot)" }}
+                  />
+                )}
               </button>
             );
           })}
@@ -333,140 +362,162 @@ export default function AsistenciaProfesorPage() {
         )}
       </div>
 
-      <Button variant="outline" className="w-full justify-center" onClick={marcarTodosPresentes}>
-        <CheckCheck className="mr-1.5" size={15} /> Marcar todos como presentes
-      </Button>
-
-      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-        {filasNomina.map(({ item: alumno, estado: estadoFila }) => {
-          const estado = estadoEfectivo(alumno.id);
-          const ausencias = ausenciasDelMes.get(alumno.id) ?? 0;
-          const hasAlert = ausencias >= 3;
-          return (
-            <div key={alumno.id} data-alumno={alumno.id} className={`card-hl overflow-hidden ${claseDeFila(estadoFila)}`} style={{ borderColor: hasAlert ? "var(--danger)" : undefined }}>
-              <div className="p-4">
-                <div className="mb-3 flex items-center gap-3">
-                  <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="md" tone={estado === "presente" ? "brand" : "neutral"} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-medium">
-                      {alumno.nombre} {alumno.apellido}
-                    </p>
-                    {hasAlert ? (
-                      <p className="mt-0.5 flex items-center gap-1 text-[11.5px]" style={{ color: "var(--danger)" }}>
-                        <AlertTriangle size={10} /> <span className="tnum">{ausencias}</span> ausencia{ausencias !== 1 ? "s" : ""} este mes
-                      </p>
-                    ) : (
-                      <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                        <span className="tnum">{ausencias}</span> ausencia{ausencias !== 1 ? "s" : ""} en el mes
-                      </p>
-                    )}
-                  </div>
-                  {estado && <Badge variant={ESTADO_BADGE[estado]}>{ESTADOS.find((e) => e.id === estado)?.label}</Badge>}
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5">
-                  {ESTADOS.map((st) => {
-                    const active = estado === st.id;
-                    return (
-                      <button
-                        key={st.id}
-                        onClick={() => setEstado(alumno.id, st.id)}
-                        aria-pressed={active}
-                        className="flex items-center justify-center gap-1.5 rounded text-[12.5px] font-medium transition-all"
-                        style={{
-                          minHeight: 44,
-                          background: active ? ESTADO_BG[st.id] : "var(--bg)",
-                          color: active ? ESTADO_COLOR[st.id] : "var(--text-muted)",
-                          border: `1px solid ${active ? ESTADO_COLOR[st.id] : "var(--border-hex)"}`,
-                        }}
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? ESTADO_COLOR[st.id] : "var(--text-faint)" }} />
-                        {st.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {estado === "tarde" && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <label className="shrink-0 text-[12px] text-muted-foreground">Min. de retraso</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={minutosEfectivo(alumno.id) ?? ""}
-                      onChange={(e) => setMinutos((actual) => ({ ...actual, [alumno.id]: Number(e.target.value) }))}
-                      placeholder="ej. 15"
-                      className="tnum h-8 flex-1 text-[12.5px]"
-                    />
-                  </div>
-                )}
-                {estado === "ausente" && (
-                  <div className="mt-3 space-y-2">
-                    <label className="flex items-center gap-2 text-[12.5px]">
-                      <input
-                        type="checkbox"
-                        checked={justificadaEfectiva(alumno.id)}
-                        onChange={(e) => setJustificadas((actual) => ({ ...actual, [alumno.id]: e.target.checked }))}
-                      />
-                      Justificada
-                    </label>
-                    <Input
-                      value={motivoEfectivo(alumno.id)}
-                      onChange={(e) => setMotivos((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
-                      placeholder={justificadaEfectiva(alumno.id) ? "Motivo de la ausencia (obligatorio)" : "Motivo de ausencia (opcional)"}
-                      aria-invalid={faltaMotivo(alumno.id)}
-                      className="h-8 text-[12.5px]"
-                    />
-                    {faltaMotivo(alumno.id) && <p className="text-[11.5px] text-destructive">Escribí el motivo para justificar la ausencia</p>}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {cursoId && alumnos?.length === 0 && (
-          <p className="py-6 text-center text-sm text-muted-foreground lg:col-span-2">Este curso todavía no tiene alumnos.</p>
-        )}
-      </div>
-
-      <div
-        className="fixed bottom-0 left-0 right-0 z-20 md:left-[244px]"
-        style={{ background: "var(--bg)", borderTop: "1px solid var(--border-hex)", paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <div className="px-4 pt-3 pb-3">
-          {tomarAsistencia.isSuccess ? (
-            <div
-              className="flex items-center justify-center gap-2 rounded py-3 text-[13.5px] font-medium"
-              style={{ background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)" }}
-            >
-              <CheckCheck size={15} /> {isToday ? "Asistencia confirmada" : "Asistencia guardada"} · {total} alumnos
-            </div>
-          ) : (
-            <Button
-              className="w-full justify-center"
-              disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || bloqueadoPorSinClases || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
-              onClick={onGuardar}
-            >
-              {tomarAsistencia.isPending
-                ? "Guardando…"
-                : marcados < total
-                  ? `Guardar borrador (${marcados}/${total})`
-                  : isToday
-                    ? `Confirmar asistencia (${total}/${total})`
-                    : `Guardar asistencia (${total}/${total})`}
-            </Button>
-          )}
-          {tomarAsistencia.isError && (
-            <p className="mt-2 text-center text-sm text-destructive">
-              {tomarAsistencia.error instanceof ApiError
-                ? tomarAsistencia.error.message
-                : "No se pudo registrar la asistencia"}{" "}
-              — no se guardó ningún registro de esta nómina para esta fecha.
-            </p>
+      {claseSinDictar && (
+        <div className="card-hl p-5" data-clase-sin-dictar>
+          <p className="eyebrow mb-1.5">Clase sin dar</p>
+          <p className="text-[13px]">
+            {claseSinDictar.motivo ? `${claseSinDictar.motivo}. ` : ""}No cuenta como falta ni como asistencia para ningún alumno.
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" disabled={quitarMarca.isPending || !!cursoPerdido} onClick={() => cursoId && quitarMarca.mutate({ cursoId, fecha })}>
+            Quitar marca
+          </Button>
+          {quitarMarca.isError && (
+            <p className="mt-2 text-sm text-destructive">{quitarMarca.error instanceof ApiError ? quitarMarca.error.message : "No se pudo quitar la marca"}</p>
           )}
         </div>
-      </div>
+      )}
+
+      {!claseSinDictar && (
+        <>
+          <Button variant="outline" className="w-full justify-center" onClick={marcarTodosPresentes}>
+            <CheckCheck className="mr-1.5" size={15} /> Marcar todos como presentes
+          </Button>
+
+          <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+            {filasNomina.map(({ item: alumno, estado: estadoFila }) => {
+              const estado = estadoEfectivo(alumno.id);
+              const ausencias = ausenciasDelMes.get(alumno.id) ?? 0;
+              const hasAlert = ausencias >= 3;
+              return (
+                <div key={alumno.id} data-alumno={alumno.id} className={`card-hl overflow-hidden ${claseDeFila(estadoFila)}`} style={{ borderColor: hasAlert ? "var(--danger)" : undefined }}>
+                  <div className="p-4">
+                    <div className="mb-3 flex items-center gap-3">
+                      <Avatar name={`${alumno.nombre} ${alumno.apellido}`} size="md" tone={estado === "presente" ? "brand" : "neutral"} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[13.5px] font-medium">
+                          {alumno.nombre} {alumno.apellido}
+                        </p>
+                        {hasAlert ? (
+                          <p className="mt-0.5 flex items-center gap-1 text-[11.5px]" style={{ color: "var(--danger)" }}>
+                            <AlertTriangle size={10} /> <span className="tnum">{ausencias}</span> ausencia{ausencias !== 1 ? "s" : ""} este mes
+                          </p>
+                        ) : (
+                          <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                            <span className="tnum">{ausencias}</span> ausencia{ausencias !== 1 ? "s" : ""} en el mes
+                          </p>
+                        )}
+                      </div>
+                      {estado && <Badge variant={ESTADO_BADGE[estado]}>{ESTADOS.find((e) => e.id === estado)?.label}</Badge>}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {ESTADOS.map((st) => {
+                        const active = estado === st.id;
+                        return (
+                          <button
+                            key={st.id}
+                            onClick={() => setEstado(alumno.id, st.id)}
+                            aria-pressed={active}
+                            className="flex items-center justify-center gap-1.5 rounded text-[12.5px] font-medium transition-all"
+                            style={{
+                              minHeight: 44,
+                              background: active ? ESTADO_BG[st.id] : "var(--bg)",
+                              color: active ? ESTADO_COLOR[st.id] : "var(--text-muted)",
+                              border: `1px solid ${active ? ESTADO_COLOR[st.id] : "var(--border-hex)"}`,
+                            }}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? ESTADO_COLOR[st.id] : "var(--text-faint)" }} />
+                            {st.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {estado === "tarde" && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <label className="shrink-0 text-[12px] text-muted-foreground">Min. de retraso</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={60}
+                          value={minutosEfectivo(alumno.id) ?? ""}
+                          onChange={(e) => setMinutos((actual) => ({ ...actual, [alumno.id]: Number(e.target.value) }))}
+                          placeholder="ej. 15"
+                          className="tnum h-8 flex-1 text-[12.5px]"
+                        />
+                      </div>
+                    )}
+                    {estado === "ausente" && (
+                      <div className="mt-3 space-y-2">
+                        <label className="flex items-center gap-2 text-[12.5px]">
+                          <input
+                            type="checkbox"
+                            checked={justificadaEfectiva(alumno.id)}
+                            onChange={(e) => setJustificadas((actual) => ({ ...actual, [alumno.id]: e.target.checked }))}
+                          />
+                          Justificada
+                        </label>
+                        <Input
+                          value={motivoEfectivo(alumno.id)}
+                          onChange={(e) => setMotivos((actual) => ({ ...actual, [alumno.id]: e.target.value }))}
+                          placeholder={justificadaEfectiva(alumno.id) ? "Motivo de la ausencia (obligatorio)" : "Motivo de ausencia (opcional)"}
+                          aria-invalid={faltaMotivo(alumno.id)}
+                          className="h-8 text-[12.5px]"
+                        />
+                        {faltaMotivo(alumno.id) && <p className="text-[11.5px] text-destructive">Escribí el motivo para justificar la ausencia</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {cursoId && alumnos?.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground lg:col-span-2">Este curso todavía no tiene alumnos.</p>
+            )}
+          </div>
+        </>
+      )}
+
+      {!claseSinDictar && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-20 md:left-[244px]"
+          style={{ background: "var(--bg)", borderTop: "1px solid var(--border-hex)", paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="px-4 pt-3 pb-3">
+            {tomarAsistencia.isSuccess ? (
+              <div
+                className="flex items-center justify-center gap-2 rounded py-3 text-[13.5px] font-medium"
+                style={{ background: "var(--brand-soft)", color: "var(--brand)", border: "1px solid var(--brand)" }}
+              >
+                <CheckCheck size={15} /> {isToday ? "Asistencia confirmada" : "Asistencia guardada"} · {total} alumnos
+              </div>
+            ) : (
+              <Button
+                className="w-full justify-center"
+                disabled={marcados === 0 || tomarAsistencia.isPending || !cursoId || !!cursoPerdido || bloqueadoPorSinClases || (alumnos ?? []).some((a) => faltaMotivo(a.id))}
+                onClick={onGuardar}
+              >
+                {tomarAsistencia.isPending
+                  ? "Guardando…"
+                  : marcados < total
+                    ? `Guardar borrador (${marcados}/${total})`
+                    : isToday
+                      ? `Confirmar asistencia (${total}/${total})`
+                      : `Guardar asistencia (${total}/${total})`}
+              </Button>
+            )}
+            {tomarAsistencia.isError && (
+              <p className="mt-2 text-center text-sm text-destructive">
+                {tomarAsistencia.error instanceof ApiError
+                  ? tomarAsistencia.error.message
+                  : "No se pudo registrar la asistencia"}{" "}
+                — no se guardó ningún registro de esta nómina para esta fecha.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      {marcandoSinClases && cursoId && <ModalSinClases cursoId={cursoId} fecha={fecha} onClose={() => setMarcandoSinClases(false)} />}
     </div>
   );
 }

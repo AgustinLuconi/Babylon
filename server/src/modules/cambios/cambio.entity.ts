@@ -34,6 +34,8 @@ export type AccionCambio =
   | "publicacion"
   | "carga"
   | "registro"
+  | "sin-clases"
+  | "quitar-sin-clases"
   | "autorizacion"
   | "revocacion"
   | "manual"

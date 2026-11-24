@@ -36,3 +36,17 @@ export interface Asistencia {
 export function etiquetaDeAsistencia(r: { estado: EstadoAsistencia; justificada: boolean }): string {
   return r.estado === "ausente" && r.justificada ? "Ausente (justificada)" : ESTADO_ASISTENCIA_LABELS[r.estado];
 }
+
+// Una clase que no se dio (un imprevisto): no cuenta como falta ni como asistencia. `motivo` solo lo recibe el equipo del instituto:
+// para la familia el servidor no lo manda.
+export interface ClaseSinDictar {
+  cursoId: string;
+  fecha: string;
+  motivo?: string;
+}
+
+export interface MarcarSinClasesInput {
+  cursoId: string;
+  fecha: string;
+  motivo?: string;
+}

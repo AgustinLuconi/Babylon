@@ -348,6 +348,12 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
       where: { cursoId: { in: cursos.map((c) => c.id) }, fecha: { gte: desde, lt: new Date(hoy.getTime() + DIA_MS) } },
     });
     const conAsistencia = new Set(tomadas.map((t) => `${t.cursoId}|${t.fecha.toISOString().slice(0, 10)}`));
+    // Una clase marcada como "sin clases" (un imprevisto) no se toma: no hay nada pendiente.
+    const sinDictar = await this.db(tx).claseSinDictar.findMany({
+      where: { cursoId: { in: cursos.map((c) => c.id) }, fecha: { gte: desde, lt: new Date(hoy.getTime() + DIA_MS) } },
+      select: { cursoId: true, fecha: true },
+    });
+    const sinClasesDelDia = new Set(sinDictar.map((c) => `${c.cursoId}|${c.fecha.toISOString().slice(0, 10)}`));
     const { hora, minuto } = fechaHoraEnArgentina(ahora);
     const ahoraHHMM = `${dos(hora)}:${dos(minuto)}`;
 
@@ -362,7 +368,7 @@ export class PrismaCriteriosDeAvisos implements CriteriosDeAvisos {
           .filter((h) => h.diaSemana === nombreDia && (atras > 0 || h.horaInicio <= ahoraHHMM))
           .map((h) => h.horaInicio)
           .sort();
-        if (clases.length === 0 || conAsistencia.has(`${curso.id}|${fecha}`)) continue;
+        if (clases.length === 0 || conAsistencia.has(`${curso.id}|${fecha}`) || sinClasesDelDia.has(`${curso.id}|${fecha}`)) continue;
         lista.push(
           aviso({
             usuarioId: cuentas.get(curso.profesorId) as string,

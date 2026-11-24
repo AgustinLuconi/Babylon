@@ -251,6 +251,7 @@ model Curso {
   categoriasPersonalizadas CategoriaPersonalizada[]
   inscripciones            Inscripcion[]
   alertas                  AlertaAutomatica[]
+  clasesSinDictar          ClaseSinDictar[]
 }
 
 model Horario {
@@ -278,6 +279,20 @@ model Asistencia {
   curso  Curso  @relation(fields: [cursoId], references: [id])
 
   @@unique([alumnoId, cursoId, fecha])
+}
+
+// Una clase que no se dio (un imprevisto): es un hecho del curso y del día, no de cada alumno. No cuenta como falta ni como
+// asistencia, y ese día no admite asistencia. El motivo es solo para el equipo del instituto.
+model ClaseSinDictar {
+  id            String   @id
+  cursoId       String
+  curso         Curso    @relation(fields: [cursoId], references: [id], onDelete: Restrict)
+  fecha         DateTime
+  motivo        String?
+  registradaPor String
+  creadaEn      DateTime @default(now())
+
+  @@unique([cursoId, fecha])
 }
 
 model Cuota {

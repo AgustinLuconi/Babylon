@@ -67,6 +67,7 @@ export async function limpiarMundo(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRaw`DELETE FROM "Notificacion" WHERE tipo::text IN ('evaluacion_sin_notas', 'evaluacion_sin_notas_profesor') AND split_part(clave, ':', 3) NOT IN (SELECT id FROM "Evaluacion")`;
   await prisma.categoriaPersonalizada.deleteMany({ where: deCursos });
   await prisma.horario.deleteMany({ where: deCursos });
+  await prisma.claseSinDictar.deleteMany({ where: { cursoId: { in: cursoIds } } });
   await prisma.curso.deleteMany({ where: { id: { in: cursoIds } } });
   await prisma.mensaje.deleteMany({ where: { chat: { padreId: { in: padreIds } } } });
   await prisma.chat.deleteMany({ where: { padreId: { in: padreIds } } });
